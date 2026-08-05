@@ -354,6 +354,23 @@
   padding-top: 8px;
 }
 
+.toolbar-draggable {
+  cursor: grab;
+}
+
+.toolbar-draggable:active {
+  cursor: grabbing;
+}
+
+.toolbar-draggable .icon-btn,
+.toolbar-draggable .search {
+  cursor: pointer;
+}
+
+.toolbar-draggable .search {
+  cursor: text;
+}
+
 .app[data-compact="true"] .icon-btn {
   width: 28px;
   height: 28px;

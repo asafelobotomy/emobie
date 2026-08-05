@@ -49,6 +49,11 @@
     <category>Office</category>
   </categories>
   <releases>
+    <release version="0.6.0" date="2026-08-05">
+      <description>
+        <p>Fix frameless window dragging from the toolbar.</p>
+      </description>
+    </release>
     <release version="0.5.5" date="2026-08-05">
       <description>
         <p>Frameless by default, compact toolbar with always-available pin/settings, and emobie branding.</p>
