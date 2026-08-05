@@ -135,7 +135,11 @@
   gap: 2px;
   padding: 4px;
   overflow: auto;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+}
+
+.category-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .app[data-layout="horizontal"] .category-nav {
