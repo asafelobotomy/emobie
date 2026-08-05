@@ -2,6 +2,7 @@
 # CI copies the built .deb next to this file as `emobie.deb` before building.
 #
 # Local example (after `npm run tauri build -- --bundles deb`):
+#   git submodule update --init flatpak/shared-modules
 #   cp src-tauri/target/release/bundle/deb/*.deb flatpak/emobie.deb
 #   flatpak-builder --force-clean --user --repo=flatpak/repo flatpak/build-dir flatpak/io.github.asafelobotomy.Emobie.yml
 #   flatpak build-bundle flatpak/repo emobie.flatpak io.github.asafelobotomy.Emobie
@@ -21,6 +22,8 @@ finish-args:
   - --talk-name=org.kde.StatusNotifierWatcher
 
 modules:
+  # Tray icons need Ayatana AppIndicator; GNOME Flatpak runtimes do not ship it.
+  - shared-modules/libayatana-appindicator/libayatana-appindicator-gtk3.json
   - name: emobie
     buildsystem: simple
     sources:

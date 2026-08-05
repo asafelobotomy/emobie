@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-08-05
+
+### Fixed
+
+- Flatpak crash on startup from missing Ayatana AppIndicator library
+- System tray init no longer panics the whole app if AppIndicator is unavailable
+
 ## [0.5.1] - 2026-08-05
 
 ### Changed
@@ -37,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Horizontal mouse-wheel scrolling in wide layouts
 - Tray icon temp path for Flatpak-friendly sandboxing
 
-[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/asafelobotomy/emobie/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/asafelobotomy/emobie/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/asafelobotomy/emobie/releases/tag/v0.5.0

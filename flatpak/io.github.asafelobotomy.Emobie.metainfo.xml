@@ -49,6 +49,11 @@
     <category>Office</category>
   </categories>
   <releases>
+    <release version="0.5.2" date="2026-08-05">
+      <description>
+        <p>Fix Flatpak startup crash by bundling Ayatana AppIndicator for the system tray.</p>
+      </description>
+    </release>
     <release version="0.5.1" date="2026-08-05">
       <description>
         <p>Migrate Flatpak runtime to supported GNOME Platform 50.</p>

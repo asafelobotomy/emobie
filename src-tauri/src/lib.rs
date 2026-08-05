@@ -1,3 +1,5 @@
+use std::panic::{catch_unwind, AssertUnwindSafe};
+
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -20,6 +22,64 @@ fn hide_main_window(app: &AppHandle) {
     }
 }
 
+fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
+    let show_item = MenuItem::with_id(app, "show", "Show Emobie", true, None::<&str>)?;
+    let hide_item = MenuItem::with_id(app, "hide", "Hide", true, None::<&str>)?;
+    let pin_item =
+        MenuItem::with_id(app, "pin", "Toggle pin above windows", true, None::<&str>)?;
+    let sep_top = PredefinedMenuItem::separator(app)?;
+    let sep_bottom = PredefinedMenuItem::separator(app)?;
+    let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+
+    let menu = Menu::with_items(
+        app,
+        &[
+            &show_item,
+            &hide_item,
+            &sep_top,
+            &pin_item,
+            &sep_bottom,
+            &quit_item,
+        ],
+    )?;
+
+    let mut tray = TrayIconBuilder::new()
+        .icon(app.default_window_icon().unwrap().clone())
+        .tooltip("Emobie")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "show" => show_main_window(app),
+            "hide" => hide_main_window(app),
+            "pin" => {
+                let _ = app.emit(PIN_EVENT, ());
+            }
+            "quit" => {
+                app.exit(0);
+            }
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                button_state: MouseButtonState::Up,
+                ..
+            } = event
+            {
+                show_main_window(tray.app_handle());
+            }
+        });
+
+    // Keep tray icon files inside the app cache so Flatpak sandboxing works
+    // without granting access to $XDG_RUNTIME_DIR/tray-icon.
+    if let Ok(cache_dir) = app.path().app_cache_dir() {
+        tray = tray.temp_dir_path(cache_dir);
+    }
+
+    let _tray = tray.build(app)?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -30,60 +90,19 @@ pub fn run() {
         .setup(|app| {
             #[cfg(desktop)]
             {
-                let show_item = MenuItem::with_id(app, "show", "Show Emobie", true, None::<&str>)?;
-                let hide_item = MenuItem::with_id(app, "hide", "Hide", true, None::<&str>)?;
-                let pin_item =
-                    MenuItem::with_id(app, "pin", "Toggle pin above windows", true, None::<&str>)?;
-                let sep_top = PredefinedMenuItem::separator(app)?;
-                let sep_bottom = PredefinedMenuItem::separator(app)?;
-                let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-
-                let menu = Menu::with_items(
-                    app,
-                    &[
-                        &show_item,
-                        &hide_item,
-                        &sep_top,
-                        &pin_item,
-                        &sep_bottom,
-                        &quit_item,
-                    ],
-                )?;
-
-                let mut tray = TrayIconBuilder::new()
-                    .icon(app.default_window_icon().unwrap().clone())
-                    .tooltip("Emobie")
-                    .menu(&menu)
-                    .show_menu_on_left_click(false)
-                    .on_menu_event(|app, event| match event.id.as_ref() {
-                        "show" => show_main_window(app),
-                        "hide" => hide_main_window(app),
-                        "pin" => {
-                            let _ = app.emit(PIN_EVENT, ());
-                        }
-                        "quit" => {
-                            app.exit(0);
-                        }
-                        _ => {}
-                    })
-                    .on_tray_icon_event(|tray, event| {
-                        if let TrayIconEvent::Click {
-                            button: MouseButton::Left,
-                            button_state: MouseButtonState::Up,
-                            ..
-                        } = event
-                        {
-                            show_main_window(tray.app_handle());
-                        }
-                    });
-
-                // Keep tray icon files inside the app cache so Flatpak sandboxing works
-                // without granting access to $XDG_RUNTIME_DIR/tray-icon.
-                if let Ok(cache_dir) = app.path().app_cache_dir() {
-                    tray = tray.temp_dir_path(cache_dir);
+                // libappindicator panics if ayatana/appindicator is missing (common in
+                // Flatpak before the shared module is bundled). Keep the window usable.
+                match catch_unwind(AssertUnwindSafe(|| setup_tray(app))) {
+                    Ok(Ok(())) => {}
+                    Ok(Err(error)) => {
+                        eprintln!("Emobie: system tray unavailable: {error}");
+                    }
+                    Err(_) => {
+                        eprintln!(
+                            "Emobie: system tray unavailable (appindicator library missing)"
+                        );
+                    }
                 }
-
-                let _tray = tray.build(app)?;
             }
             Ok(())
         })

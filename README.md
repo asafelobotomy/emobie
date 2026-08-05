@@ -65,6 +65,9 @@ The packaged app lands under `src-tauri/target/release/bundle/`.
 # Build the Debian package first
 npm run tauri build -- --bundles deb
 
+# Init Flatpak shared modules (Ayatana AppIndicator)
+git submodule update --init flatpak/shared-modules
+
 # Stage it for the Flatpak manifest
 cp src-tauri/target/release/bundle/deb/*.deb flatpak/emobie.deb
 
@@ -89,8 +92,8 @@ Create a release:
 
 ```bash
 # Ensure package.json, Cargo.toml, and tauri.conf.json versions match
-git tag v0.5.1
-git push origin v0.5.1
+git tag v0.5.2
+git push origin v0.5.2
 ```
 
 Or run the **Release** workflow manually from the Actions tab.
