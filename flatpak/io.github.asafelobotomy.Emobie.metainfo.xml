@@ -49,6 +49,11 @@
     <category>Office</category>
   </categories>
   <releases>
+    <release version="0.6.1" date="2026-08-05">
+      <description>
+        <p>Startup options, emoji sort preference, frameless resize cursors, and a fixed pin button frame.</p>
+      </description>
+    </release>
     <release version="0.6.0" date="2026-08-05">
       <description>
         <p>Fix frameless window dragging from the toolbar.</p>

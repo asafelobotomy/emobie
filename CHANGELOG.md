@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-08-05
+
+### Added
+
+- Launch on startup and start minimized to system tray settings
+- Sort by preference (default, name, type, date added, number of uses)
+- Resize edge cursors for the frameless window
+
+### Fixed
+
+- Pin button no longer rotates its frame when pinned
+
 ## [0.6.0] - 2026-08-05
 
 ### Fixed
@@ -79,7 +91,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Horizontal mouse-wheel scrolling in wide layouts
 - Tray icon temp path for Flatpak-friendly sandboxing
 
-[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/asafelobotomy/emobie/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/asafelobotomy/emobie/compare/v0.5.5...v0.6.0
 [0.5.5]: https://github.com/asafelobotomy/emobie/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/asafelobotomy/emobie/compare/v0.5.3...v0.5.4

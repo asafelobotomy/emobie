@@ -228,6 +228,11 @@ pub fn run() {
         .setup(|app| {
             #[cfg(desktop)]
             {
+                app.handle().plugin(
+                    tauri_plugin_autostart::Builder::new()
+                        .app_name("emobie")
+                        .build(),
+                )?;
                 setup_tray(app);
             }
             Ok(())

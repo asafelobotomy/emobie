@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { SkinTonePicker } from "./SkinTonePicker";
-import type { Preferences, ThemeMode, EmojiSize } from "../types/preferences";
+import {
+  SORT_OPTIONS,
+  type Preferences,
+  type ThemeMode,
+  type EmojiSize,
+  type SortBy,
+} from "../types/preferences";
 import type { SkinTone } from "../data/loadEmojis";
 
 type SettingsPanelProps = {
@@ -13,6 +19,9 @@ type SettingsPanelProps = {
   onSkinTone: (tone: SkinTone) => void;
   onHotkey: (hotkey: string) => void;
   onShowTitleBar: (show: boolean) => void;
+  onLaunchOnStartup: (enabled: boolean) => void;
+  onStartMinimizedToTray: (enabled: boolean) => void;
+  onSortBy: (sortBy: SortBy) => void;
   onClearRecents: () => void;
 };
 
@@ -62,6 +71,9 @@ export function SettingsPanel({
   onSkinTone,
   onHotkey,
   onShowTitleBar,
+  onLaunchOnStartup,
+  onStartMinimizedToTray,
+  onSortBy,
   onClearRecents,
 }: SettingsPanelProps) {
   const titleId = useId();
@@ -170,6 +182,41 @@ export function SettingsPanel({
             checked={prefs.showTitleBar}
             onChange={(event) => onShowTitleBar(event.target.checked)}
           />
+        </div>
+
+        <div className="settings-row settings-toggle-row">
+          <label htmlFor="launch-on-startup">Launch on startup</label>
+          <input
+            id="launch-on-startup"
+            type="checkbox"
+            checked={prefs.launchOnStartup}
+            onChange={(event) => onLaunchOnStartup(event.target.checked)}
+          />
+        </div>
+
+        <div className="settings-row settings-toggle-row">
+          <label htmlFor="start-minimized">Start minimized to system tray</label>
+          <input
+            id="start-minimized"
+            type="checkbox"
+            checked={prefs.startMinimizedToTray}
+            onChange={(event) => onStartMinimizedToTray(event.target.checked)}
+          />
+        </div>
+
+        <div className="settings-row">
+          <label htmlFor="sort-by">Sort by</label>
+          <select
+            id="sort-by"
+            value={prefs.sortBy}
+            onChange={(event) => onSortBy(event.target.value as SortBy)}
+          >
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="settings-row">

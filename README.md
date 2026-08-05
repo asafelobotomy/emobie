@@ -90,8 +90,8 @@ Create a release:
 
 ```bash
 # Ensure package.json, Cargo.toml, and tauri.conf.json versions match
-git tag v0.6.0
-git push origin v0.6.0
+git tag v0.6.1
+git push origin v0.6.1
 ```
 
 Or run the **Release** workflow manually from the Actions tab.

@@ -5,8 +5,9 @@ import {
   type Preferences,
   type ThemeMode,
   type EmojiSize,
+  type SortBy,
 } from "../types/preferences";
-import type { SkinTone } from "../data/loadEmojis";
+import { findEmojiByChar, type SkinTone } from "../data/loadEmojis";
 
 const STORE_PATH = "emobie-preferences.json";
 
@@ -19,11 +20,42 @@ function getStore(): Promise<Store> {
   return storePromise;
 }
 
+function normalizeCountMap(value: unknown): Record<string, number> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  const result: Record<string, number> = {};
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    const n = Number(raw);
+    if (key && Number.isFinite(n) && n > 0) {
+      result[key] = Math.floor(n);
+    }
+  }
+  return result;
+}
+
+const SORT_VALUES = new Set<SortBy>([
+  "default",
+  "name",
+  "type",
+  "dateAdded",
+  "uses",
+]);
+
 function normalizePreferences(saved: Partial<Preferences> | undefined): Preferences {
   const merged = { ...DEFAULT_PREFERENCES, ...saved };
+  const sortBy = SORT_VALUES.has(merged.sortBy as SortBy)
+    ? (merged.sortBy as SortBy)
+    : DEFAULT_PREFERENCES.sortBy;
+
   return {
     ...merged,
     showTitleBar: Boolean(merged.showTitleBar),
+    launchOnStartup: Boolean(merged.launchOnStartup),
+    startMinimizedToTray: Boolean(merged.startMinimizedToTray),
+    sortBy,
+    usageCounts: normalizeCountMap(merged.usageCounts),
+    firstUsedAt: normalizeCountMap(merged.firstUsedAt),
     recents: Array.isArray(merged.recents) ? merged.recents.filter(Boolean) : [],
     favorites: Array.isArray(merged.favorites)
       ? merged.favorites.filter(Boolean)
@@ -108,6 +140,18 @@ export function usePreferences() {
     (showTitleBar: boolean) => update({ showTitleBar }),
     [update],
   );
+  const setLaunchOnStartup = useCallback(
+    (launchOnStartup: boolean) => update({ launchOnStartup }),
+    [update],
+  );
+  const setStartMinimizedToTray = useCallback(
+    (startMinimizedToTray: boolean) => update({ startMinimizedToTray }),
+    [update],
+  );
+  const setSortBy = useCallback(
+    (sortBy: SortBy) => update({ sortBy }),
+    [update],
+  );
 
   const pushRecent = useCallback((emoji: string) => {
     setPrefs((current) => {
@@ -115,7 +159,28 @@ export function usePreferences() {
         emoji,
         ...current.recents.filter((item) => item !== emoji),
       ].slice(0, current.recentMax);
-      const next = { ...current, recents: nextRecents };
+
+      const match = findEmojiByChar(emoji);
+      let usageCounts = current.usageCounts;
+      let firstUsedAt = current.firstUsedAt;
+      if (match) {
+        const now = Date.now();
+        usageCounts = {
+          ...current.usageCounts,
+          [match.hexcode]: (current.usageCounts[match.hexcode] ?? 0) + 1,
+        };
+        firstUsedAt = {
+          ...current.firstUsedAt,
+          [match.hexcode]: current.firstUsedAt[match.hexcode] ?? now,
+        };
+      }
+
+      const next = {
+        ...current,
+        recents: nextRecents,
+        usageCounts,
+        firstUsedAt,
+      };
       void writePreferences(next);
       return next;
     });
@@ -147,6 +212,9 @@ export function usePreferences() {
     setSkinTone,
     setHotkey,
     setShowTitleBar,
+    setLaunchOnStartup,
+    setStartMinimizedToTray,
+    setSortBy,
     pushRecent,
     clearRecents,
     toggleFavorite,

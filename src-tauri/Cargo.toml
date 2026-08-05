@@ -1,6 +1,6 @@
 [package]
 name = "emobie"
-version = "0.6.0"
+version = "0.6.1"
 description = "Emobie — compact emoji palette for content creators"
 authors = ["aSafeLobotomy"]
 edition = "2021"
@@ -26,3 +26,4 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"
+tauri-plugin-autostart = "2"

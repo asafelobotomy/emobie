@@ -2,6 +2,7 @@ import type { SkinTone } from "../data/loadEmojis";
 
 export type ThemeMode = "system" | "light" | "dark";
 export type EmojiSize = "sm" | "md" | "lg";
+export type SortBy = "default" | "name" | "type" | "dateAdded" | "uses";
 
 export type Preferences = {
   theme: ThemeMode;
@@ -11,6 +12,13 @@ export type Preferences = {
   skinTone: SkinTone;
   hotkey: string;
   showTitleBar: boolean;
+  launchOnStartup: boolean;
+  startMinimizedToTray: boolean;
+  sortBy: SortBy;
+  /** hexcode -> copy count */
+  usageCounts: Record<string, number>;
+  /** hexcode -> first copy timestamp (ms) */
+  firstUsedAt: Record<string, number>;
   recents: string[];
   favorites: string[];
 };
@@ -23,9 +31,22 @@ export const DEFAULT_PREFERENCES: Preferences = {
   skinTone: 0,
   hotkey: "Control+Shift+Space",
   showTitleBar: false,
+  launchOnStartup: false,
+  startMinimizedToTray: false,
+  sortBy: "default",
+  usageCounts: {},
+  firstUsedAt: {},
   recents: [],
   favorites: [],
 };
+
+export const SORT_OPTIONS: { value: SortBy; label: string }[] = [
+  { value: "default", label: "Default order" },
+  { value: "name", label: "Name" },
+  { value: "type", label: "Type (category)" },
+  { value: "dateAdded", label: "Date added" },
+  { value: "uses", label: "Number of uses" },
+];
 
 export const SKIN_TONES: { tone: SkinTone; label: string; swatch: string }[] = [
   { tone: 0, label: "Default", swatch: "#FFCC22" },

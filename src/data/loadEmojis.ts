@@ -131,10 +131,66 @@ function sortFavoritesFirst(
   });
 }
 
+export type EmojiSortBy = "default" | "name" | "type" | "dateAdded" | "uses";
+
+export type EmojiSortContext = {
+  sortBy: EmojiSortBy;
+  usageCounts: Record<string, number>;
+  firstUsedAt: Record<string, number>;
+};
+
+function compareBySort(
+  a: EmobieEmoji,
+  b: EmobieEmoji,
+  ctx: EmojiSortContext,
+): number {
+  switch (ctx.sortBy) {
+    case "name":
+      return a.label.localeCompare(b.label, undefined, { sensitivity: "base" });
+    case "type":
+      return a.group - b.group || a.order - b.order;
+    case "dateAdded": {
+      const aAt = ctx.firstUsedAt[a.hexcode] ?? Number.POSITIVE_INFINITY;
+      const bAt = ctx.firstUsedAt[b.hexcode] ?? Number.POSITIVE_INFINITY;
+      if (aAt !== bAt) return aAt - bAt;
+      return a.order - b.order;
+    }
+    case "uses": {
+      const aUses = ctx.usageCounts[a.hexcode] ?? 0;
+      const bUses = ctx.usageCounts[b.hexcode] ?? 0;
+      if (aUses !== bUses) return bUses - aUses;
+      return a.order - b.order;
+    }
+    case "default":
+      return a.order - b.order;
+    default: {
+      const _exhaustive: never = ctx.sortBy;
+      return _exhaustive;
+    }
+  }
+}
+
+function applySort(
+  emojis: EmobieEmoji[],
+  favoriteHexcodes: string[],
+  ctx: EmojiSortContext,
+): EmobieEmoji[] {
+  if (ctx.sortBy === "default") {
+    return sortFavoritesFirst(emojis, favoriteHexcodes);
+  }
+
+  return [...emojis].sort((a, b) => compareBySort(a, b, ctx));
+}
+
 export function searchEmojis(
   query: string,
   tone: SkinTone,
   favoriteHexcodes: string[] = [],
+  sortCtx: EmojiSortContext = {
+    sortBy: "default",
+    usageCounts: {},
+    firstUsedAt: {},
+  },
 ): EmobieEmoji[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
@@ -149,22 +205,32 @@ export function searchEmojis(
     emoji: applySkinTone(emoji, tone),
   }));
 
-  return sortFavoritesFirst(matches, favoriteHexcodes);
+  return applySort(matches, favoriteHexcodes, sortCtx);
 }
 
 export function emojisForCategory(
   groupId: number,
   tone: SkinTone,
   favoriteHexcodes: string[] = [],
+  sortCtx: EmojiSortContext = {
+    sortBy: "default",
+    usageCounts: {},
+    firstUsedAt: {},
+  },
 ): EmobieEmoji[] {
   if (groupId === FAVORITES_CATEGORY_ID) {
-    return favoriteHexcodes
+    const favorites = favoriteHexcodes
       .map((hexcode) => EMOJIS.find((emoji) => emoji.hexcode === hexcode))
       .filter((emoji): emoji is EmobieEmoji => Boolean(emoji))
       .map((emoji) => ({
         ...emoji,
         emoji: applySkinTone(emoji, tone),
       }));
+
+    if (sortCtx.sortBy === "default") {
+      return favorites;
+    }
+    return [...favorites].sort((a, b) => compareBySort(a, b, sortCtx));
   }
 
   const categoryEmojis = EMOJIS.filter((emoji) => emoji.group === groupId).map(
@@ -174,7 +240,7 @@ export function emojisForCategory(
     }),
   );
 
-  return sortFavoritesFirst(categoryEmojis, favoriteHexcodes);
+  return applySort(categoryEmojis, favoriteHexcodes, sortCtx);
 }
 
 export function findEmojiByChar(char: string): EmobieEmoji | undefined {

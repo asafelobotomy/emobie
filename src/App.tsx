@@ -5,6 +5,7 @@ import { CategoryNav } from "./components/CategoryNav";
 import { EmojiGrid } from "./components/EmojiGrid";
 import { RecentStrip } from "./components/RecentStrip";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { WindowResizeHandles } from "./components/WindowResizeHandles";
 import {
   FAVORITES_CATEGORY_ID,
   NAV_CATEGORIES,
@@ -18,6 +19,8 @@ import { useAlwaysOnTop } from "./hooks/useAlwaysOnTop";
 import { useGlobalHotkey } from "./hooks/useGlobalHotkey";
 import { useTheme } from "./hooks/useTheme";
 import { useWindowDecorations } from "./hooks/useWindowDecorations";
+import { useAutostart } from "./hooks/useAutostart";
+import { useStartMinimized } from "./hooks/useStartMinimized";
 import "@fontsource/outfit/400.css";
 import "@fontsource/outfit/600.css";
 import "@fontsource/fraunces/600.css";
@@ -35,6 +38,9 @@ function App() {
     setSkinTone,
     setHotkey,
     setShowTitleBar,
+    setLaunchOnStartup,
+    setStartMinimizedToTray,
+    setSortBy,
     pushRecent,
     clearRecents,
     toggleFavorite,
@@ -51,6 +57,8 @@ function App() {
   useTheme(prefs.theme);
   useAlwaysOnTop(prefs.pinned, ready);
   useWindowDecorations(prefs.showTitleBar, ready);
+  useAutostart(prefs.launchOnStartup, ready);
+  useStartMinimized(prefs.startMinimizedToTray, ready);
   const hotkeyError = useGlobalHotkey(prefs.hotkey, ready);
 
   useEffect(() => {
@@ -77,12 +85,26 @@ function App() {
     };
   }, [setPinned]);
 
+  const sortCtx = useMemo(
+    () => ({
+      sortBy: prefs.sortBy,
+      usageCounts: prefs.usageCounts,
+      firstUsedAt: prefs.firstUsedAt,
+    }),
+    [prefs.sortBy, prefs.usageCounts, prefs.firstUsedAt],
+  );
+
   const visibleEmojis = useMemo(() => {
     if (query.trim()) {
-      return searchEmojis(query, prefs.skinTone, prefs.favorites);
+      return searchEmojis(query, prefs.skinTone, prefs.favorites, sortCtx);
     }
-    return emojisForCategory(activeCategory, prefs.skinTone, prefs.favorites);
-  }, [query, activeCategory, prefs.skinTone, prefs.favorites]);
+    return emojisForCategory(
+      activeCategory,
+      prefs.skinTone,
+      prefs.favorites,
+      sortCtx,
+    );
+  }, [query, activeCategory, prefs.skinTone, prefs.favorites, sortCtx]);
 
   const emptyMessage =
     !query.trim() && activeCategory === FAVORITES_CATEGORY_ID
@@ -95,14 +117,17 @@ function App() {
       ? `Copied ${lastCopied}`
       : null;
 
+  const frameless = !prefs.showTitleBar;
+
   return (
     <div className="app-shell" ref={setRootEl}>
+      <WindowResizeHandles enabled={frameless} />
       <div
         className="app"
         data-layout={layout}
         data-scroll={scrollAxis}
         data-compact={compact ? "true" : "false"}
-        data-frameless={prefs.showTitleBar ? "false" : "true"}
+        data-frameless={frameless ? "true" : "false"}
       >
         <Toolbar
           query={query}
@@ -110,7 +135,7 @@ function App() {
           pinned={prefs.pinned}
           onTogglePin={togglePin}
           onOpenSettings={() => setSettingsOpen(true)}
-          frameless={!prefs.showTitleBar}
+          frameless={frameless}
         />
         <div className="body">
           <CategoryNav
@@ -150,6 +175,9 @@ function App() {
           onSkinTone={setSkinTone}
           onHotkey={setHotkey}
           onShowTitleBar={setShowTitleBar}
+          onLaunchOnStartup={setLaunchOnStartup}
+          onStartMinimizedToTray={setStartMinimizedToTray}
+          onSortBy={setSortBy}
           onClearRecents={clearRecents}
         />
       ) : null}
