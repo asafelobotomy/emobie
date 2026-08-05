@@ -4,10 +4,17 @@ type RecentStripProps = {
   recents: string[];
   flashKey: string | null;
   status: string | null;
+  statusError?: boolean;
   onCopy: (emoji: string) => void;
 };
 
-export function RecentStrip({ recents, flashKey, status, onCopy }: RecentStripProps) {
+export function RecentStrip({
+  recents,
+  flashKey,
+  status,
+  statusError,
+  onCopy,
+}: RecentStripProps) {
   return (
     <div className="recent-strip">
       <span className="recent-label" title="Recent">
@@ -28,7 +35,9 @@ export function RecentStrip({ recents, flashKey, status, onCopy }: RecentStripPr
           ))
         )}
       </div>
-      {status ? <span className="status">{status}</span> : null}
+      {status ? (
+        <span className={`status${statusError ? " error" : ""}`}>{status}</span>
+      ) : null}
     </div>
   );
 }

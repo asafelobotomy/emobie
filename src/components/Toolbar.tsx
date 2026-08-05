@@ -36,9 +36,17 @@ export function Toolbar({
 
   return (
     <header className="toolbar">
-      <div className="brand" title="Emobie">
+      <button
+        type="button"
+        className="brand"
+        title={compact ? "Open settings" : "Emobie"}
+        aria-label={compact ? "Open settings" : "Emobie"}
+        onClick={() => {
+          if (compact) onOpenSettings();
+        }}
+      >
         Emobie
-      </div>
+      </button>
 
       {showSearchField ? (
         <input

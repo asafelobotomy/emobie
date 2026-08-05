@@ -5,7 +5,6 @@ use tauri::{
 };
 
 const PIN_EVENT: &str = "tray-pin-toggle";
-const SHOW_EVENT: &str = "tray-show";
 
 fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -35,12 +34,20 @@ pub fn run() {
                 let hide_item = MenuItem::with_id(app, "hide", "Hide", true, None::<&str>)?;
                 let pin_item =
                     MenuItem::with_id(app, "pin", "Toggle pin above windows", true, None::<&str>)?;
-                let sep = PredefinedMenuItem::separator(app)?;
+                let sep_top = PredefinedMenuItem::separator(app)?;
+                let sep_bottom = PredefinedMenuItem::separator(app)?;
                 let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
                 let menu = Menu::with_items(
                     app,
-                    &[&show_item, &hide_item, &sep, &pin_item, &sep, &quit_item],
+                    &[
+                        &show_item,
+                        &hide_item,
+                        &sep_top,
+                        &pin_item,
+                        &sep_bottom,
+                        &quit_item,
+                    ],
                 )?;
 
                 let _tray = TrayIconBuilder::new()
@@ -67,7 +74,6 @@ pub fn run() {
                         } = event
                         {
                             show_main_window(tray.app_handle());
-                            let _ = tray.app_handle().emit(SHOW_EVENT, ());
                         }
                     })
                     .build(app)?;

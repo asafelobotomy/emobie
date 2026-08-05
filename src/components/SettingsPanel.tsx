@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { SkinTonePicker } from "./SkinTonePicker";
 import type { Preferences, ThemeMode, EmojiSize } from "../types/preferences";
 import type { SkinTone } from "../data/loadEmojis";
 
 type SettingsPanelProps = {
   prefs: Preferences;
+  hotkeyError: string | null;
   onClose: () => void;
   onTheme: (theme: ThemeMode) => void;
   onEmojiSize: (size: EmojiSize) => void;
@@ -19,6 +20,11 @@ function formatHotkey(event: KeyboardEvent): string | null {
     return null;
   }
 
+  const hasModifier = event.ctrlKey || event.shiftKey || event.altKey || event.metaKey;
+  if (!hasModifier) {
+    return null;
+  }
+
   const parts: string[] = [];
   if (event.ctrlKey) parts.push("Control");
   if (event.shiftKey) parts.push("Shift");
@@ -27,7 +33,12 @@ function formatHotkey(event: KeyboardEvent): string | null {
 
   let key = event.key;
   if (key === " ") key = "Space";
-  if (key.length === 1) key = key.toUpperCase();
+  else if (key === "ArrowUp") key = "Up";
+  else if (key === "ArrowDown") key = "Down";
+  else if (key === "ArrowLeft") key = "Left";
+  else if (key === "ArrowRight") key = "Right";
+  else if (key === "Escape") key = "Esc";
+  else if (key.length === 1) key = key.toUpperCase();
 
   parts.push(key);
   return parts.join("+");
@@ -35,6 +46,7 @@ function formatHotkey(event: KeyboardEvent): string | null {
 
 export function SettingsPanel({
   prefs,
+  hotkeyError,
   onClose,
   onTheme,
   onEmojiSize,
@@ -43,27 +55,60 @@ export function SettingsPanel({
   onHotkey,
   onClearRecents,
 }: SettingsPanelProps) {
+  const titleId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
   const [capturing, setCapturing] = useState(false);
   const [draftHotkey, setDraftHotkey] = useState(prefs.hotkey);
+  const [hotkeyHint, setHotkeyHint] = useState<string | null>(null);
 
   useEffect(() => {
     setDraftHotkey(prefs.hotkey);
   }, [prefs.hotkey]);
 
   useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const focusable = panelRef.current?.querySelector<HTMLElement>(
+      "select, button, input",
+    );
+    focusable?.focus();
+
+    return () => {
+      previouslyFocused?.focus?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (capturing) {
+        setCapturing(false);
+        setHotkeyHint(null);
+        return;
+      }
+      onClose();
+    };
+
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [capturing, onClose]);
+
+  useEffect(() => {
     if (!capturing) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") return;
       event.preventDefault();
       event.stopPropagation();
-      if (event.key === "Escape") {
-        setCapturing(false);
+      const next = formatHotkey(event);
+      if (!next) {
+        setHotkeyHint("Include Ctrl, Shift, Alt, or Meta");
         return;
       }
-      const next = formatHotkey(event);
-      if (!next) return;
       setDraftHotkey(next);
       onHotkey(next);
+      setHotkeyHint(null);
       setCapturing(false);
     };
 
@@ -72,13 +117,28 @@ export function SettingsPanel({
   }, [capturing, onHotkey]);
 
   const startCapture = useCallback(() => {
+    setHotkeyHint(null);
     setCapturing(true);
   }, []);
 
   return (
-    <div className="settings-overlay" role="dialog" aria-modal="true" aria-label="Settings">
-      <div className="settings-panel">
-        <h2>Preferences</h2>
+    <div
+      className="settings-overlay"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        ref={panelRef}
+        className="settings-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
+        <h2 id={titleId}>Preferences</h2>
 
         <div className="settings-row">
           <label htmlFor="theme">Theme</label>
@@ -107,7 +167,9 @@ export function SettingsPanel({
         </div>
 
         <div className="settings-row">
-          <span id="skin-tone-label">Default skin tone</span>
+          <span id="skin-tone-label" className="settings-label">
+            Default skin tone
+          </span>
           <SkinTonePicker skinTone={prefs.skinTone} onSkinTone={onSkinTone} />
         </div>
 
@@ -128,7 +190,7 @@ export function SettingsPanel({
         </div>
 
         <div className="settings-row">
-          <label>Global hotkey</label>
+          <span className="settings-label">Global hotkey</span>
           <button
             type="button"
             className={`hotkey-capture${capturing ? " active" : ""}`}
@@ -136,6 +198,8 @@ export function SettingsPanel({
           >
             {capturing ? "Press a shortcut…" : draftHotkey}
           </button>
+          {hotkeyHint ? <p className="settings-hint">{hotkeyHint}</p> : null}
+          {hotkeyError ? <p className="settings-error">{hotkeyError}</p> : null}
         </div>
 
         <div className="settings-actions">

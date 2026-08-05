@@ -19,11 +19,23 @@ function getStore(): Promise<Store> {
   return storePromise;
 }
 
+function normalizePreferences(saved: Partial<Preferences> | undefined): Preferences {
+  const merged = { ...DEFAULT_PREFERENCES, ...saved };
+  return {
+    ...merged,
+    recents: Array.isArray(merged.recents) ? merged.recents.filter(Boolean) : [],
+    favorites: Array.isArray(merged.favorites)
+      ? merged.favorites.filter(Boolean)
+      : [],
+    recentMax: Math.min(96, Math.max(8, Number(merged.recentMax) || 32)),
+  };
+}
+
 async function readPreferences(): Promise<Preferences> {
   try {
     const store = await getStore();
     const saved = await store.get<Partial<Preferences>>("preferences");
-    return { ...DEFAULT_PREFERENCES, ...saved };
+    return normalizePreferences(saved);
   } catch {
     return { ...DEFAULT_PREFERENCES };
   }
@@ -72,20 +84,17 @@ export function usePreferences() {
     (emojiSize: EmojiSize) => update({ emojiSize }),
     [update],
   );
-  const setRecentMax = useCallback(
-    (recentMax: number) => {
-      setPrefs((current) => {
-        const next = {
-          ...current,
-          recentMax,
-          recents: current.recents.slice(0, recentMax),
-        };
-        void writePreferences(next);
-        return next;
-      });
-    },
-    [],
-  );
+  const setRecentMax = useCallback((recentMax: number) => {
+    setPrefs((current) => {
+      const next = {
+        ...current,
+        recentMax,
+        recents: current.recents.slice(0, recentMax),
+      };
+      void writePreferences(next);
+      return next;
+    });
+  }, []);
   const setSkinTone = useCallback(
     (skinTone: SkinTone) => update({ skinTone }),
     [update],

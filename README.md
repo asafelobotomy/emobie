@@ -5,6 +5,7 @@ Compact Linux-first emoji palette for content creators. Browse the full Unicode 
 ## Features
 
 - Complete emoji catalog (emojibase), organized by category
+- Favorites section (right-click to favorite / unfavorite)
 - Search by label, tags, and shortcodes
 - One-click copy to clipboard with recent history
 - Always-on-top pin

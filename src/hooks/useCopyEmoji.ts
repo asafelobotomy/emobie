@@ -4,6 +4,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 export function useCopyEmoji(onCopied: (emoji: string) => void) {
   const [lastCopied, setLastCopied] = useState<string | null>(null);
   const [flashKey, setFlashKey] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState<string | null>(null);
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -16,8 +17,24 @@ export function useCopyEmoji(onCopied: (emoji: string) => void) {
 
   const copyEmoji = useCallback(
     async (emoji: string) => {
-      await writeText(emoji);
+      try {
+        await writeText(emoji);
+      } catch (error) {
+        console.error("Failed to copy emoji", error);
+        setCopyError("Copy failed");
+        setLastCopied(null);
+        setFlashKey(null);
+        if (timerRef.current !== null) {
+          window.clearTimeout(timerRef.current);
+        }
+        timerRef.current = window.setTimeout(() => {
+          setCopyError(null);
+        }, 1600);
+        return;
+      }
+
       onCopied(emoji);
+      setCopyError(null);
       setLastCopied(emoji);
       setFlashKey(emoji);
 
@@ -32,5 +49,5 @@ export function useCopyEmoji(onCopied: (emoji: string) => void) {
     [onCopied],
   );
 
-  return { copyEmoji, lastCopied, flashKey };
+  return { copyEmoji, lastCopied, flashKey, copyError };
 }

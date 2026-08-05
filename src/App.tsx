@@ -47,14 +47,14 @@ function App() {
   pinnedRef.current = prefs.pinned;
 
   useTheme(prefs.theme);
-  useAlwaysOnTop(prefs.pinned);
-  useGlobalHotkey(prefs.hotkey, ready);
+  useAlwaysOnTop(prefs.pinned, ready);
+  const hotkeyError = useGlobalHotkey(prefs.hotkey, ready);
 
   useEffect(() => {
     document.documentElement.dataset.size = prefs.emojiSize;
   }, [prefs.emojiSize]);
 
-  const { copyEmoji, lastCopied, flashKey } = useCopyEmoji(pushRecent);
+  const { copyEmoji, lastCopied, flashKey, copyError } = useCopyEmoji(pushRecent);
 
   const togglePin = useCallback(() => {
     setPinned(!pinnedRef.current);
@@ -86,11 +86,20 @@ function App() {
       ? "Right-click an emoji to add it to Favorites."
       : "No emojis match your search.";
 
-  const status = lastCopied ? `Copied ${lastCopied}` : null;
+  const status = copyError
+    ? copyError
+    : lastCopied
+      ? `Copied ${lastCopied}`
+      : null;
 
   return (
     <div className="app-shell" ref={setRootEl}>
-      <div className="app" data-layout={layout} data-scroll={scrollAxis} data-compact={compact ? "true" : "false"}>
+      <div
+        className="app"
+        data-layout={layout}
+        data-scroll={scrollAxis}
+        data-compact={compact ? "true" : "false"}
+      >
         <Toolbar
           query={query}
           onQueryChange={setQuery}
@@ -108,27 +117,28 @@ function App() {
               setQuery("");
             }}
           />
-          <main className="main-pane">
-            <EmojiGrid
-              emojis={visibleEmojis}
-              flashKey={flashKey}
-              favorites={prefs.favorites}
-              emptyMessage={emptyMessage}
-              onCopy={copyEmoji}
-              onToggleFavorite={toggleFavorite}
-            />
-          </main>
+          <EmojiGrid
+            emojis={visibleEmojis}
+            flashKey={flashKey}
+            favorites={prefs.favorites}
+            scrollAxis={scrollAxis}
+            emptyMessage={emptyMessage}
+            onCopy={copyEmoji}
+            onToggleFavorite={toggleFavorite}
+          />
         </div>
         <RecentStrip
           recents={prefs.recents}
           flashKey={flashKey}
           status={status}
+          statusError={Boolean(copyError)}
           onCopy={copyEmoji}
         />
       </div>
       {settingsOpen ? (
         <SettingsPanel
           prefs={prefs}
+          hotkeyError={hotkeyError}
           onClose={() => setSettingsOpen(false)}
           onTheme={setTheme}
           onEmojiSize={setEmojiSize}

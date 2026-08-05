@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 
@@ -16,6 +16,7 @@ async function toggleVisibility() {
 
 export function useGlobalHotkey(hotkey: string, enabled: boolean) {
   const registeredRef = useRef<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!enabled || !hotkey) return;
@@ -40,11 +41,15 @@ export function useGlobalHotkey(hotkey: string, enabled: boolean) {
         });
         if (!cancelled) {
           registeredRef.current = hotkey;
+          setError(null);
         } else {
           await unregister(hotkey);
         }
-      } catch (error) {
-        console.error("Failed to register hotkey", hotkey, error);
+      } catch (err) {
+        console.error("Failed to register hotkey", hotkey, err);
+        if (!cancelled) {
+          setError("Could not register hotkey — try another shortcut.");
+        }
       }
     };
 
@@ -59,4 +64,6 @@ export function useGlobalHotkey(hotkey: string, enabled: boolean) {
       }
     };
   }, [hotkey, enabled]);
+
+  return error;
 }
