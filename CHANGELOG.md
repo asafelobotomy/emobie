@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-08-05
+
+### Added
+
+- Doesbie branding icons across window, tray, favicon, and toolbar
+
+### Changed
+
+- Hotkeys accept any shortcut except bare letter/number keys (those still need a modifier)
+- Linux tray uses StatusNotifierItem so left-click shows Emobie; right-click opens the menu
+
 ## [0.5.3] - 2026-08-05
 
 ### Fixed
@@ -50,7 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Horizontal mouse-wheel scrolling in wide layouts
 - Tray icon temp path for Flatpak-friendly sandboxing
 
-[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/asafelobotomy/emobie/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/asafelobotomy/emobie/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/asafelobotomy/emobie/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/asafelobotomy/emobie/compare/v0.5.0...v0.5.1

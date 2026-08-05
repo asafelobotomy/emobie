@@ -11,8 +11,8 @@ Compact Linux-first emoji palette for content creators. Browse the full Unicode 
 - Always-on-top pin
 - Light / dark / system theme
 - Freely resizable compact window (horizontal, square, or vertical layout)
-- Global hotkey (default `Ctrl+Shift+Space`) to show/hide
-- System tray: left-click to show, menu for Show/Hide, Pin, Quit
+- Global hotkey (default `Ctrl+Shift+Space`) to show/hide — letters/numbers need a modifier
+- System tray: left-click shows Emobie; right-click opens Show/Hide/Pin/Quit
 - Close button hides to tray instead of quitting
 - Preferences for theme, emoji size, recent max, skin tone, and hotkey
 - Flatpak packaging (`io.github.asafelobotomy.Emobie`)
@@ -65,9 +65,6 @@ The packaged app lands under `src-tauri/target/release/bundle/`.
 # Build the Debian package first
 npm run tauri build -- --bundles deb
 
-# Init Flatpak shared modules (Ayatana AppIndicator)
-git submodule update --init flatpak/shared-modules
-
 # Stage it for the Flatpak manifest
 cp src-tauri/target/release/bundle/deb/*.deb flatpak/emobie.deb
 
@@ -92,8 +89,8 @@ Create a release:
 
 ```bash
 # Ensure package.json, Cargo.toml, and tauri.conf.json versions match
-git tag v0.5.3
-git push origin v0.5.3
+git tag v0.5.4
+git push origin v0.5.4
 ```
 
 Or run the **Release** workflow manually from the Actions tab.

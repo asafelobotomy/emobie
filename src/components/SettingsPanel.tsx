@@ -15,13 +15,20 @@ type SettingsPanelProps = {
   onClearRecents: () => void;
 };
 
+function isLetterOrDigitKey(key: string): boolean {
+  return key.length === 1 && /[A-Za-z0-9]/.test(key);
+}
+
 function formatHotkey(event: KeyboardEvent): string | null {
   if (["Shift", "Control", "Alt", "Meta"].includes(event.key)) {
     return null;
   }
 
-  const hasModifier = event.ctrlKey || event.shiftKey || event.altKey || event.metaKey;
-  if (!hasModifier) {
+  const hasActionModifier =
+    event.ctrlKey || event.altKey || event.metaKey || event.shiftKey;
+
+  // Bare letters/digits are reserved for typing; everything else is allowed.
+  if (isLetterOrDigitKey(event.key) && !hasActionModifier) {
     return null;
   }
 
@@ -103,7 +110,7 @@ export function SettingsPanel({
       event.stopPropagation();
       const next = formatHotkey(event);
       if (!next) {
-        setHotkeyHint("Include Ctrl, Shift, Alt, or Meta");
+        setHotkeyHint("Letter and number keys need Ctrl, Alt, Shift, or Meta");
         return;
       }
       setDraftHotkey(next);
@@ -198,7 +205,12 @@ export function SettingsPanel({
           >
             {capturing ? "Press a shortcut…" : draftHotkey}
           </button>
-          {hotkeyHint ? <p className="settings-hint">{hotkeyHint}</p> : null}
+          {hotkeyHint ? <p className="settings-hint">{hotkeyHint}</p> : (
+            <p className="settings-hint">
+              Letters and numbers need Ctrl, Alt, Shift, or Meta. Function keys and
+              punctuation can stand alone.
+            </p>
+          )}
           {hotkeyError ? <p className="settings-error">{hotkeyError}</p> : null}
         </div>
 

@@ -47,11 +47,33 @@
   background: transparent;
   padding: 0;
   cursor: default;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1;
+}
+
+.brand-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  display: block;
+}
+
+.brand-name {
+  line-height: 1;
 }
 
 .app[data-compact="true"] .brand {
   cursor: pointer;
   font-size: 0.9rem;
+}
+
+.app[data-compact="true"] .brand-mark {
+  width: 18px;
+  height: 18px;
 }
 
 .app[data-compact="true"] .brand:hover {

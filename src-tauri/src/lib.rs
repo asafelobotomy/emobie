@@ -1,10 +1,4 @@
-use std::panic::{catch_unwind, AssertUnwindSafe};
-
-use tauri::{
-    menu::{Menu, MenuItem, PredefinedMenuItem},
-    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager, WindowEvent,
-};
+use tauri::{AppHandle, Manager, WindowEvent};
 
 const PIN_EVENT: &str = "tray-pin-toggle";
 
@@ -22,7 +16,130 @@ fn hide_main_window(app: &AppHandle) {
     }
 }
 
-fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
+#[cfg(target_os = "linux")]
+mod linux_tray {
+    use super::{hide_main_window, show_main_window, PIN_EVENT};
+    use image::GenericImageView;
+    use ksni::blocking::TrayMethods;
+    use ksni::{Icon, MenuItem, ToolTip, Tray};
+    use tauri::{AppHandle, Emitter, Manager};
+
+    struct EmobieTray {
+        app: AppHandle,
+        icons: Vec<Icon>,
+    }
+
+    fn load_icons() -> Vec<Icon> {
+        const PNG: &[u8] = include_bytes!("../icons/64x64.png");
+        let Ok(img) = image::load_from_memory(PNG) else {
+            return Vec::new();
+        };
+        let (width, height) = img.dimensions();
+        let mut data = img.into_rgba8().into_vec();
+        for pixel in data.chunks_exact_mut(4) {
+            pixel.rotate_right(1); // RGBA → ARGB
+        }
+        vec![Icon {
+            width: width as i32,
+            height: height as i32,
+            data,
+        }]
+    }
+
+    impl Tray for EmobieTray {
+        fn id(&self) -> String {
+            "io.github.asafelobotomy.Emobie".into()
+        }
+
+        fn title(&self) -> String {
+            "Emobie".into()
+        }
+
+        fn icon_pixmap(&self) -> Vec<Icon> {
+            self.icons.clone()
+        }
+
+        fn tool_tip(&self) -> ToolTip {
+            ToolTip {
+                title: "Emobie".into(),
+                description: "Emoji palette".into(),
+                ..Default::default()
+            }
+        }
+
+        fn activate(&mut self, _x: i32, _y: i32) {
+            show_main_window(&self.app);
+        }
+
+        fn menu(&self) -> Vec<MenuItem<Self>> {
+            use ksni::menu::*;
+            vec![
+                StandardItem {
+                    label: "Show Emobie".into(),
+                    activate: Box::new(|this: &mut Self| show_main_window(&this.app)),
+                    ..Default::default()
+                }
+                .into(),
+                StandardItem {
+                    label: "Hide".into(),
+                    activate: Box::new(|this: &mut Self| hide_main_window(&this.app)),
+                    ..Default::default()
+                }
+                .into(),
+                MenuItem::Separator,
+                StandardItem {
+                    label: "Toggle pin above windows".into(),
+                    activate: Box::new(|this: &mut Self| {
+                        let _ = this.app.emit(PIN_EVENT, ());
+                    }),
+                    ..Default::default()
+                }
+                .into(),
+                MenuItem::Separator,
+                StandardItem {
+                    label: "Quit".into(),
+                    activate: Box::new(|this: &mut Self| {
+                        this.app.exit(0);
+                    }),
+                    ..Default::default()
+                }
+                .into(),
+            ]
+        }
+    }
+
+    // Kept alive via app.manage so the StatusNotifierItem stays registered.
+    #[allow(dead_code)]
+    pub struct TrayGuard(ksni::blocking::Handle<EmobieTray>);
+
+    pub fn setup(app: &tauri::App) -> Result<(), String> {
+        let handle = app.handle().clone();
+        let icons = load_icons();
+        if icons.is_empty() {
+            return Err("failed to decode tray icon".into());
+        }
+
+        let tray_handle = EmobieTray {
+            app: handle,
+            icons,
+        }
+        .spawn()
+        .map_err(|err| err.to_string())?;
+
+        app.manage(TrayGuard(tray_handle));
+        Ok(())
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn setup_tray_tauri(app: &tauri::App) -> tauri::Result<()> {
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+    use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+    use tauri::{
+        menu::{Menu, MenuItem, PredefinedMenuItem},
+        Emitter,
+    };
+
     let show_item = MenuItem::with_id(app, "show", "Show Emobie", true, None::<&str>)?;
     let hide_item = MenuItem::with_id(app, "hide", "Hide", true, None::<&str>)?;
     let pin_item =
@@ -43,41 +160,62 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
         ],
     )?;
 
-    let mut tray = TrayIconBuilder::new()
-        .icon(app.default_window_icon().unwrap().clone())
-        .tooltip("Emobie")
-        .menu(&menu)
-        .show_menu_on_left_click(false)
-        .on_menu_event(|app, event| match event.id.as_ref() {
-            "show" => show_main_window(app),
-            "hide" => hide_main_window(app),
-            "pin" => {
-                let _ = app.emit(PIN_EVENT, ());
-            }
-            "quit" => {
-                app.exit(0);
-            }
-            _ => {}
-        })
-        .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
-                ..
-            } = event
-            {
-                show_main_window(tray.app_handle());
-            }
-        });
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        let mut tray = TrayIconBuilder::new()
+            .icon(app.default_window_icon().unwrap().clone())
+            .tooltip("Emobie")
+            .menu(&menu)
+            .show_menu_on_left_click(false)
+            .on_menu_event(|app, event| match event.id.as_ref() {
+                "show" => show_main_window(app),
+                "hide" => hide_main_window(app),
+                "pin" => {
+                    let _ = app.emit(PIN_EVENT, ());
+                }
+                "quit" => {
+                    app.exit(0);
+                }
+                _ => {}
+            })
+            .on_tray_icon_event(|tray, event| {
+                if let TrayIconEvent::Click {
+                    button: MouseButton::Left,
+                    button_state: MouseButtonState::Up,
+                    ..
+                } = event
+                {
+                    show_main_window(tray.app_handle());
+                }
+            });
 
-    // Keep tray icon files inside the app cache so Flatpak sandboxing works
-    // without granting access to $XDG_RUNTIME_DIR/tray-icon.
-    if let Ok(cache_dir) = app.path().app_cache_dir() {
-        tray = tray.temp_dir_path(cache_dir);
+        if let Ok(cache_dir) = app.path().app_cache_dir() {
+            tray = tray.temp_dir_path(cache_dir);
+        }
+
+        tray.build(app)
+    }));
+
+    match result {
+        Ok(Ok(_tray)) => Ok(()),
+        Ok(Err(error)) => Err(error),
+        Err(_) => Err(tauri::Error::FailedToReceiveMessage),
+    }
+}
+
+fn setup_tray(app: &tauri::App) {
+    #[cfg(target_os = "linux")]
+    {
+        if let Err(error) = linux_tray::setup(app) {
+            eprintln!("Emobie: system tray unavailable: {error}");
+        }
     }
 
-    let _tray = tray.build(app)?;
-    Ok(())
+    #[cfg(not(target_os = "linux"))]
+    {
+        if let Err(error) = setup_tray_tauri(app) {
+            eprintln!("Emobie: system tray unavailable: {error}");
+        }
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -90,19 +228,7 @@ pub fn run() {
         .setup(|app| {
             #[cfg(desktop)]
             {
-                // libappindicator panics if ayatana/appindicator is missing (common in
-                // Flatpak before the shared module is bundled). Keep the window usable.
-                match catch_unwind(AssertUnwindSafe(|| setup_tray(app))) {
-                    Ok(Ok(())) => {}
-                    Ok(Err(error)) => {
-                        eprintln!("Emobie: system tray unavailable: {error}");
-                    }
-                    Err(_) => {
-                        eprintln!(
-                            "Emobie: system tray unavailable (appindicator library missing)"
-                        );
-                    }
-                }
+                setup_tray(app);
             }
             Ok(())
         })

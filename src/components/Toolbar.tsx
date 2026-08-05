@@ -45,7 +45,8 @@ export function Toolbar({
           if (compact) onOpenSettings();
         }}
       >
-        Emobie
+        <img className="brand-mark" src="/emobie-icon.png" alt="" width={22} height={22} />
+        <span className="brand-name">Emobie</span>
       </button>
 
       {showSearchField ? (

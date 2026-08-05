@@ -49,6 +49,11 @@
     <category>Office</category>
   </categories>
   <releases>
+    <release version="0.5.4" date="2026-08-05">
+      <description>
+        <p>Doesbie branding, looser hotkeys, and left-click tray show via StatusNotifierItem.</p>
+      </description>
+    </release>
     <release version="0.5.3" date="2026-08-05">
       <description>
         <p>Hide the category strip scrollbar so icons stay fully visible.</p>

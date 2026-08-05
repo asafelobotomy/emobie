@@ -11,7 +11,9 @@ node_modules
 dist
 dist-ssr
 *.local
-dist-release/
+# Tauri generates these; Emobie is Linux-first and does not ship mobile bundles
+src-tauri/icons/android/
+src-tauri/icons/ios/
 
 # Flatpak local build artifacts
 flatpak/emobie.deb
