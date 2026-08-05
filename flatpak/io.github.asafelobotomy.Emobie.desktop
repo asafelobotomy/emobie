@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Emobie
+GenericName=Emoji Palette
+Comment=Compact emoji palette for content creators
+Exec=emobie
+Icon=io.github.asafelobotomy.Emobie
+Terminal=false
+Categories=Utility;Office;
+Keywords=emoji;clipboard;palette;
+StartupNotify=true

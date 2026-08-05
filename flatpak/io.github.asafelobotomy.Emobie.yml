@@ -1,0 +1,77 @@
+# Flatpak manifest for Emobie.
+# CI copies the built .deb next to this file as `emobie.deb` before building.
+#
+# Local example (after `npm run tauri build -- --bundles deb`):
+#   cp src-tauri/target/release/bundle/deb/*.deb flatpak/emobie.deb
+#   flatpak-builder --force-clean --user --repo=flatpak/repo flatpak/build-dir flatpak/io.github.asafelobotomy.Emobie.yml
+#   flatpak build-bundle flatpak/repo emobie.flatpak io.github.asafelobotomy.Emobie
+
+id: io.github.asafelobotomy.Emobie
+runtime: org.gnome.Platform
+runtime-version: "48"
+sdk: org.gnome.Sdk
+command: emobie
+
+finish-args:
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --share=ipc
+  - --talk-name=org.freedesktop.portal.Desktop
+  - --talk-name=org.kde.StatusNotifierWatcher
+
+modules:
+  - name: emobie
+    buildsystem: simple
+    sources:
+      - type: file
+        path: emobie.deb
+      - type: file
+        path: io.github.asafelobotomy.Emobie.metainfo.xml
+      - type: file
+        path: io.github.asafelobotomy.Emobie.desktop
+    build-commands:
+      - set -euo pipefail
+      - mkdir -p deb-extract
+      - |
+        (
+          cd deb-extract
+          ar -x ../emobie.deb
+          tar -xf data.tar.*
+        )
+      - install -Dm755 deb-extract/usr/bin/emobie /app/bin/emobie
+      - |
+        if [ -d deb-extract/usr/lib/Emobie ]; then
+          mkdir -p /app/lib/Emobie
+          cp -a deb-extract/usr/lib/Emobie/. /app/lib/Emobie/
+          find /app/lib/Emobie -type f -exec chmod 644 {} \;
+          find /app/lib/Emobie -type d -exec chmod 755 {} \;
+        fi
+      - |
+        if [ -d deb-extract/usr/lib/emobie ]; then
+          mkdir -p /app/lib/emobie
+          cp -a deb-extract/usr/lib/emobie/. /app/lib/emobie/
+          find /app/lib/emobie -type f -exec chmod 644 {} \;
+          find /app/lib/emobie -type d -exec chmod 755 {} \;
+        fi
+      - install -Dm644 io.github.asafelobotomy.Emobie.desktop /app/share/applications/io.github.asafelobotomy.Emobie.desktop
+      - |
+        for size in 32x32 128x128 256x256@2; do
+          src="deb-extract/usr/share/icons/hicolor/${size}/apps"
+          if [ -d "$src" ]; then
+            icon="$(find "$src" -maxdepth 1 -type f \( -name '*.png' -o -name '*.svg' \) | head -n1 || true)"
+            if [ -n "$icon" ]; then
+              install -Dm644 "$icon" "/app/share/icons/hicolor/${size}/apps/io.github.asafelobotomy.Emobie.${icon##*.}"
+            fi
+          fi
+        done
+      - |
+        if [ -f deb-extract/usr/share/icons/hicolor/128x128/apps/emobie.png ]; then
+          install -Dm644 deb-extract/usr/share/icons/hicolor/128x128/apps/emobie.png \
+            /app/share/icons/hicolor/128x128/apps/io.github.asafelobotomy.Emobie.png
+        elif [ -f deb-extract/usr/share/icons/hicolor/128x128/apps/Emobie.png ]; then
+          install -Dm644 deb-extract/usr/share/icons/hicolor/128x128/apps/Emobie.png \
+            /app/share/icons/hicolor/128x128/apps/io.github.asafelobotomy.Emobie.png
+        fi
+      - install -Dm644 io.github.asafelobotomy.Emobie.metainfo.xml \
+          /app/share/metainfo/io.github.asafelobotomy.Emobie.metainfo.xml

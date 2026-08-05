@@ -15,6 +15,7 @@ Compact Linux-first emoji palette for content creators. Browse the full Unicode 
 - System tray: left-click to show, menu for Show/Hide, Pin, Quit
 - Close button hides to tray instead of quitting
 - Preferences for theme, emoji size, recent max, skin tone, and hotkey
+- Flatpak packaging (`io.github.asafelobotomy.Emobie`)
 
 ## Prerequisites (Linux)
 
@@ -58,8 +59,45 @@ npm run tauri build
 
 The packaged app lands under `src-tauri/target/release/bundle/`.
 
+### Flatpak (from a built `.deb`)
+
+```bash
+# Build the Debian package first
+npm run tauri build -- --bundles deb
+
+# Stage it for the Flatpak manifest
+cp src-tauri/target/release/bundle/deb/*.deb flatpak/emobie.deb
+
+# Build and install a local Flatpak
+flatpak install -y flathub org.gnome.Platform//48 org.gnome.Sdk//48
+flatpak-builder --force-clean --user --repo=flatpak/repo flatpak/build-dir \
+  flatpak/io.github.asafelobotomy.Emobie.yml
+flatpak build-bundle flatpak/repo emobie.flatpak io.github.asafelobotomy.Emobie
+flatpak install --user emobie.flatpak
+flatpak run io.github.asafelobotomy.Emobie
+```
+
+## Releases
+
+Tagged versions (`vX.Y.Z`) trigger GitHub Actions to:
+
+1. Build the Linux `.deb`
+2. Wrap it as a `.flatpak` bundle
+3. Publish a GitHub Release with both artifacts and notes from [`CHANGELOG.md`](CHANGELOG.md)
+
+Create a release:
+
+```bash
+# Ensure package.json, Cargo.toml, and tauri.conf.json versions match
+git tag v0.5.0
+git push origin v0.5.0
+```
+
+Or run the **Release** workflow manually from the Actions tab.
+
 ## Notes
 
 - Global shortcuts and tray icons can behave differently on Wayland vs X11 depending on your compositor.
 - Emobie copies to the clipboard only (it does not auto-paste into the focused app).
 - Quit from the tray menu — closing the window keeps Emobie running in the tray.
+- See [`CHANGELOG.md`](CHANGELOG.md) for version history.

@@ -50,7 +50,7 @@ pub fn run() {
                     ],
                 )?;
 
-                let _tray = TrayIconBuilder::new()
+                let mut tray = TrayIconBuilder::new()
                     .icon(app.default_window_icon().unwrap().clone())
                     .tooltip("Emobie")
                     .menu(&menu)
@@ -75,8 +75,15 @@ pub fn run() {
                         {
                             show_main_window(tray.app_handle());
                         }
-                    })
-                    .build(app)?;
+                    });
+
+                // Keep tray icon files inside the app cache so Flatpak sandboxing works
+                // without granting access to $XDG_RUNTIME_DIR/tray-icon.
+                if let Ok(cache_dir) = app.path().app_cache_dir() {
+                    tray = tray.temp_dir_path(cache_dir);
+                }
+
+                let _tray = tray.build(app)?;
             }
             Ok(())
         })

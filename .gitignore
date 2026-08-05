@@ -11,7 +11,13 @@ node_modules
 dist
 dist-ssr
 *.local
+dist-release/
 
+# Flatpak local build artifacts
+flatpak/emobie.deb
+flatpak/build-dir/
+flatpak/repo/
+.flatpak-builder/
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -1,0 +1,209 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build (e.g. v0.5.0). Leave empty to use package.json version."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    name: Resolve version
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version and tag
+        id: meta
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.tag }}" ]]; then
+            TAG="${{ inputs.tag }}"
+          elif [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          else
+            PKG_VERSION="$(node -p "require('./package.json').version")"
+            TAG="v${PKG_VERSION}"
+          fi
+
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]; then
+            echo "Invalid tag format: $TAG" >&2
+            exit 1
+          fi
+
+          VERSION="${TAG#v}"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          CARGO_VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -n1)"
+          TAURI_VERSION="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+
+          if [[ "$VERSION" != "$PKG_VERSION" || "$VERSION" != "$CARGO_VERSION" || "$VERSION" != "$TAURI_VERSION" ]]; then
+            echo "Version mismatch. tag=$VERSION package=$PKG_VERSION cargo=$CARGO_VERSION tauri=$TAURI_VERSION" >&2
+            exit 1
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building release $TAG"
+
+  build-deb:
+    name: Build Debian package
+    needs: prepare
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            libxdo-dev \
+            build-essential \
+            file
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build Tauri deb
+        run: npm run tauri build -- --bundles deb
+
+      - name: Stage deb artifact
+        run: |
+          set -euo pipefail
+          DEB="$(find src-tauri/target/release/bundle/deb -name '*.deb' | head -n1)"
+          test -n "$DEB"
+          mkdir -p dist-release
+          cp "$DEB" "dist-release/emobie_${{ needs.prepare.outputs.version }}_amd64.deb"
+          cp "$DEB" flatpak/emobie.deb
+          ls -lh dist-release flatpak/emobie.deb
+
+      - name: Upload deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: emobie-deb
+          path: |
+            dist-release/*.deb
+            flatpak/emobie.deb
+          if-no-files-found: error
+
+  build-flatpak:
+    name: Build Flatpak bundle
+    needs: [prepare, build-deb]
+    runs-on: ubuntu-22.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
+      options: --privileged
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download deb
+        uses: actions/download-artifact@v4
+        with:
+          name: emobie-deb
+          path: artifacts
+
+      - name: Prepare Flatpak sources
+        run: |
+          set -euo pipefail
+          cp artifacts/flatpak/emobie.deb flatpak/emobie.deb
+          ls -lh flatpak/emobie.deb
+
+      - name: Build Flatpak
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: emobie-${{ needs.prepare.outputs.version }}-x86_64.flatpak
+          manifest-path: flatpak/io.github.asafelobotomy.Emobie.yml
+          cache-key: flatpak-builder-${{ github.sha }}
+          branch: stable
+          arch: x86_64
+
+      - name: Upload Flatpak
+        uses: actions/upload-artifact@v4
+        with:
+          name: emobie-flatpak
+          path: emobie-${{ needs.prepare.outputs.version }}-x86_64.flatpak
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: [prepare, build-deb, build-flatpak]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Build release notes from CHANGELOG
+        id: notes
+        run: |
+          set -euo pipefail
+          chmod +x scripts/extract-changelog.sh
+          NOTES_FILE="release-notes.md"
+          {
+            echo "## Emobie ${{ needs.prepare.outputs.version }}"
+            echo
+            ./scripts/extract-changelog.sh "${{ needs.prepare.outputs.version }}"
+            echo
+            echo "### Install Flatpak"
+            echo
+            echo '```bash'
+            echo "flatpak install --user emobie-${{ needs.prepare.outputs.version }}-x86_64.flatpak"
+            echo "flatpak run io.github.asafelobotomy.Emobie"
+            echo '```'
+          } > "$NOTES_FILE"
+          cat "$NOTES_FILE"
+
+      - name: Collect release files
+        run: |
+          set -euo pipefail
+          mkdir -p release-files
+          find artifacts -type f \( -name '*.deb' -o -name '*.flatpak' \) -print -exec cp {} release-files/ \;
+          ls -lh release-files
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: Emobie ${{ needs.prepare.outputs.version }}
+          body_path: release-notes.md
+          files: release-files/*
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

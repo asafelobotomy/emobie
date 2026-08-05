@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.asafelobotomy.Emobie</id>
+  <launchable type="desktop-id">io.github.asafelobotomy.Emobie.desktop</launchable>
+  <name>Emobie</name>
+  <summary>Compact emoji palette for content creators</summary>
+  <developer id="io.github.asafelobotomy">
+    <name>aSafeLobotomy</name>
+  </developer>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <url type="homepage">https://github.com/asafelobotomy/emobie</url>
+  <url type="bugtracker">https://github.com/asafelobotomy/emobie/issues</url>
+  <url type="vcs-browser">https://github.com/asafelobotomy/emobie</url>
+  <content_rating type="oars-1.1" />
+  <keywords>
+    <keyword>emoji</keyword>
+    <keyword>clipboard</keyword>
+    <keyword>palette</keyword>
+    <keyword>creator</keyword>
+  </keywords>
+  <branding>
+    <color type="primary" scheme_preference="light">#1a6b5a</color>
+    <color type="primary" scheme_preference="dark">#3dba9a</color>
+  </branding>
+  <recommends>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <display_length compare="ge">360</display_length>
+  </recommends>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+  <description>
+    <p>
+      Emobie is a compact Linux-first emoji palette for content creators.
+      Browse the full Unicode emoji set, favorite what you use most, copy with
+      one click, pin above other windows, and summon Emobie with a global hotkey
+      or the system tray.
+    </p>
+    <p>
+      Resize freely between horizontal, square, and vertical layouts. Preferences
+      cover theme, emoji size, skin tone, recent history, and hotkey binding.
+    </p>
+  </description>
+  <categories>
+    <category>Utility</category>
+    <category>Office</category>
+  </categories>
+  <releases>
+    <release version="0.5.0" date="2026-08-05">
+      <description>
+        <p>First Flatpak-ready release.</p>
+        <ul>
+          <li>Full Unicode emoji catalog with categories, search, and skin tones</li>
+          <li>Favorites via right-click, plus recent emoji history</li>
+          <li>Always-on-top pin, system tray, and global hotkey toggle</li>
+          <li>Adaptive compact layouts and light/dark/system themes</li>
+          <li>Flatpak packaging and GitHub release workflow</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+</component>
