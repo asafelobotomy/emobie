@@ -52,7 +52,7 @@ mod linux_tray {
         }
 
         fn title(&self) -> String {
-            "Emobie".into()
+            "emobie".into()
         }
 
         fn icon_pixmap(&self) -> Vec<Icon> {
@@ -61,7 +61,7 @@ mod linux_tray {
 
         fn tool_tip(&self) -> ToolTip {
             ToolTip {
-                title: "Emobie".into(),
+                title: "emobie".into(),
                 description: "Emoji palette".into(),
                 ..Default::default()
             }
@@ -75,7 +75,7 @@ mod linux_tray {
             use ksni::menu::*;
             vec![
                 StandardItem {
-                    label: "Show Emobie".into(),
+                    label: "Show emobie".into(),
                     activate: Box::new(|this: &mut Self| show_main_window(&this.app)),
                     ..Default::default()
                 }
@@ -140,7 +140,7 @@ fn setup_tray_tauri(app: &tauri::App) -> tauri::Result<()> {
         Emitter,
     };
 
-    let show_item = MenuItem::with_id(app, "show", "Show Emobie", true, None::<&str>)?;
+    let show_item = MenuItem::with_id(app, "show", "Show emobie", true, None::<&str>)?;
     let hide_item = MenuItem::with_id(app, "hide", "Hide", true, None::<&str>)?;
     let pin_item =
         MenuItem::with_id(app, "pin", "Toggle pin above windows", true, None::<&str>)?;
@@ -163,7 +163,7 @@ fn setup_tray_tauri(app: &tauri::App) -> tauri::Result<()> {
     let result = catch_unwind(AssertUnwindSafe(|| {
         let mut tray = TrayIconBuilder::new()
             .icon(app.default_window_icon().unwrap().clone())
-            .tooltip("Emobie")
+            .tooltip("emobie")
             .menu(&menu)
             .show_menu_on_left_click(false)
             .on_menu_event(|app, event| match event.id.as_ref() {
@@ -206,14 +206,14 @@ fn setup_tray(app: &tauri::App) {
     #[cfg(target_os = "linux")]
     {
         if let Err(error) = linux_tray::setup(app) {
-            eprintln!("Emobie: system tray unavailable: {error}");
+            eprintln!("emobie: system tray unavailable: {error}");
         }
     }
 
     #[cfg(not(target_os = "linux"))]
     {
         if let Err(error) = setup_tray_tauri(app) {
-            eprintln!("Emobie: system tray unavailable: {error}");
+            eprintln!("emobie: system tray unavailable: {error}");
         }
     }
 }
@@ -240,5 +240,5 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![])
         .run(tauri::generate_context!())
-        .expect("error while running Emobie");
+        .expect("error while running emobie");
 }

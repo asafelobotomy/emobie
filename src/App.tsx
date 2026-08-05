@@ -17,6 +17,7 @@ import { useCopyEmoji } from "./hooks/useCopyEmoji";
 import { useAlwaysOnTop } from "./hooks/useAlwaysOnTop";
 import { useGlobalHotkey } from "./hooks/useGlobalHotkey";
 import { useTheme } from "./hooks/useTheme";
+import { useWindowDecorations } from "./hooks/useWindowDecorations";
 import "@fontsource/outfit/400.css";
 import "@fontsource/outfit/600.css";
 import "@fontsource/fraunces/600.css";
@@ -33,6 +34,7 @@ function App() {
     setRecentMax,
     setSkinTone,
     setHotkey,
+    setShowTitleBar,
     pushRecent,
     clearRecents,
     toggleFavorite,
@@ -48,6 +50,7 @@ function App() {
 
   useTheme(prefs.theme);
   useAlwaysOnTop(prefs.pinned, ready);
+  useWindowDecorations(prefs.showTitleBar, ready);
   const hotkeyError = useGlobalHotkey(prefs.hotkey, ready);
 
   useEffect(() => {
@@ -99,6 +102,7 @@ function App() {
         data-layout={layout}
         data-scroll={scrollAxis}
         data-compact={compact ? "true" : "false"}
+        data-frameless={prefs.showTitleBar ? "false" : "true"}
       >
         <Toolbar
           query={query}
@@ -106,7 +110,7 @@ function App() {
           pinned={prefs.pinned}
           onTogglePin={togglePin}
           onOpenSettings={() => setSettingsOpen(true)}
-          compact={compact}
+          frameless={!prefs.showTitleBar}
         />
         <div className="body">
           <CategoryNav
@@ -145,6 +149,7 @@ function App() {
           onRecentMax={setRecentMax}
           onSkinTone={setSkinTone}
           onHotkey={setHotkey}
+          onShowTitleBar={setShowTitleBar}
           onClearRecents={clearRecents}
         />
       ) : null}

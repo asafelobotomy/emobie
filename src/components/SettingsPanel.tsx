@@ -12,6 +12,7 @@ type SettingsPanelProps = {
   onRecentMax: (value: number) => void;
   onSkinTone: (tone: SkinTone) => void;
   onHotkey: (hotkey: string) => void;
+  onShowTitleBar: (show: boolean) => void;
   onClearRecents: () => void;
 };
 
@@ -60,6 +61,7 @@ export function SettingsPanel({
   onRecentMax,
   onSkinTone,
   onHotkey,
+  onShowTitleBar,
   onClearRecents,
 }: SettingsPanelProps) {
   const titleId = useId();
@@ -158,6 +160,16 @@ export function SettingsPanel({
             <option value="light">Light</option>
             <option value="dark">Dark</option>
           </select>
+        </div>
+
+        <div className="settings-row settings-toggle-row">
+          <label htmlFor="show-title-bar">Show title bar</label>
+          <input
+            id="show-title-bar"
+            type="checkbox"
+            checked={prefs.showTitleBar}
+            onChange={(event) => onShowTitleBar(event.target.checked)}
+          />
         </div>
 
         <div className="settings-row">

@@ -2,7 +2,7 @@
 <component type="desktop-application">
   <id>io.github.asafelobotomy.Emobie</id>
   <launchable type="desktop-id">io.github.asafelobotomy.Emobie.desktop</launchable>
-  <name>Emobie</name>
+  <name>emobie</name>
   <summary>Compact emoji palette for content creators</summary>
   <developer id="io.github.asafelobotomy">
     <name>aSafeLobotomy</name>
@@ -49,6 +49,11 @@
     <category>Office</category>
   </categories>
   <releases>
+    <release version="0.5.5" date="2026-08-05">
+      <description>
+        <p>Frameless by default, compact toolbar with always-available pin/settings, and emobie branding.</p>
+      </description>
+    </release>
     <release version="0.5.4" date="2026-08-05">
       <description>
         <p>Doesbie branding, looser hotkeys, and left-click tray show via StatusNotifierItem.</p>

@@ -23,6 +23,7 @@ function normalizePreferences(saved: Partial<Preferences> | undefined): Preferen
   const merged = { ...DEFAULT_PREFERENCES, ...saved };
   return {
     ...merged,
+    showTitleBar: Boolean(merged.showTitleBar),
     recents: Array.isArray(merged.recents) ? merged.recents.filter(Boolean) : [],
     favorites: Array.isArray(merged.favorites)
       ? merged.favorites.filter(Boolean)
@@ -103,6 +104,10 @@ export function usePreferences() {
     (hotkey: string) => update({ hotkey }),
     [update],
   );
+  const setShowTitleBar = useCallback(
+    (showTitleBar: boolean) => update({ showTitleBar }),
+    [update],
+  );
 
   const pushRecent = useCallback((emoji: string) => {
     setPrefs((current) => {
@@ -141,6 +146,7 @@ export function usePreferences() {
     setRecentMax,
     setSkinTone,
     setHotkey,
+    setShowTitleBar,
     pushRecent,
     clearRecents,
     toggleFavorite,

@@ -1,4 +1,4 @@
-# Emobie
+# emobie
 
 Compact Linux-first emoji palette for content creators. Browse the full Unicode emoji set, search by name or keyword, one-click copy, pin above other windows, and summon Emobie from a global hotkey or the system tray.
 
@@ -14,7 +14,8 @@ Compact Linux-first emoji palette for content creators. Browse the full Unicode 
 - Global hotkey (default `Ctrl+Shift+Space`) to show/hide — letters/numbers need a modifier
 - System tray: left-click shows Emobie; right-click opens Show/Hide/Pin/Quit
 - Close button hides to tray instead of quitting
-- Preferences for theme, emoji size, recent max, skin tone, and hotkey
+- Preferences for theme, emoji size, recent max, skin tone, hotkey, and title bar
+- Title bar hidden by default (drag from the toolbar); optional in Settings
 - Flatpak packaging (`io.github.asafelobotomy.Emobie`)
 
 ## Prerequisites (Linux)
@@ -89,8 +90,8 @@ Create a release:
 
 ```bash
 # Ensure package.json, Cargo.toml, and tauri.conf.json versions match
-git tag v0.5.4
-git push origin v0.5.4
+git tag v0.5.5
+git push origin v0.5.5
 ```
 
 Or run the **Release** workflow manually from the Actions tab.

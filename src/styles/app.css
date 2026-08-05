@@ -60,6 +60,7 @@
   flex: 0 0 auto;
   object-fit: contain;
   display: block;
+  pointer-events: none;
 }
 
 .brand-name {
@@ -67,7 +68,6 @@
 }
 
 .app[data-compact="true"] .brand {
-  cursor: pointer;
   font-size: 0.9rem;
 }
 
@@ -76,17 +76,24 @@
   height: 18px;
 }
 
-.app[data-compact="true"] .brand:hover {
-  color: color-mix(in srgb, var(--accent) 80%, var(--ink));
+.toolbar-search {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
 }
 
 .search {
   flex: 1 1 auto;
+  width: 100%;
   min-width: 0;
+  max-width: 14rem;
   border: 1px solid var(--border);
   background: var(--bg-elevated);
   border-radius: 999px;
-  padding: 6px 12px;
+  padding: 4px 10px;
+  font-size: 0.85rem;
+  line-height: 1.2;
   outline: none;
   box-shadow: var(--shadow);
 }
@@ -338,8 +345,13 @@
 }
 
 .app[data-compact="true"] .search {
-  padding: 4px 10px;
-  font-size: 0.85rem;
+  padding: 3px 8px;
+  font-size: 0.8rem;
+  max-width: 11rem;
+}
+
+.app[data-frameless="true"] .toolbar {
+  padding-top: 8px;
 }
 
 .app[data-compact="true"] .icon-btn {
@@ -422,6 +434,18 @@
   display: grid;
   gap: 6px;
   margin-bottom: 12px;
+}
+
+.settings-toggle-row {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-toggle-row input[type="checkbox"] {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--accent);
 }
 
 .settings-row label,

@@ -7,7 +7,7 @@ type ToolbarProps = {
   pinned: boolean;
   onTogglePin: () => void;
   onOpenSettings: () => void;
-  compact: boolean;
+  frameless: boolean;
 };
 
 export function Toolbar({
@@ -16,67 +16,77 @@ export function Toolbar({
   pinned,
   onTogglePin,
   onOpenSettings,
-  compact,
+  frameless,
 }: ToolbarProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
-  const showSearchField = !compact || searchOpen || query.length > 0;
+  const showSearchField = searchOpen || query.length > 0;
+  const showActions = !showSearchField;
 
   useEffect(() => {
-    if (compact && showSearchField) {
+    if (showSearchField) {
       searchRef.current?.focus();
     }
-  }, [compact, showSearchField]);
+  }, [showSearchField]);
 
-  useEffect(() => {
-    if (!compact) {
+  const closeSearchIfEmpty = () => {
+    if (query.length === 0) {
       setSearchOpen(false);
     }
-  }, [compact]);
+  };
 
   return (
-    <header className="toolbar">
-      <button
-        type="button"
-        className="brand"
-        title={compact ? "Open settings" : "Emobie"}
-        aria-label={compact ? "Open settings" : "Emobie"}
-        onClick={() => {
-          if (compact) onOpenSettings();
-        }}
-      >
-        <img className="brand-mark" src="/emobie-icon.png" alt="" width={22} height={22} />
-        <span className="brand-name">Emobie</span>
-      </button>
-
-      {showSearchField ? (
-        <input
-          ref={searchRef}
-          className="search"
-          type="search"
-          placeholder="Search emojis…"
-          value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
-          onBlur={() => {
-            if (compact && query.length === 0) {
-              setSearchOpen(false);
-            }
-          }}
-          aria-label="Search emojis"
+    <header
+      className="toolbar"
+      {...(frameless ? { "data-tauri-drag-region": "" } : {})}
+    >
+      <div className="brand" title="emobie" aria-label="emobie">
+        <img
+          className="brand-mark"
+          src="/emobie-icon.png"
+          alt=""
+          width={22}
+          height={22}
+          draggable={false}
         />
-      ) : (
-        <button
-          type="button"
-          className="icon-btn search-toggle"
-          title="Search emojis"
-          aria-label="Search emojis"
-          onClick={() => setSearchOpen(true)}
-        >
-          <SearchIcon />
-        </button>
-      )}
+        <span className="brand-name">emobie</span>
+      </div>
 
-      {!compact ? (
+      <div className="toolbar-search">
+        {showSearchField ? (
+          <input
+            ref={searchRef}
+            className="search"
+            type="search"
+            placeholder="Search…"
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            onBlur={closeSearchIfEmpty}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                if (query.length > 0) {
+                  onQueryChange("");
+                }
+                setSearchOpen(false);
+              }
+            }}
+            aria-label="Search emojis"
+          />
+        ) : (
+          <button
+            type="button"
+            className="icon-btn search-toggle"
+            title="Search emojis"
+            aria-label="Search emojis"
+            onClick={() => setSearchOpen(true)}
+          >
+            <SearchIcon />
+          </button>
+        )}
+      </div>
+
+      {showActions ? (
         <div className="toolbar-actions">
           <button
             type="button"

@@ -10,6 +10,7 @@ export type Preferences = {
   recentMax: number;
   skinTone: SkinTone;
   hotkey: string;
+  showTitleBar: boolean;
   recents: string[];
   favorites: string[];
 };
@@ -21,6 +22,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   recentMax: 32,
   skinTone: 0,
   hotkey: "Control+Shift+Space",
+  showTitleBar: false,
   recents: [],
   favorites: [],
 };
