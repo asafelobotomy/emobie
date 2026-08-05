@@ -69,7 +69,7 @@ npm run tauri build -- --bundles deb
 cp src-tauri/target/release/bundle/deb/*.deb flatpak/emobie.deb
 
 # Build and install a local Flatpak
-flatpak install -y flathub org.gnome.Platform//48 org.gnome.Sdk//48
+flatpak install -y flathub org.gnome.Platform//50 org.gnome.Sdk//50
 flatpak-builder --force-clean --user --repo=flatpak/repo flatpak/build-dir \
   flatpak/io.github.asafelobotomy.Emobie.yml
 flatpak build-bundle flatpak/repo emobie.flatpak io.github.asafelobotomy.Emobie
@@ -89,8 +89,8 @@ Create a release:
 
 ```bash
 # Ensure package.json, Cargo.toml, and tauri.conf.json versions match
-git tag v0.5.0
-git push origin v0.5.0
+git tag v0.5.1
+git push origin v0.5.1
 ```
 
 Or run the **Release** workflow manually from the Actions tab.

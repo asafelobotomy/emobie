@@ -121,7 +121,7 @@ jobs:
     needs: [prepare, build-deb]
     runs-on: ubuntu-22.04
     container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
       options: --privileged
     steps:
       - name: Checkout
