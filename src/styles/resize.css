@@ -1,0 +1,72 @@
+.resize-handles {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.resize-edge {
+  position: absolute;
+  pointer-events: auto;
+}
+
+.resize-edge.north {
+  top: 0;
+  left: 8px;
+  right: 8px;
+  height: 6px;
+  cursor: n-resize;
+}
+
+.resize-edge.south {
+  bottom: 0;
+  left: 8px;
+  right: 8px;
+  height: 6px;
+  cursor: s-resize;
+}
+
+.resize-edge.east {
+  top: 8px;
+  right: 0;
+  bottom: 8px;
+  width: 6px;
+  cursor: e-resize;
+}
+
+.resize-edge.west {
+  top: 8px;
+  left: 0;
+  bottom: 8px;
+  width: 6px;
+  cursor: w-resize;
+}
+
+.resize-edge.corner {
+  width: 10px;
+  height: 10px;
+}
+
+.resize-edge.ne {
+  top: 0;
+  right: 0;
+  cursor: ne-resize;
+}
+
+.resize-edge.nw {
+  top: 0;
+  left: 0;
+  cursor: nw-resize;
+}
+
+.resize-edge.se {
+  bottom: 0;
+  right: 0;
+  cursor: se-resize;
+}
+
+.resize-edge.sw {
+  bottom: 0;
+  left: 0;
+  cursor: sw-resize;
+}

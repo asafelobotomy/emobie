@@ -9,3 +9,4 @@ Terminal=false
 Categories=Utility;Office;
 Keywords=emoji;clipboard;palette;
 StartupNotify=true
+StartupWMClass=emobie

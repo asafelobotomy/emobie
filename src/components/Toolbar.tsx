@@ -22,7 +22,6 @@ export function Toolbar({
   const [searchOpen, setSearchOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const showSearchField = searchOpen || query.length > 0;
-  const showActions = !showSearchField;
 
   useEffect(() => {
     if (showSearchField) {
@@ -108,33 +107,31 @@ export function Toolbar({
         )}
       </div>
 
-      {showActions ? (
-        <div className="toolbar-actions">
-          <button
-            type="button"
-            className="icon-btn pin"
-            title={pinned ? "Unpin" : "Pin above windows"}
-            aria-label={pinned ? "Unpin" : "Pin above windows"}
-            aria-pressed={pinned}
-            data-tauri-drag-region="false"
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={onTogglePin}
-          >
-            <PinIcon />
-          </button>
-          <button
-            type="button"
-            className="icon-btn"
-            title="Settings"
-            aria-label="Settings"
-            data-tauri-drag-region="false"
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={onOpenSettings}
-          >
-            <SettingsIcon />
-          </button>
-        </div>
-      ) : null}
+      <div className="toolbar-actions">
+        <button
+          type="button"
+          className="icon-btn pin"
+          title={pinned ? "Unpin" : "Pin above windows"}
+          aria-label={pinned ? "Unpin" : "Pin above windows"}
+          aria-pressed={pinned}
+          data-tauri-drag-region="false"
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={onTogglePin}
+        >
+          <PinIcon />
+        </button>
+        <button
+          type="button"
+          className="icon-btn"
+          title="Settings"
+          aria-label="Settings"
+          data-tauri-drag-region="false"
+          onMouseDown={(event) => event.stopPropagation()}
+          onClick={onOpenSettings}
+        >
+          <SettingsIcon />
+        </button>
+      </div>
     </header>
   );
 }

@@ -40,12 +40,58 @@ export function CategoryNav({ categories, activeId, onSelect }: CategoryNavProps
     return () => nav.removeEventListener("wheel", onWheel);
   }, []);
 
+  const moveSelection = (delta: number) => {
+    const index = categories.findIndex((category) => category.id === activeId);
+    if (index < 0) return;
+    const nextIndex = (index + delta + categories.length) % categories.length;
+    const next = categories[nextIndex];
+    onSelect(next.id);
+    const buttons = navRef.current?.querySelectorAll<HTMLElement>('[role="tab"]');
+    buttons?.[nextIndex]?.focus();
+  };
+
   return (
     <nav
       ref={navRef}
       className="category-nav"
       aria-label="Emoji categories"
       role="tablist"
+      onKeyDown={(event) => {
+        switch (event.key) {
+          case "ArrowRight":
+          case "ArrowDown":
+            event.preventDefault();
+            moveSelection(1);
+            break;
+          case "ArrowLeft":
+          case "ArrowUp":
+            event.preventDefault();
+            moveSelection(-1);
+            break;
+          case "Home":
+            event.preventDefault();
+            if (categories[0]) {
+              onSelect(categories[0].id);
+              navRef.current
+                ?.querySelectorAll<HTMLElement>('[role="tab"]')[0]
+                ?.focus();
+            }
+            break;
+          case "End": {
+            event.preventDefault();
+            const last = categories[categories.length - 1];
+            if (last) {
+              onSelect(last.id);
+              const buttons =
+                navRef.current?.querySelectorAll<HTMLElement>('[role="tab"]');
+              buttons?.[categories.length - 1]?.focus();
+            }
+            break;
+          }
+          default:
+            break;
+        }
+      }}
     >
       {categories.map((category) => {
         const selected = category.id === activeId;

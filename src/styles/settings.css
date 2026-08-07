@@ -1,0 +1,138 @@
+.skin-tones {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+.skin-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+}
+
+.skin-swatch[aria-pressed="true"] {
+  border-color: var(--accent);
+  transform: scale(1.08);
+}
+
+.settings-overlay {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  z-index: 50;
+  padding: 12px;
+}
+
+.settings-panel {
+  width: min(100%, 340px);
+  max-height: 100%;
+  overflow: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 12px 40px rgba(16, 24, 22, 0.18);
+}
+
+.settings-panel h2 {
+  margin: 0 0 12px;
+  font-family: var(--font-brand);
+  font-size: 1.15rem;
+}
+
+.settings-row {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.settings-toggle-row {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-toggle-row input[type="checkbox"] {
+  width: 1.05rem;
+  height: 1.05rem;
+  accent-color: var(--accent);
+}
+
+.settings-row label,
+.settings-row .settings-label {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+}
+
+.settings-hint,
+.settings-error {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.settings-hint {
+  color: var(--ink-muted);
+}
+
+.settings-hint-block {
+  margin: -6px 0 12px;
+}
+
+.settings-error {
+  color: var(--danger);
+}
+
+.settings-row select,
+.settings-row input[type="number"],
+.settings-row input[type="text"] {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.settings-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  border: 1px solid var(--border);
+  background: var(--bg-muted);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #f4faf7;
+}
+
+.btn.danger {
+  color: var(--danger);
+}
+
+.hotkey-capture {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.hotkey-capture.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}

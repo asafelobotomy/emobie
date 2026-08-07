@@ -12,3 +12,13 @@ commands.allow = ["is_launch_on_startup"]
 identifier = "allow-is-tray-available"
 description = "Allows checking whether the system tray was set up"
 commands.allow = ["is_tray_available"]
+
+[[permission]]
+identifier = "allow-release-single-instance-lock"
+description = "Allows releasing the single-instance lock when multiple instances are enabled"
+commands.allow = ["release_single_instance_lock"]
+
+[[permission]]
+identifier = "allow-quit-app"
+description = "Allows quitting the application from the UI"
+commands.allow = ["quit_app"]

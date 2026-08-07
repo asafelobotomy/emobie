@@ -41,6 +41,9 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Check source file line limits
+        run: bash scripts/check-loc.sh
+
       - name: Typecheck and frontend build
         run: npm run build
 

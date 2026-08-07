@@ -14,6 +14,8 @@ export type Preferences = {
   showTitleBar: boolean;
   launchOnStartup: boolean;
   startMinimizedToTray: boolean;
+  /** When true, skip the single-instance lock so multiple windows can run. */
+  allowMultipleInstances: boolean;
   sortBy: SortBy;
   /** hexcode -> copy count */
   usageCounts: Record<string, number>;
@@ -33,6 +35,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   showTitleBar: false,
   launchOnStartup: false,
   startMinimizedToTray: false,
+  allowMultipleInstances: false,
   sortBy: "default",
   usageCounts: {},
   firstUsedAt: {},
@@ -44,7 +47,7 @@ export const SORT_OPTIONS: { value: SortBy; label: string }[] = [
   { value: "default", label: "Default order" },
   { value: "name", label: "Name" },
   { value: "type", label: "Type (category)" },
-  { value: "dateAdded", label: "Date added" },
+  { value: "dateAdded", label: "First used" },
   { value: "uses", label: "Number of uses" },
 ];
 

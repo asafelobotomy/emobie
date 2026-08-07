@@ -9,6 +9,7 @@ lerna-debug.log*
 
 node_modules
 dist
+dist-release
 dist-ssr
 *.local
 # Tauri generates these; Emobie is Linux-first and does not ship mobile bundles

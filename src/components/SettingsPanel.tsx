@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { SkinTonePicker } from "./SkinTonePicker";
+import { HotkeyCapture } from "./HotkeyCapture";
 import {
   SORT_OPTIONS,
   type Preferences,
@@ -9,9 +11,15 @@ import {
 } from "../types/preferences";
 import type { SkinTone } from "../data/loadEmojis";
 
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 type SettingsPanelProps = {
   prefs: Preferences;
   hotkeyError: string | null;
+  autostartError: string | null;
+  prefsError: string | null;
+  trayUnavailable?: boolean;
   onClose: () => void;
   onTheme: (theme: ThemeMode) => void;
   onEmojiSize: (size: EmojiSize) => void;
@@ -21,49 +29,24 @@ type SettingsPanelProps = {
   onShowTitleBar: (show: boolean) => void;
   onLaunchOnStartup: (enabled: boolean) => void;
   onStartMinimizedToTray: (enabled: boolean) => void;
+  onAllowMultipleInstances: (enabled: boolean) => void;
   onSortBy: (sortBy: SortBy) => void;
   onClearRecents: () => void;
+  onClearUsageStats: () => void;
 };
 
-function isLetterOrDigitKey(key: string): boolean {
-  return key.length === 1 && /[A-Za-z0-9]/.test(key);
-}
-
-function formatHotkey(event: KeyboardEvent): string | null {
-  if (["Shift", "Control", "Alt", "Meta"].includes(event.key)) {
-    return null;
-  }
-
-  const hasActionModifier =
-    event.ctrlKey || event.altKey || event.metaKey || event.shiftKey;
-
-  // Bare letters/digits are reserved for typing; everything else is allowed.
-  if (isLetterOrDigitKey(event.key) && !hasActionModifier) {
-    return null;
-  }
-
-  const parts: string[] = [];
-  if (event.ctrlKey) parts.push("Control");
-  if (event.shiftKey) parts.push("Shift");
-  if (event.altKey) parts.push("Alt");
-  if (event.metaKey) parts.push("Meta");
-
-  let key = event.key;
-  if (key === " ") key = "Space";
-  else if (key === "ArrowUp") key = "Up";
-  else if (key === "ArrowDown") key = "Down";
-  else if (key === "ArrowLeft") key = "Left";
-  else if (key === "ArrowRight") key = "Right";
-  else if (key === "Escape") key = "Esc";
-  else if (key.length === 1) key = key.toUpperCase();
-
-  parts.push(key);
-  return parts.join("+");
+function getFocusable(panel: HTMLElement): HTMLElement[] {
+  return Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+    (el) => !el.hasAttribute("disabled") && el.offsetParent !== null,
+  );
 }
 
 export function SettingsPanel({
   prefs,
   hotkeyError,
+  autostartError,
+  prefsError,
+  trayUnavailable,
   onClose,
   onTheme,
   onEmojiSize,
@@ -73,25 +56,20 @@ export function SettingsPanel({
   onShowTitleBar,
   onLaunchOnStartup,
   onStartMinimizedToTray,
+  onAllowMultipleInstances,
   onSortBy,
   onClearRecents,
+  onClearUsageStats,
 }: SettingsPanelProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
-  const [capturing, setCapturing] = useState(false);
-  const [draftHotkey, setDraftHotkey] = useState(prefs.hotkey);
-  const [hotkeyHint, setHotkeyHint] = useState<string | null>(null);
-
-  useEffect(() => {
-    setDraftHotkey(prefs.hotkey);
-  }, [prefs.hotkey]);
 
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null;
-    const focusable = panelRef.current?.querySelector<HTMLElement>(
-      "select, button, input",
-    );
-    focusable?.focus();
+    const focusable = panelRef.current
+      ? getFocusable(panelRef.current)
+      : [];
+    focusable[0]?.focus();
 
     return () => {
       previouslyFocused?.focus?.();
@@ -100,47 +78,46 @@ export function SettingsPanel({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (capturing) {
-        setCapturing(false);
-        setHotkeyHint(null);
+      if (event.key === "Escape") {
+        // HotkeyCapture owns Escape while actively recording a shortcut.
+        if (panelRef.current?.querySelector(".hotkey-capture.active")) {
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
         return;
       }
-      onClose();
+
+      if (event.key !== "Tab" || !panelRef.current) return;
+
+      const focusable = getFocusable(panelRef.current);
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+
+      if (event.shiftKey) {
+        if (active === first || !panelRef.current.contains(active)) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (active === last || !panelRef.current.contains(active)) {
+        event.preventDefault();
+        first.focus();
+      }
     };
 
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [capturing, onClose]);
+  }, [onClose]);
 
-  useEffect(() => {
-    if (!capturing) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") return;
-      event.preventDefault();
-      event.stopPropagation();
-      const next = formatHotkey(event);
-      if (!next) {
-        setHotkeyHint("Letter and number keys need Ctrl, Alt, Shift, or Meta");
-        return;
-      }
-      setDraftHotkey(next);
-      onHotkey(next);
-      setHotkeyHint(null);
-      setCapturing(false);
-    };
-
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [capturing, onHotkey]);
-
-  const startCapture = useCallback(() => {
-    setHotkeyHint(null);
-    setCapturing(true);
-  }, []);
+  const quitApp = () => {
+    void invoke("quit_app").catch((error) => {
+      console.error("Failed to quit", error);
+    });
+  };
 
   return (
     <div
@@ -160,6 +137,14 @@ export function SettingsPanel({
         aria-labelledby={titleId}
       >
         <h2 id={titleId}>Preferences</h2>
+
+        {trayUnavailable ? (
+          <p className="settings-hint">
+            System tray unavailable — closing the window quits the app. Use Quit
+            below when you want to exit.
+          </p>
+        ) : null}
+        {prefsError ? <p className="settings-error">{prefsError}</p> : null}
 
         <div className="settings-row">
           <label htmlFor="theme">Theme</label>
@@ -193,6 +178,9 @@ export function SettingsPanel({
             onChange={(event) => onLaunchOnStartup(event.target.checked)}
           />
         </div>
+        {autostartError ? (
+          <p className="settings-error">{autostartError}</p>
+        ) : null}
 
         <div className="settings-row settings-toggle-row">
           <label htmlFor="start-minimized">Start minimized to system tray</label>
@@ -203,6 +191,20 @@ export function SettingsPanel({
             onChange={(event) => onStartMinimizedToTray(event.target.checked)}
           />
         </div>
+
+        <div className="settings-row settings-toggle-row">
+          <label htmlFor="allow-multiple">Allow multiple instances</label>
+          <input
+            id="allow-multiple"
+            type="checkbox"
+            checked={prefs.allowMultipleInstances}
+            onChange={(event) => onAllowMultipleInstances(event.target.checked)}
+          />
+        </div>
+        <p className="settings-hint settings-hint-block">
+          Takes effect immediately. Turn off and restart emobie to enforce a
+          single instance again.
+        </p>
 
         <div className="settings-row">
           <label htmlFor="sort-by">Sort by</label>
@@ -255,27 +257,25 @@ export function SettingsPanel({
           />
         </div>
 
-        <div className="settings-row">
-          <span className="settings-label">Global hotkey</span>
-          <button
-            type="button"
-            className={`hotkey-capture${capturing ? " active" : ""}`}
-            onClick={startCapture}
-          >
-            {capturing ? "Press a shortcut…" : draftHotkey}
-          </button>
-          {hotkeyHint ? <p className="settings-hint">{hotkeyHint}</p> : (
-            <p className="settings-hint">
-              Letters and numbers need Ctrl, Alt, Shift, or Meta. Function keys and
-              punctuation can stand alone.
-            </p>
-          )}
-          {hotkeyError ? <p className="settings-error">{hotkeyError}</p> : null}
-        </div>
+        <HotkeyCapture
+          value={prefs.hotkey}
+          error={hotkeyError}
+          onChange={onHotkey}
+        />
 
         <div className="settings-actions">
           <button type="button" className="btn danger" onClick={onClearRecents}>
             Clear recents
+          </button>
+          <button
+            type="button"
+            className="btn danger"
+            onClick={onClearUsageStats}
+          >
+            Reset usage stats
+          </button>
+          <button type="button" className="btn" onClick={quitApp}>
+            Quit
           </button>
           <button type="button" className="btn primary" onClick={onClose}>
             Done

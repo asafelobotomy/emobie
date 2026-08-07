@@ -34,6 +34,8 @@ function normalizeCountMap(value: unknown): Record<string, number> {
   return result;
 }
 
+const THEME_VALUES = new Set<ThemeMode>(["system", "light", "dark"]);
+const EMOJI_SIZE_VALUES = new Set<EmojiSize>(["sm", "md", "lg"]);
 const SORT_VALUES = new Set<SortBy>([
   "default",
   "name",
@@ -47,12 +49,31 @@ function normalizePreferences(saved: Partial<Preferences> | undefined): Preferen
   const sortBy = SORT_VALUES.has(merged.sortBy as SortBy)
     ? (merged.sortBy as SortBy)
     : DEFAULT_PREFERENCES.sortBy;
+  const theme = THEME_VALUES.has(merged.theme as ThemeMode)
+    ? (merged.theme as ThemeMode)
+    : DEFAULT_PREFERENCES.theme;
+  const emojiSize = EMOJI_SIZE_VALUES.has(merged.emojiSize as EmojiSize)
+    ? (merged.emojiSize as EmojiSize)
+    : DEFAULT_PREFERENCES.emojiSize;
+  const skinToneRaw = Number(merged.skinTone);
+  const skinTone = (Number.isFinite(skinToneRaw)
+    ? Math.min(5, Math.max(0, Math.round(skinToneRaw)))
+    : DEFAULT_PREFERENCES.skinTone) as SkinTone;
+  const hotkey =
+    typeof merged.hotkey === "string" && merged.hotkey.trim()
+      ? merged.hotkey.trim()
+      : DEFAULT_PREFERENCES.hotkey;
 
   return {
     ...merged,
+    theme,
+    emojiSize,
+    skinTone,
+    hotkey,
     showTitleBar: Boolean(merged.showTitleBar),
     launchOnStartup: Boolean(merged.launchOnStartup),
     startMinimizedToTray: Boolean(merged.startMinimizedToTray),
+    allowMultipleInstances: Boolean(merged.allowMultipleInstances),
     sortBy,
     usageCounts: normalizeCountMap(merged.usageCounts),
     firstUsedAt: normalizeCountMap(merged.firstUsedAt),
@@ -74,15 +95,22 @@ async function readPreferences(): Promise<Preferences> {
   }
 }
 
-async function writePreferences(prefs: Preferences): Promise<void> {
-  const store = await getStore();
-  await store.set("preferences", prefs);
-  await store.save();
+async function writePreferences(prefs: Preferences): Promise<boolean> {
+  try {
+    const store = await getStore();
+    await store.set("preferences", prefs);
+    await store.save();
+    return true;
+  } catch (error) {
+    console.error("Failed to save preferences", error);
+    return false;
+  }
 }
 
 export function usePreferences() {
   const [prefs, setPrefs] = useState<Preferences>(DEFAULT_PREFERENCES);
   const [ready, setReady] = useState(false);
+  const [prefsError, setPrefsError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,13 +125,22 @@ export function usePreferences() {
     };
   }, []);
 
-  const update = useCallback((patch: Partial<Preferences>) => {
-    setPrefs((current) => {
-      const next = { ...current, ...patch };
-      void writePreferences(next);
-      return next;
+  const persist = useCallback((next: Preferences) => {
+    void writePreferences(next).then((ok) => {
+      setPrefsError(ok ? null : "Could not save preferences.");
     });
   }, []);
+
+  const update = useCallback(
+    (patch: Partial<Preferences>) => {
+      setPrefs((current) => {
+        const next = { ...current, ...patch };
+        persist(next);
+        return next;
+      });
+    },
+    [persist],
+  );
 
   const setTheme = useCallback(
     (theme: ThemeMode) => update({ theme }),
@@ -117,17 +154,20 @@ export function usePreferences() {
     (emojiSize: EmojiSize) => update({ emojiSize }),
     [update],
   );
-  const setRecentMax = useCallback((recentMax: number) => {
-    setPrefs((current) => {
-      const next = {
-        ...current,
-        recentMax,
-        recents: current.recents.slice(0, recentMax),
-      };
-      void writePreferences(next);
-      return next;
-    });
-  }, []);
+  const setRecentMax = useCallback(
+    (recentMax: number) => {
+      setPrefs((current) => {
+        const next = {
+          ...current,
+          recentMax,
+          recents: current.recents.slice(0, recentMax),
+        };
+        persist(next);
+        return next;
+      });
+    },
+    [persist],
+  );
   const setSkinTone = useCallback(
     (skinTone: SkinTone) => update({ skinTone }),
     [update],
@@ -148,63 +188,78 @@ export function usePreferences() {
     (startMinimizedToTray: boolean) => update({ startMinimizedToTray }),
     [update],
   );
+  const setAllowMultipleInstances = useCallback(
+    (allowMultipleInstances: boolean) => update({ allowMultipleInstances }),
+    [update],
+  );
   const setSortBy = useCallback(
     (sortBy: SortBy) => update({ sortBy }),
     [update],
   );
 
-  const pushRecent = useCallback((emoji: string) => {
-    setPrefs((current) => {
-      const nextRecents = [
-        emoji,
-        ...current.recents.filter((item) => item !== emoji),
-      ].slice(0, current.recentMax);
+  const pushRecent = useCallback(
+    (emoji: string) => {
+      setPrefs((current) => {
+        const nextRecents = [
+          emoji,
+          ...current.recents.filter((item) => item !== emoji),
+        ].slice(0, current.recentMax);
 
-      const match = findEmojiByChar(emoji);
-      let usageCounts = current.usageCounts;
-      let firstUsedAt = current.firstUsedAt;
-      if (match) {
-        const now = Date.now();
-        usageCounts = {
-          ...current.usageCounts,
-          [match.hexcode]: (current.usageCounts[match.hexcode] ?? 0) + 1,
-        };
-        firstUsedAt = {
-          ...current.firstUsedAt,
-          [match.hexcode]: current.firstUsedAt[match.hexcode] ?? now,
-        };
-      }
+        const match = findEmojiByChar(emoji);
+        let usageCounts = current.usageCounts;
+        let firstUsedAt = current.firstUsedAt;
+        if (match) {
+          const now = Date.now();
+          usageCounts = {
+            ...current.usageCounts,
+            [match.hexcode]: (current.usageCounts[match.hexcode] ?? 0) + 1,
+          };
+          firstUsedAt = {
+            ...current.firstUsedAt,
+            [match.hexcode]: current.firstUsedAt[match.hexcode] ?? now,
+          };
+        }
 
-      const next = {
-        ...current,
-        recents: nextRecents,
-        usageCounts,
-        firstUsedAt,
-      };
-      void writePreferences(next);
-      return next;
-    });
-  }, []);
+        const next = {
+          ...current,
+          recents: nextRecents,
+          usageCounts,
+          firstUsedAt,
+        };
+        persist(next);
+        return next;
+      });
+    },
+    [persist],
+  );
 
   const clearRecents = useCallback(() => {
     update({ recents: [] });
   }, [update]);
 
-  const toggleFavorite = useCallback((hexcode: string) => {
-    setPrefs((current) => {
-      const exists = current.favorites.includes(hexcode);
-      const favorites = exists
-        ? current.favorites.filter((item) => item !== hexcode)
-        : [hexcode, ...current.favorites];
-      const next = { ...current, favorites };
-      void writePreferences(next);
-      return next;
-    });
-  }, []);
+  const clearUsageStats = useCallback(() => {
+    update({ usageCounts: {}, firstUsedAt: {} });
+  }, [update]);
+
+  const toggleFavorite = useCallback(
+    (hexcode: string) => {
+      setPrefs((current) => {
+        const exists = current.favorites.includes(hexcode);
+        const favorites = exists
+          ? current.favorites.filter((item) => item !== hexcode)
+          : [hexcode, ...current.favorites];
+        const next = { ...current, favorites };
+        persist(next);
+        return next;
+      });
+    },
+    [persist],
+  );
 
   return {
     prefs,
     ready,
+    prefsError,
     setTheme,
     setPinned,
     setEmojiSize,
@@ -214,9 +269,11 @@ export function usePreferences() {
     setShowTitleBar,
     setLaunchOnStartup,
     setStartMinimizedToTray,
+    setAllowMultipleInstances,
     setSortBy,
     pushRecent,
     clearRecents,
+    clearUsageStats,
     toggleFavorite,
     update,
   };

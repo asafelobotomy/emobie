@@ -22,6 +22,7 @@ export function EmojiButton({
   return (
     <button
       type="button"
+      role="listitem"
       className={`emoji-btn${flashing ? " flash" : ""}${favorited ? " favorited" : ""}`}
       title={title}
       aria-label={title}
@@ -30,6 +31,16 @@ export function EmojiButton({
         if (!onToggleFavorite) return;
         event.preventDefault();
         onToggleFavorite();
+      }}
+      onKeyDown={(event) => {
+        if (!onToggleFavorite) return;
+        if (
+          event.key === "ContextMenu" ||
+          (event.key === "F10" && event.shiftKey)
+        ) {
+          event.preventDefault();
+          onToggleFavorite();
+        }
       }}
     >
       {emoji}

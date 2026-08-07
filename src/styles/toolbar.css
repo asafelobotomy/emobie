@@ -1,0 +1,153 @@
+.toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-elevated) 88%, transparent);
+  backdrop-filter: blur(8px);
+  min-height: 40px;
+}
+
+.brand {
+  font-family: var(--font-brand);
+  font-weight: 650;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+  color: var(--accent);
+  white-space: nowrap;
+  user-select: none;
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: default;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1;
+}
+
+.brand-mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+}
+
+.brand-name {
+  line-height: 1;
+}
+
+.app[data-compact="true"] .brand {
+  font-size: 0.9rem;
+}
+
+.app[data-compact="true"] .brand-mark {
+  width: 18px;
+  height: 18px;
+}
+
+.toolbar-search {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.search {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  max-width: 14rem;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.85rem;
+  line-height: 1.2;
+  outline: none;
+  box-shadow: var(--shadow);
+}
+
+.search:focus {
+  border-color: var(--accent);
+}
+
+.search-toggle {
+  flex: 0 0 auto;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-muted);
+  display: grid;
+  place-items: center;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.icon-btn:hover {
+  background: var(--bg-muted);
+  color: var(--ink);
+}
+
+.icon-btn[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--accent);
+}
+
+.app[data-compact="true"] .toolbar {
+  padding: 3px 6px;
+  min-height: 32px;
+  gap: 4px;
+}
+
+.app[data-compact="true"] .search {
+  padding: 3px 8px;
+  font-size: 0.8rem;
+  max-width: 11rem;
+}
+
+.app[data-frameless="true"] .toolbar {
+  padding-top: 8px;
+}
+
+.toolbar-draggable {
+  cursor: grab;
+}
+
+.toolbar-draggable:active {
+  cursor: grabbing;
+}
+
+.toolbar-draggable .icon-btn,
+.toolbar-draggable .search {
+  cursor: pointer;
+}
+
+.toolbar-draggable .search {
+  cursor: text;
+}
+
+.app[data-compact="true"] .icon-btn {
+  width: 28px;
+  height: 28px;
+}

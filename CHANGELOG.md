@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-08-07
+
+### Added
+
+- Allow multiple instances setting (hotkey disabled while enabled; restart to re-enforce single instance)
+- Quit from Settings; close exits when the system tray is unavailable
+- Reset usage stats in Settings
+- CI per-file LOC gate (max 400 lines)
+
+### Changed
+
+- Start minimized is applied in Rust before the window paints (no flash)
+- Sort label “Date added” renamed to “First used”
+- Pin and Settings stay available while search is open
+- Hotkeys require Ctrl, Alt, or Meta for letter/digit keys
+- Preference normalization for theme, emoji size, skin tone, and hotkey
+- CSS split into focused modules; Rust tray/prefs extracted under the 400 LOC rule
+
+### Fixed
+
+- Autostart desktop entry uses Name=emobie under Flatpak
+- Autostart and preference save errors surface in Settings
+- Resize handles no longer sit above the Settings dialog
+- StartupWMClass set for better window manager grouping
+
 ## [0.6.2] - 2026-08-07
 
 ### Fixed
@@ -99,7 +124,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Horizontal mouse-wheel scrolling in wide layouts
 - Tray icon temp path for Flatpak-friendly sandboxing
 
-[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/asafelobotomy/emobie/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/asafelobotomy/emobie/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/asafelobotomy/emobie/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/asafelobotomy/emobie/compare/v0.5.5...v0.6.0

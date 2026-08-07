@@ -33,7 +33,7 @@ fn flatpak_desktop_contents() -> String {
         "\
 [Desktop Entry]
 Type=Application
-Name={FLATPAK_APP_ID}
+Name={APP_NAME}
 X-XDP-Autostart={FLATPAK_APP_ID}
 Exec=flatpak run --command={APP_NAME} {FLATPAK_APP_ID}
 X-Flatpak={FLATPAK_APP_ID}

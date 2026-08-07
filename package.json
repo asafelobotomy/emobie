@@ -1,7 +1,7 @@
 {
   "name": "emobie",
   "private": true,
-  "version": "0.6.2",
+  "version": "0.6.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,7 +15,6 @@
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-clipboard-manager": "^2.3.2",
     "@tauri-apps/plugin-global-shortcut": "^2.3.2",
-    "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-store": "^2.4.4",
     "emojibase": "^17.0.0",
     "emojibase-data": "^17.0.0",

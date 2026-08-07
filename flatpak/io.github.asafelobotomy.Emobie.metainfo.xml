@@ -48,7 +48,18 @@
     <category>Utility</category>
     <category>Office</category>
   </categories>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/asafelobotomy/emobie/main/branding/emobie-icon.png</image>
+      <caption>emobie — compact emoji palette</caption>
+    </screenshot>
+  </screenshots>
   <releases>
+    <release version="0.6.3" date="2026-08-07">
+      <description>
+        <p>Lifecycle reliability: tray-aware quit, cold-start without flash, multi-instance setting, and audit polish across settings and chrome.</p>
+      </description>
+    </release>
     <release version="0.6.2" date="2026-08-07">
       <description>
         <p>Fix Flatpak launch-on-startup, avoid invisible start-minimized without a tray, and focus a single instance on relaunch.</p>

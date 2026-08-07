@@ -90,8 +90,8 @@ Create a release:
 
 ```bash
 # Ensure package.json, Cargo.toml, and tauri.conf.json versions match
-git tag v0.6.2
-git push origin v0.6.2
+git tag v0.6.3
+git push origin v0.6.3
 ```
 
 Or run the **Release** workflow manually from the Actions tab.
@@ -101,4 +101,5 @@ Or run the **Release** workflow manually from the Actions tab.
 - Global shortcuts and tray icons can behave differently on Wayland vs X11 depending on your compositor.
 - Emobie copies to the clipboard only (it does not auto-paste into the focused app).
 - Quit from the tray menu — closing the window keeps Emobie running in the tray.
+- Flatpak app data (preferences store, etc.) lives under `~/.var/app/io.github.asafelobotomy.Emobie/data/com.emobie.app/`.
 - See [`CHANGELOG.md`](CHANGELOG.md) for version history.

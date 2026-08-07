@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Toolbar } from "./components/Toolbar";
 import { CategoryNav } from "./components/CategoryNav";
@@ -20,17 +21,22 @@ import { useGlobalHotkey } from "./hooks/useGlobalHotkey";
 import { useTheme } from "./hooks/useTheme";
 import { useWindowDecorations } from "./hooks/useWindowDecorations";
 import { useAutostart } from "./hooks/useAutostart";
-import { useStartMinimized } from "./hooks/useStartMinimized";
+import { useAllowMultipleInstances } from "./hooks/useAllowMultipleInstances";
 import "@fontsource/outfit/400.css";
 import "@fontsource/outfit/600.css";
 import "@fontsource/fraunces/600.css";
 import "./styles/tokens.css";
 import "./styles/app.css";
+import "./styles/resize.css";
+import "./styles/toolbar.css";
+import "./styles/layout.css";
+import "./styles/settings.css";
 
 function App() {
   const {
     prefs,
     ready,
+    prefsError,
     setTheme,
     setPinned,
     setEmojiSize,
@@ -40,9 +46,11 @@ function App() {
     setShowTitleBar,
     setLaunchOnStartup,
     setStartMinimizedToTray,
+    setAllowMultipleInstances,
     setSortBy,
     pushRecent,
     clearRecents,
+    clearUsageStats,
     toggleFavorite,
   } = usePreferences();
 
@@ -51,19 +59,38 @@ function App() {
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState(FAVORITES_CATEGORY_ID);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [trayUnavailable, setTrayUnavailable] = useState(false);
   const pinnedRef = useRef(prefs.pinned);
   pinnedRef.current = prefs.pinned;
 
   useTheme(prefs.theme);
   useAlwaysOnTop(prefs.pinned, ready);
   useWindowDecorations(prefs.showTitleBar, ready);
-  useAutostart(prefs.launchOnStartup, ready);
-  useStartMinimized(prefs.startMinimizedToTray, ready);
-  const hotkeyError = useGlobalHotkey(prefs.hotkey, ready);
+  const autostartError = useAutostart(prefs.launchOnStartup, ready);
+  useAllowMultipleInstances(prefs.allowMultipleInstances, ready);
+  const hotkeyError = useGlobalHotkey(
+    prefs.hotkey,
+    ready && !prefs.allowMultipleInstances,
+  );
 
   useEffect(() => {
     document.documentElement.dataset.size = prefs.emojiSize;
   }, [prefs.emojiSize]);
+
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    void invoke<boolean>("is_tray_available")
+      .then((ok) => {
+        if (!cancelled) setTrayUnavailable(!ok);
+      })
+      .catch(() => {
+        if (!cancelled) setTrayUnavailable(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ready]);
 
   const { copyEmoji, lastCopied, flashKey, copyError } = useCopyEmoji(pushRecent);
 
@@ -113,15 +140,20 @@ function App() {
 
   const status = copyError
     ? copyError
-    : lastCopied
-      ? `Copied ${lastCopied}`
-      : null;
+    : hotkeyError
+      ? hotkeyError
+      : trayUnavailable
+        ? "System tray unavailable — close quits the app."
+        : lastCopied
+          ? `Copied ${lastCopied}`
+          : null;
 
+  const statusError = Boolean(copyError || hotkeyError || trayUnavailable);
   const frameless = !prefs.showTitleBar;
 
   return (
     <div className="app-shell" ref={setRootEl}>
-      <WindowResizeHandles enabled={frameless} />
+      <WindowResizeHandles enabled={frameless && !settingsOpen} />
       <div
         className="app"
         data-layout={layout}
@@ -160,7 +192,7 @@ function App() {
           recents={prefs.recents}
           flashKey={flashKey}
           status={status}
-          statusError={Boolean(copyError)}
+          statusError={statusError}
           onCopy={copyEmoji}
         />
       </div>
@@ -168,6 +200,9 @@ function App() {
         <SettingsPanel
           prefs={prefs}
           hotkeyError={hotkeyError}
+          autostartError={autostartError}
+          prefsError={prefsError}
+          trayUnavailable={trayUnavailable}
           onClose={() => setSettingsOpen(false)}
           onTheme={setTheme}
           onEmojiSize={setEmojiSize}
@@ -177,8 +212,10 @@ function App() {
           onShowTitleBar={setShowTitleBar}
           onLaunchOnStartup={setLaunchOnStartup}
           onStartMinimizedToTray={setStartMinimizedToTray}
+          onAllowMultipleInstances={setAllowMultipleInstances}
           onSortBy={setSortBy}
           onClearRecents={clearRecents}
+          onClearUsageStats={clearUsageStats}
         />
       ) : null}
     </div>
