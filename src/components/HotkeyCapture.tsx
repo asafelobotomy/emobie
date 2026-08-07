@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { formatHotkey } from "../lib/formatHotkey";
 
 type HotkeyCaptureProps = {
   value: string;
@@ -6,40 +7,7 @@ type HotkeyCaptureProps = {
   onChange: (hotkey: string) => void;
 };
 
-function isLetterOrDigitKey(key: string): boolean {
-  return key.length === 1 && /[A-Za-z0-9]/.test(key);
-}
-
-/** Require Ctrl/Alt/Meta for letter/digit keys — Shift alone is not enough. */
-export function formatHotkey(event: KeyboardEvent): string | null {
-  if (["Shift", "Control", "Alt", "Meta"].includes(event.key)) {
-    return null;
-  }
-
-  const hasStrongModifier = event.ctrlKey || event.altKey || event.metaKey;
-
-  if (isLetterOrDigitKey(event.key) && !hasStrongModifier) {
-    return null;
-  }
-
-  const parts: string[] = [];
-  if (event.ctrlKey) parts.push("Control");
-  if (event.shiftKey) parts.push("Shift");
-  if (event.altKey) parts.push("Alt");
-  if (event.metaKey) parts.push("Meta");
-
-  let key = event.key;
-  if (key === " ") key = "Space";
-  else if (key === "ArrowUp") key = "Up";
-  else if (key === "ArrowDown") key = "Down";
-  else if (key === "ArrowLeft") key = "Left";
-  else if (key === "ArrowRight") key = "Right";
-  else if (key === "Escape") key = "Esc";
-  else if (key.length === 1) key = key.toUpperCase();
-
-  parts.push(key);
-  return parts.join("+");
-}
+export { formatHotkey } from "../lib/formatHotkey";
 
 export function HotkeyCapture({ value, error, onChange }: HotkeyCaptureProps) {
   const [capturing, setCapturing] = useState(false);
@@ -96,12 +64,15 @@ export function HotkeyCapture({ value, error, onChange }: HotkeyCaptureProps) {
 
   return (
     <div className="settings-row">
-      <span className="settings-label">Global hotkey</span>
+      <label className="settings-label" id="hotkey-label">
+        Global hotkey
+      </label>
       <button
         type="button"
         className={`hotkey-capture${capturing ? " active" : ""}`}
         onClick={startCapture}
         aria-pressed={capturing}
+        aria-labelledby="hotkey-label"
       >
         {capturing ? "Press a shortcut…" : draftHotkey}
       </button>
