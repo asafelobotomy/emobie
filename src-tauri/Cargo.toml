@@ -1,6 +1,6 @@
 [package]
 name = "emobie"
-version = "0.6.3"
+version = "0.6.4"
 description = "Emobie — compact emoji palette for content creators"
 authors = ["aSafeLobotomy"]
 edition = "2021"

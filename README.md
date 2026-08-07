@@ -17,6 +17,7 @@ Compact Linux-first emoji palette for content creators. Browse the full Unicode 
 - Preferences for theme, emoji size, recent max, skin tone, hotkey, and title bar
 - Title bar hidden by default (drag from the toolbar); optional in Settings
 - Flatpak packaging (`io.github.asafelobotomy.Emobie`)
+- Also ships as `.deb`, `.rpm`, and AppImage from GitHub Releases
 
 ## Prerequisites (Linux)
 
@@ -60,6 +61,22 @@ npm run tauri build
 
 The packaged app lands under `src-tauri/target/release/bundle/`.
 
+Linux package formats:
+
+```bash
+# Debian / Ubuntu
+npm run tauri build -- --bundles deb
+
+# Fedora / RHEL / openSUSE
+npm run tauri build -- --bundles rpm
+
+# Portable AppImage
+npm run tauri build -- --bundles appimage
+
+# All three at once
+npm run tauri build -- --bundles deb,rpm,appimage
+```
+
 ### Flatpak (from a built `.deb`)
 
 ```bash
@@ -82,16 +99,16 @@ flatpak run io.github.asafelobotomy.Emobie
 
 Tagged versions (`vX.Y.Z`) trigger GitHub Actions to:
 
-1. Build the Linux `.deb`
-2. Wrap it as a `.flatpak` bundle
-3. Publish a GitHub Release with both artifacts and notes from [`CHANGELOG.md`](CHANGELOG.md)
+1. Build Linux `.deb`, `.rpm`, and AppImage
+2. Wrap the `.deb` as a `.flatpak` bundle
+3. Publish a GitHub Release with all artifacts and notes from [`CHANGELOG.md`](CHANGELOG.md)
 
 Create a release:
 
 ```bash
 # Ensure package.json, Cargo.toml, and tauri.conf.json versions match
-git tag v0.6.3
-git push origin v0.6.3
+git tag v0.6.4
+git push origin v0.6.4
 ```
 
 Or run the **Release** workflow manually from the Actions tab.

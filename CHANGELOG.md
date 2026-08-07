@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-08-07
+
+### Added
+
+- GitHub Releases now publish `.rpm` and AppImage alongside `.deb` and Flatpak
+
 ## [0.6.3] - 2026-08-07
 
 ### Added
@@ -124,7 +130,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Horizontal mouse-wheel scrolling in wide layouts
 - Tray icon temp path for Flatpak-friendly sandboxing
 
-[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.3...HEAD
+[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.4...HEAD
+[0.6.4]: https://github.com/asafelobotomy/emobie/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/asafelobotomy/emobie/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/asafelobotomy/emobie/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/asafelobotomy/emobie/compare/v0.6.0...v0.6.1

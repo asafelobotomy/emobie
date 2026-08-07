@@ -55,6 +55,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.4" date="2026-08-07">
+      <description>
+        <p>Ship .rpm and AppImage packages on GitHub Releases alongside .deb and Flatpak.</p>
+      </description>
+    </release>
     <release version="0.6.3" date="2026-08-07">
       <description>
         <p>Lifecycle reliability: tray-aware quit, cold-start without flash, multi-instance setting, and audit polish across settings and chrome.</p>

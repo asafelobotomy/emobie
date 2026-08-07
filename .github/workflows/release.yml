@@ -61,8 +61,8 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Building release $TAG"
 
-  build-deb:
-    name: Build Debian package
+  build-linux:
+    name: Build Linux packages
     needs: prepare
     runs-on: ubuntu-22.04
     steps:
@@ -89,36 +89,49 @@ jobs:
             libssl-dev \
             libxdo-dev \
             build-essential \
-            file
+            file \
+            rpm \
+            libfuse2
 
       - name: Install npm dependencies
         run: npm ci
 
-      - name: Build Tauri deb
-        run: npm run tauri build -- --bundles deb
+      - name: Build Tauri deb, rpm, and AppImage
+        run: npm run tauri build -- --bundles deb,rpm,appimage
 
-      - name: Stage deb artifact
+      - name: Stage package artifacts
         run: |
           set -euo pipefail
-          DEB="$(find src-tauri/target/release/bundle/deb -name '*.deb' | head -n1)"
-          test -n "$DEB"
+          VERSION="${{ needs.prepare.outputs.version }}"
           mkdir -p dist-release
-          cp "$DEB" "dist-release/emobie_${{ needs.prepare.outputs.version }}_amd64.deb"
+
+          DEB="$(find src-tauri/target/release/bundle/deb -name '*.deb' | head -n1)"
+          RPM="$(find src-tauri/target/release/bundle/rpm -name '*.rpm' | head -n1)"
+          APPIMAGE="$(find src-tauri/target/release/bundle/appimage -name '*.AppImage' | head -n1)"
+
+          test -n "$DEB"
+          test -n "$RPM"
+          test -n "$APPIMAGE"
+
+          cp "$DEB" "dist-release/emobie_${VERSION}_amd64.deb"
           cp "$DEB" flatpak/emobie.deb
+          cp "$RPM" "dist-release/emobie-${VERSION}-1.x86_64.rpm"
+          cp "$APPIMAGE" "dist-release/emobie_${VERSION}_amd64.AppImage"
+          chmod +x "dist-release/emobie_${VERSION}_amd64.AppImage"
           ls -lh dist-release flatpak/emobie.deb
 
-      - name: Upload deb
+      - name: Upload Linux packages
         uses: actions/upload-artifact@v4
         with:
-          name: emobie-deb
+          name: emobie-linux
           path: |
-            dist-release/*.deb
+            dist-release/*
             flatpak/emobie.deb
           if-no-files-found: error
 
   build-flatpak:
     name: Build Flatpak bundle
-    needs: [prepare, build-deb]
+    needs: [prepare, build-linux]
     runs-on: ubuntu-22.04
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
@@ -127,10 +140,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download deb
+      - name: Download Linux packages
         uses: actions/download-artifact@v4
         with:
-          name: emobie-deb
+          name: emobie-linux
           path: artifacts
 
       - name: Prepare Flatpak sources
@@ -157,7 +170,7 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    needs: [prepare, build-deb, build-flatpak]
+    needs: [prepare, build-linux, build-flatpak]
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
@@ -172,18 +185,33 @@ jobs:
         id: notes
         run: |
           set -euo pipefail
+          VERSION="${{ needs.prepare.outputs.version }}"
           chmod +x scripts/extract-changelog.sh
           NOTES_FILE="release-notes.md"
           {
-            echo "## Emobie ${{ needs.prepare.outputs.version }}"
+            echo "## Emobie ${VERSION}"
             echo
-            ./scripts/extract-changelog.sh "${{ needs.prepare.outputs.version }}"
+            ./scripts/extract-changelog.sh "${VERSION}"
+            echo
+            echo "### Packages"
+            echo
+            echo "- **Flatpak:** \`emobie-${VERSION}-x86_64.flatpak\`"
+            echo "- **Debian/Ubuntu:** \`emobie_${VERSION}_amd64.deb\`"
+            echo "- **Fedora/RHEL:** \`emobie-${VERSION}-1.x86_64.rpm\`"
+            echo "- **AppImage:** \`emobie_${VERSION}_amd64.AppImage\`"
             echo
             echo "### Install Flatpak"
             echo
             echo '```bash'
-            echo "flatpak install --user emobie-${{ needs.prepare.outputs.version }}-x86_64.flatpak"
+            echo "flatpak install --user emobie-${VERSION}-x86_64.flatpak"
             echo "flatpak run io.github.asafelobotomy.Emobie"
+            echo '```'
+            echo
+            echo "### Install AppImage"
+            echo
+            echo '```bash'
+            echo "chmod +x emobie_${VERSION}_amd64.AppImage"
+            echo "./emobie_${VERSION}_amd64.AppImage"
             echo '```'
           } > "$NOTES_FILE"
           cat "$NOTES_FILE"
@@ -192,7 +220,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-files
-          find artifacts -type f \( -name '*.deb' -o -name '*.flatpak' \) -print -exec cp {} release-files/ \;
+          find artifacts -type f \( \
+            -name '*.deb' -o \
+            -name '*.rpm' -o \
+            -name '*.AppImage' -o \
+            -name '*.flatpak' \
+          \) -print -exec cp {} release-files/ \;
+          # Keep flatpak/emobie.deb out of the public release if duplicated;
+          # named dist-release copies are enough.
+          rm -f release-files/emobie.deb
           ls -lh release-files
 
       - name: Create GitHub Release
