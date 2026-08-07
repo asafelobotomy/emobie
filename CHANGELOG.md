@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-08-07
+
+### Fixed
+
+- Launch on startup under Flatpak now uses `flatpak run` instead of a sandbox-only path
+- Start minimized is skipped when the system tray is unavailable, so the window cannot vanish
+- Relaunching focuses the existing instance instead of stacking invisible copies
+
 ## [0.6.1] - 2026-08-05
 
 ### Added
@@ -91,7 +99,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Horizontal mouse-wheel scrolling in wide layouts
 - Tray icon temp path for Flatpak-friendly sandboxing
 
-[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/asafelobotomy/emobie/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/asafelobotomy/emobie/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/asafelobotomy/emobie/compare/v0.5.5...v0.6.0
 [0.5.5]: https://github.com/asafelobotomy/emobie/compare/v0.5.4...v0.5.5

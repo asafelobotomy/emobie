@@ -1,6 +1,11 @@
-use tauri::{AppHandle, Manager, WindowEvent};
+use tauri::{AppHandle, Manager, State, WindowEvent};
+
+mod autostart;
 
 const PIN_EVENT: &str = "tray-pin-toggle";
+const FLATPAK_APP_ID: &str = "io.github.asafelobotomy.Emobie";
+
+struct TrayAvailable(bool);
 
 fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -14,6 +19,11 @@ fn hide_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.hide();
     }
+}
+
+#[tauri::command]
+fn is_tray_available(tray: State<'_, TrayAvailable>) -> bool {
+    tray.0
 }
 
 #[cfg(target_os = "linux")]
@@ -202,18 +212,26 @@ fn setup_tray_tauri(app: &tauri::App) -> tauri::Result<()> {
     }
 }
 
-fn setup_tray(app: &tauri::App) {
+fn setup_tray(app: &tauri::App) -> bool {
     #[cfg(target_os = "linux")]
     {
-        if let Err(error) = linux_tray::setup(app) {
-            eprintln!("emobie: system tray unavailable: {error}");
+        match linux_tray::setup(app) {
+            Ok(()) => true,
+            Err(error) => {
+                eprintln!("emobie: system tray unavailable: {error}");
+                false
+            }
         }
     }
 
     #[cfg(not(target_os = "linux"))]
     {
-        if let Err(error) = setup_tray_tauri(app) {
-            eprintln!("emobie: system tray unavailable: {error}");
+        match setup_tray_tauri(app) {
+            Ok(()) => true,
+            Err(error) => {
+                eprintln!("emobie: system tray unavailable: {error}");
+                false
+            }
         }
     }
 }
@@ -221,6 +239,17 @@ fn setup_tray(app: &tauri::App) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin({
+            let mut single = tauri_plugin_single_instance::Builder::new().callback(
+                |app, _argv, _cwd| {
+                    show_main_window(app);
+                },
+            );
+            if std::env::var_os("FLATPAK_ID").is_some() {
+                single = single.dbus_id(FLATPAK_APP_ID);
+            }
+            single.build()
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -228,12 +257,12 @@ pub fn run() {
         .setup(|app| {
             #[cfg(desktop)]
             {
-                app.handle().plugin(
-                    tauri_plugin_autostart::Builder::new()
-                        .app_name("emobie")
-                        .build(),
-                )?;
-                setup_tray(app);
+                let tray_ok = setup_tray(app);
+                app.manage(TrayAvailable(tray_ok));
+            }
+            #[cfg(not(desktop))]
+            {
+                app.manage(TrayAvailable(false));
             }
             Ok(())
         })
@@ -243,7 +272,11 @@ pub fn run() {
                 let _ = window.hide();
             }
         })
-        .invoke_handler(tauri::generate_handler![])
+        .invoke_handler(tauri::generate_handler![
+            autostart::set_launch_on_startup,
+            autostart::is_launch_on_startup,
+            is_tray_available,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running emobie");
 }

@@ -1,0 +1,14 @@
+[[permission]]
+identifier = "allow-set-launch-on-startup"
+description = "Allows enabling or disabling launch on startup"
+commands.allow = ["set_launch_on_startup"]
+
+[[permission]]
+identifier = "allow-is-launch-on-startup"
+description = "Allows checking whether launch on startup is enabled"
+commands.allow = ["is_launch_on_startup"]
+
+[[permission]]
+identifier = "allow-is-tray-available"
+description = "Allows checking whether the system tray was set up"
+commands.allow = ["is_tray_available"]

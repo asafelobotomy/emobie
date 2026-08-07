@@ -18,8 +18,10 @@
     "core:window:allow-close",
     "opener:default",
     "store:default",
-    "autostart:default",
     "clipboard-manager:allow-write-text",
-    "clipboard-manager:allow-read-text"
+    "clipboard-manager:allow-read-text",
+    "allow-set-launch-on-startup",
+    "allow-is-launch-on-startup",
+    "allow-is-tray-available"
   ]
 }

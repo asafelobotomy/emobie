@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
+import { invoke } from "@tauri-apps/api/core";
 
 /** Keep desktop autostart registration in sync with the preference. */
 export function useAutostart(launchOnStartup: boolean, enabled: boolean) {
@@ -11,13 +11,11 @@ export function useAutostart(launchOnStartup: boolean, enabled: boolean) {
 
     void (async () => {
       try {
-        const currentlyEnabled = await isEnabled();
+        const currentlyEnabled = await invoke<boolean>("is_launch_on_startup");
         if (cancelled) return;
 
-        if (launchOnStartup && !currentlyEnabled) {
-          await enable();
-        } else if (!launchOnStartup && currentlyEnabled) {
-          await disable();
+        if (launchOnStartup !== currentlyEnabled) {
+          await invoke("set_launch_on_startup", { enabled: launchOnStartup });
         }
         syncedRef.current = true;
       } catch (error) {

@@ -49,6 +49,11 @@
     <category>Office</category>
   </categories>
   <releases>
+    <release version="0.6.2" date="2026-08-07">
+      <description>
+        <p>Fix Flatpak launch-on-startup, avoid invisible start-minimized without a tray, and focus a single instance on relaunch.</p>
+      </description>
+    </release>
     <release version="0.6.1" date="2026-08-05">
       <description>
         <p>Startup options, emoji sort preference, frameless resize cursors, and a fixed pin button frame.</p>
