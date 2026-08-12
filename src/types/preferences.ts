@@ -4,6 +4,14 @@ export type ThemeMode = "system" | "light" | "dark";
 export type EmojiSize = "sm" | "md" | "lg";
 export type SortBy = "default" | "name" | "type" | "dateAdded" | "uses";
 
+export type Macro = {
+  id: string;
+  trigger: string;
+  expansion: string;
+  hotkey: string | null;
+  enabled: boolean;
+};
+
 export type Preferences = {
   theme: ThemeMode;
   pinned: boolean;
@@ -23,6 +31,12 @@ export type Preferences = {
   firstUsedAt: Record<string, number>;
   recents: string[];
   favorites: string[];
+  macros: Macro[];
+  showShortcodeMacros: boolean;
+  autoPasteOnCopy: boolean;
+  expandAsYouType: boolean;
+  checkUpdatesOnStartup: boolean;
+  dismissedUpdateVersion: string | null;
 };
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -41,6 +55,12 @@ export const DEFAULT_PREFERENCES: Preferences = {
   firstUsedAt: {},
   recents: [],
   favorites: [],
+  macros: [],
+  showShortcodeMacros: true,
+  autoPasteOnCopy: false,
+  expandAsYouType: false,
+  checkUpdatesOnStartup: true,
+  dismissedUpdateVersion: null,
 };
 
 export const SORT_OPTIONS: { value: SortBy; label: string }[] = [

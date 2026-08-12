@@ -1,9 +1,17 @@
 //! System tray setup (Linux ksni + other platforms via Tauri tray).
 
+use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
 pub const PIN_EVENT: &str = "tray-pin-toggle";
 const FLATPAK_APP_ID: &str = "io.github.asafelobotomy.Emobie";
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrayStatus {
+    pub available: bool,
+    pub detail: String,
+}
 
 pub fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
@@ -24,7 +32,7 @@ mod linux {
     use super::{hide_main_window, show_main_window, FLATPAK_APP_ID, PIN_EVENT};
     use image::GenericImageView;
     use ksni::blocking::TrayMethods;
-    use ksni::{Icon, MenuItem, ToolTip, Tray};
+    use ksni::{Category, Icon, MenuItem, ToolTip, Tray};
     use tauri::{AppHandle, Emitter, Manager};
 
     struct EmobieTray {
@@ -58,9 +66,17 @@ mod linux {
         }
     }
 
+    fn in_flatpak() -> bool {
+        std::env::var_os("FLATPAK_ID").is_some()
+    }
+
     impl Tray for EmobieTray {
         fn id(&self) -> String {
             self.id.clone()
+        }
+
+        fn category(&self) -> Category {
+            Category::ApplicationStatus
         }
 
         fn title(&self) -> String {
@@ -130,13 +146,24 @@ mod linux {
             return Err("failed to decode tray icon".into());
         }
 
-        let tray_handle = EmobieTray {
+        let tray = EmobieTray {
             app: handle,
             icons,
             id: tray_id(unique_id),
-        }
-        .spawn()
-        .map_err(|err| err.to_string())?;
+        };
+
+        // Flatpak Flathub cannot own StatusNotifierItem-* well-known names.
+        // Cinnamon/Mint (xapp-sn-watcher) still hosts the item without own-name.
+        let sandboxed = in_flatpak();
+        let tray_handle = tray
+            .disable_dbus_name(sandboxed)
+            .assume_sni_available(true)
+            .spawn()
+            .map_err(|err| {
+                format!(
+                    "{err} (Cinnamon: enable System Tray applet; Mint uses xapp-sn-watcher)"
+                )
+            })?;
 
         app.manage(TrayGuard(tray_handle));
         Ok(())
@@ -215,15 +242,21 @@ fn setup_tray_tauri(app: &tauri::App) -> tauri::Result<()> {
     }
 }
 
-/// Returns true when the tray was set up successfully.
-pub fn setup(app: &tauri::App, unique_id: bool) -> bool {
+/// Returns tray availability plus a short diagnostic string.
+pub fn setup(app: &tauri::App, unique_id: bool) -> TrayStatus {
     #[cfg(target_os = "linux")]
     {
         match linux::setup(app, unique_id) {
-            Ok(()) => true,
+            Ok(()) => TrayStatus {
+                available: true,
+                detail: "StatusNotifier tray ready".into(),
+            },
             Err(error) => {
                 eprintln!("emobie: system tray unavailable: {error}");
-                false
+                TrayStatus {
+                    available: false,
+                    detail: error,
+                }
             }
         }
     }
@@ -232,10 +265,17 @@ pub fn setup(app: &tauri::App, unique_id: bool) -> bool {
     {
         let _ = unique_id;
         match setup_tray_tauri(app) {
-            Ok(()) => true,
+            Ok(()) => TrayStatus {
+                available: true,
+                detail: "Tray ready".into(),
+            },
             Err(error) => {
-                eprintln!("emobie: system tray unavailable: {error}");
-                false
+                let detail = error.to_string();
+                eprintln!("emobie: system tray unavailable: {detail}");
+                TrayStatus {
+                    available: false,
+                    detail,
+                }
             }
         }
     }

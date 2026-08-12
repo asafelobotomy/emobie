@@ -21,6 +21,7 @@ while IFS= read -r -d '' file; do
 done < <(
   find "$ROOT/src" -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.css' \) -print0
   find "$ROOT/src-tauri/src" -type f -name '*.rs' -print0
+  find "$ROOT/crates" -type f -name '*.rs' -print0 2>/dev/null || true
 )
 
 if (( failed )); then

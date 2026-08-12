@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Startup check against GitHub Releases for newer versions (toggle in Settings; dismissible)
+- Text macros: Macros nav category, in-pane Add (+), per-macro hotkeys, emoji shortcodes + common emoticons (`:)`, `;')`, …), Espanso-ish YAML import/export
+- Optional auto-paste on copy and as-you-type expansion via host helper `emobie-inputd` ([`docs/MACROS.md`](docs/MACROS.md))
+- Flatpak socket access to `$XDG_RUNTIME_DIR/emobie` for the host input helper (no `--device=input`)
+- Flathub-bound offline source Flatpak manifest (`cargo-sources` / `node-sources`) alongside the GitHub Releases `.deb` wrap
+- App screenshots and Flathub readiness checklist ([`docs/FLATHUB.md`](docs/FLATHUB.md)); submission remains deferred
+
+### Fixed
+
+- Linux Flatpak tray registration on Cinnamon/Mint: disable StatusNotifierItem well-known name ownership in the sandbox and assume SNI via xapp-sn-watcher
+- Clearer tray diagnostics in Settings when the tray fails to start
+
 ## [0.6.4] - 2026-08-07
 
 ### Added

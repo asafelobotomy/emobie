@@ -2,7 +2,10 @@ import type { Emoji as EmojibaseEmoji } from "emojibase";
 import { EMOJI } from "emojibase";
 import data from "emojibase-data/en/data.json";
 import messages from "emojibase-data/en/messages.json";
-import shortcodes from "emojibase-data/en/shortcodes/emojibase.json";
+import shortcodesEmojibase from "emojibase-data/en/shortcodes/emojibase.json";
+import shortcodesGithub from "emojibase-data/en/shortcodes/github.json";
+import shortcodesLegacy from "emojibase-data/en/shortcodes/emojibase-legacy.json";
+import { extraEmoticonsFor } from "./extraEmoticons";
 
 export type SkinTone = 0 | 1 | 2 | 3 | 4 | 5;
 
@@ -13,6 +16,7 @@ export type EmobieEmoji = {
   group: number;
   tags: string[];
   shortcodes: string[];
+  emoticons: string[];
   skins?: { emoji: string; tone: number | number[] }[];
   order: number;
 };
@@ -38,14 +42,46 @@ const CATEGORY_ICONS: Record<string, string> = {
 
 const SKIP_GROUPS = new Set(["component"]);
 
-function normalizeShortcodes(value: string | string[] | undefined): string[] {
+function asStringList(value: string | string[] | undefined): string[] {
   if (!value) return [];
   return Array.isArray(value) ? value : [value];
 }
 
+function mergeShortcodes(hexcode: string): string[] {
+  const packs = [
+    shortcodesEmojibase,
+    shortcodesGithub,
+    shortcodesLegacy,
+  ] as Record<string, string | string[]>[];
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const pack of packs) {
+    for (const code of asStringList(pack[hexcode])) {
+      const key = code.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(code);
+    }
+  }
+  return result;
+}
+
+function mergeEmoticons(
+  emoji: string,
+  base: string | string[] | undefined,
+): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const item of [...asStringList(base), ...extraEmoticonsFor(emoji)]) {
+    if (!item || seen.has(item)) continue;
+    seen.add(item);
+    result.push(item);
+  }
+  return result;
+}
+
 function buildEmojis(): EmobieEmoji[] {
   const emojiData = data as EmojibaseEmoji[];
-  const shortcodeMap = shortcodes as Record<string, string | string[]>;
 
   return emojiData
     .filter((item) => item.type === EMOJI && item.group !== undefined)
@@ -59,7 +95,8 @@ function buildEmojis(): EmobieEmoji[] {
       hexcode: item.hexcode,
       group: item.group as number,
       tags: item.tags ?? [],
-      shortcodes: normalizeShortcodes(shortcodeMap[item.hexcode]),
+      shortcodes: mergeShortcodes(item.hexcode),
+      emoticons: mergeEmoticons(item.emoji, item.emoticon),
       skins: item.skins?.map((skin) => ({
         emoji: skin.emoji,
         tone: skin.tone as number | number[],
@@ -96,6 +133,7 @@ export function applySkinTone(emoji: EmobieEmoji, tone: SkinTone): string {
 }
 
 export const FAVORITES_CATEGORY_ID = -1;
+export const MACROS_CATEGORY_ID = -2;
 
 export const FAVORITES_CATEGORY: Category = {
   id: FAVORITES_CATEGORY_ID,
@@ -104,7 +142,18 @@ export const FAVORITES_CATEGORY: Category = {
   icon: "⭐",
 };
 
-export const NAV_CATEGORIES: Category[] = [FAVORITES_CATEGORY, ...CATEGORIES];
+export const MACROS_CATEGORY: Category = {
+  id: MACROS_CATEGORY_ID,
+  key: "macros",
+  label: "Macros",
+  icon: "⌘",
+};
+
+export const NAV_CATEGORIES: Category[] = [
+  FAVORITES_CATEGORY,
+  MACROS_CATEGORY,
+  ...CATEGORIES,
+];
 
 function sortFavoritesFirst(
   emojis: EmobieEmoji[],
@@ -198,7 +247,12 @@ export function searchEmojis(
   const matches = EMOJIS.filter((emoji) => {
     if (emoji.label.toLowerCase().includes(q)) return true;
     if (emoji.tags.some((tag) => tag.includes(q))) return true;
-    if (emoji.shortcodes.some((code) => code.toLowerCase().includes(q))) return true;
+    if (emoji.shortcodes.some((code) => code.toLowerCase().includes(q))) {
+      return true;
+    }
+    if (emoji.emoticons.some((emoticon) => emoticon.toLowerCase().includes(q))) {
+      return true;
+    }
     return false;
   }).map((emoji) => ({
     ...emoji,

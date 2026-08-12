@@ -1,10 +1,17 @@
-# Flatpak manifest for Emobie.
-# CI copies the built .deb next to this file as `emobie.deb` before building.
+# Flathub-bound Flatpak — builds emobie from source offline (cargo + npm).
+# GitHub Releases still use io.github.asafelobotomy.Emobie.deb.yml.
 #
-# Local example (after `npm run tauri build -- --bundles deb`):
-#   cp src-tauri/target/release/bundle/deb/*.deb flatpak/emobie.deb
-#   flatpak-builder --force-clean --user --repo=flatpak/repo flatpak/build-dir flatpak/io.github.asafelobotomy.Emobie.yml
-#   flatpak build-bundle flatpak/repo emobie.flatpak io.github.asafelobotomy.Emobie
+# Regenerate dependency manifests after lockfile changes:
+#   ./scripts/generate-flatpak-sources.sh
+#
+# Update the git tag/commit below to the release being packaged.
+#
+# Local build (requires rust + node SDK extensions):
+#   flatpak install -y flathub org.gnome.Sdk//50 \
+#     org.freedesktop.Sdk.Extension.rust-stable//25.08 \
+#     org.freedesktop.Sdk.Extension.node22//25.08
+#   flatpak-builder --force-clean --user --install \
+#     flatpak/build-dir-src flatpak/io.github.asafelobotomy.Emobie.yml
 
 id: io.github.asafelobotomy.Emobie
 runtime: org.gnome.Platform
@@ -12,69 +19,64 @@ runtime-version: "50"
 sdk: org.gnome.Sdk
 command: emobie
 
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+  - org.freedesktop.Sdk.Extension.node22
+
 finish-args:
   - --socket=wayland
   - --socket=fallback-x11
   - --device=dri
   - --share=ipc
-  - --talk-name=org.freedesktop.portal.Desktop
+  - --share=network
+  # Tray (StatusNotifier). No --own-name wildcard (Flathub disallows); ksni
+  # disables dbus name ownership inside Flatpak so Cinnamon/Mint xapp-sn-watcher works.
   - --talk-name=org.kde.StatusNotifierWatcher
   - --talk-name=org.x.StatusNotifierWatcher
-  - --own-name=org.kde.StatusNotifierItem.*
-  - --filesystem=xdg-config/autostart:create
+  # Optional host emobie-inputd socket (as-you-type / auto-paste). No --device=input.
+  - --filesystem=xdg-run/emobie
+  # Launch-on-startup uses the Autostart portal path long-term; do not grant
+  # xdg-config/autostart filesystem (Flathub linter rejects it). See docs/FLATHUB.md.
+
+build-options:
+  append-path: /usr/lib/sdk/node22/bin:/usr/lib/sdk/rust-stable/bin
 
 modules:
+  - shared-modules/libappindicator/libappindicator-gtk3-12.10.json
+
   - name: emobie
     buildsystem: simple
+    build-options:
+      env:
+        CARGO_HOME: /run/build/emobie/cargo
+        XDG_CACHE_HOME: /run/build/emobie/flatpak-node/cache
+        npm_config_cache: /run/build/emobie/flatpak-node/npm-cache
+        npm_config_offline: "true"
     sources:
-      - type: file
-        path: emobie.deb
+      - type: git
+        url: https://github.com/asafelobotomy/emobie.git
+        tag: v0.6.4
+        commit: c5c851204d3b2f38fd41f0236e054f16edd00f4b
+        x-checker-data:
+          type: git
+          tag-pattern: ^v([0-9]+(\.[0-9]+)*)$
+
+      - node-sources.json
+      - cargo-sources.json
+
       - type: file
         path: io.github.asafelobotomy.Emobie.metainfo.xml
       - type: file
         path: io.github.asafelobotomy.Emobie.desktop
     build-commands:
-      - set -euo pipefail
-      - mkdir -p deb-extract
-      - |
-        (
-          cd deb-extract
-          ar -x ../emobie.deb
-          tar -xf data.tar.*
-        )
-      - install -Dm755 deb-extract/usr/bin/emobie /app/bin/emobie
-      - |
-        if [ -d deb-extract/usr/lib/Emobie ]; then
-          mkdir -p /app/lib/Emobie
-          cp -a deb-extract/usr/lib/Emobie/. /app/lib/Emobie/
-          find /app/lib/Emobie -type f -exec chmod 644 {} \;
-          find /app/lib/Emobie -type d -exec chmod 755 {} \;
-        fi
-      - |
-        if [ -d deb-extract/usr/lib/emobie ]; then
-          mkdir -p /app/lib/emobie
-          cp -a deb-extract/usr/lib/emobie/. /app/lib/emobie/
-          find /app/lib/emobie -type f -exec chmod 644 {} \;
-          find /app/lib/emobie -type d -exec chmod 755 {} \;
-        fi
+      - npm ci --offline --legacy-peer-deps
+      - cargo --offline fetch --manifest-path src-tauri/Cargo.toml --verbose
+      - npm run --offline tauri build -- --no-bundle
+      - install -Dm755 src-tauri/target/release/emobie /app/bin/emobie
       - install -Dm644 io.github.asafelobotomy.Emobie.desktop /app/share/applications/io.github.asafelobotomy.Emobie.desktop
-      - |
-        for size in 32x32 128x128 256x256@2; do
-          src="deb-extract/usr/share/icons/hicolor/${size}/apps"
-          if [ -d "$src" ]; then
-            icon="$(find "$src" -maxdepth 1 -type f \( -name '*.png' -o -name '*.svg' \) | head -n1 || true)"
-            if [ -n "$icon" ]; then
-              install -Dm644 "$icon" "/app/share/icons/hicolor/${size}/apps/io.github.asafelobotomy.Emobie.${icon##*.}"
-            fi
-          fi
-        done
-      - |
-        if [ -f deb-extract/usr/share/icons/hicolor/128x128/apps/emobie.png ]; then
-          install -Dm644 deb-extract/usr/share/icons/hicolor/128x128/apps/emobie.png \
-            /app/share/icons/hicolor/128x128/apps/io.github.asafelobotomy.Emobie.png
-        elif [ -f deb-extract/usr/share/icons/hicolor/128x128/apps/Emobie.png ]; then
-          install -Dm644 deb-extract/usr/share/icons/hicolor/128x128/apps/Emobie.png \
-            /app/share/icons/hicolor/128x128/apps/io.github.asafelobotomy.Emobie.png
-        fi
-      - install -Dm644 io.github.asafelobotomy.Emobie.metainfo.xml \
-          /app/share/metainfo/io.github.asafelobotomy.Emobie.metainfo.xml
+      - install -Dm644 io.github.asafelobotomy.Emobie.metainfo.xml /app/share/metainfo/io.github.asafelobotomy.Emobie.metainfo.xml
+      - install -Dm644 src-tauri/icons/32x32.png /app/share/icons/hicolor/32x32/apps/io.github.asafelobotomy.Emobie.png
+      - install -Dm644 src-tauri/icons/128x128.png /app/share/icons/hicolor/128x128/apps/io.github.asafelobotomy.Emobie.png
+      - install -Dm644 src-tauri/icons/128x128@2x.png /app/share/icons/hicolor/256x256/apps/io.github.asafelobotomy.Emobie.png
+      - install -Dm644 src-tauri/icons/icon.png /app/share/icons/hicolor/512x512/apps/io.github.asafelobotomy.Emobie.png
+      - install -Dm644 LICENSE /app/share/licenses/io.github.asafelobotomy.Emobie/LICENSE

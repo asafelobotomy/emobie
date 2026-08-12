@@ -14,6 +14,21 @@ description = "Allows checking whether the system tray was set up"
 commands.allow = ["is_tray_available"]
 
 [[permission]]
+identifier = "allow-tray-status"
+description = "Allows reading tray availability diagnostics"
+commands.allow = ["tray_status"]
+
+[[permission]]
+identifier = "allow-check-for-updates"
+description = "Allows checking GitHub Releases for a newer version"
+commands.allow = ["check_for_updates"]
+
+[[permission]]
+identifier = "allow-open-release-page"
+description = "Allows opening the Emobie GitHub release page"
+commands.allow = ["open_release_page"]
+
+[[permission]]
 identifier = "allow-release-single-instance-lock"
 description = "Allows releasing the single-instance lock when multiple instances are enabled"
 commands.allow = ["release_single_instance_lock"]
@@ -22,3 +37,23 @@ commands.allow = ["release_single_instance_lock"]
 identifier = "allow-quit-app"
 description = "Allows quitting the application from the UI"
 commands.allow = ["quit_app"]
+
+[[permission]]
+identifier = "allow-input-helper-status"
+description = "Allows querying emobie-inputd status"
+commands.allow = ["input_helper_status"]
+
+[[permission]]
+identifier = "allow-input-helper-set-enabled"
+description = "Allows enabling or disabling as-you-type expansion"
+commands.allow = ["input_helper_set_enabled"]
+
+[[permission]]
+identifier = "allow-input-helper-sync-matches"
+description = "Allows syncing macro matches to emobie-inputd"
+commands.allow = ["input_helper_sync_matches"]
+
+[[permission]]
+identifier = "allow-input-helper-inject-paste"
+description = "Allows requesting a Ctrl+V paste injection"
+commands.allow = ["input_helper_inject_paste"]

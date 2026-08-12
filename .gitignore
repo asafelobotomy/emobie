@@ -19,8 +19,14 @@ src-tauri/icons/ios/
 # Flatpak local build artifacts
 flatpak/emobie.deb
 flatpak/build-dir/
+flatpak/build-dir-src/
 flatpak/repo/
 .flatpak-builder/
+builddir/
+repo/
+
+# Rust build outputs (host helper and other crates/)
+crates/**/target/
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

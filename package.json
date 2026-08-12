@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "node --experimental-strip-types --test src/lib/*.test.ts",
+    "test:inputd": "cargo test --manifest-path crates/emobie-inputd/Cargo.toml",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -20,7 +21,8 @@
     "emojibase": "^17.0.0",
     "emojibase-data": "^17.0.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

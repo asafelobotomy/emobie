@@ -1,0 +1,14 @@
+[Unit]
+Description=Emobie input helper (text expansion)
+Documentation=https://github.com/asafelobotomy/emobie
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/emobie-inputd
+Restart=on-failure
+RestartSec=2
+# Runs as the graphical user session so Wayland/X11 inject works.
+# Device access is granted via udev + emobie-input group.
+
+[Install]
+WantedBy=default.target

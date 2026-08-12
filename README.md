@@ -57,7 +57,10 @@ App ID: `io.github.asafelobotomy.Emobie`
 |---|---|
 | **Catalog** | Full Unicode emoji set via emojibase, with categories and search (name, tags, shortcodes) |
 | **Favorites & recents** | Right-click to favorite; recent history with configurable size |
-| **Copy** | One-click clipboard copy (no auto-paste into other apps) |
+| **Macros** | Custom trigger → expansion cards (+ to add), shortcodes + emoticons (`:)`, `;')`, …), per-macro hotkeys, YAML import/export |
+| **Updates** | Optional startup check against GitHub Releases (dismissible notice in Settings) |
+| **Copy** | One-click clipboard copy; optional auto-paste when the host input helper is available |
+| **Expand** | Optional as-you-type expansion via `emobie-inputd` (off by default; see [docs/MACROS.md](docs/MACROS.md)) |
 | **Summon** | Global hotkey (default `Ctrl+Shift+Space`; letters/numbers need a modifier) and system tray |
 | **Layout** | Resize freely — horizontal, square, or vertical; frameless by default (optional title bar in Settings) |
 | **Pin** | Always-on-top from the toolbar or tray |
@@ -133,7 +136,7 @@ npm run tauri build -- --bundles appimage
 npm run tauri build -- --bundles deb,rpm,appimage
 ```
 
-### Flatpak (from a `.deb`)
+### Flatpak (GitHub Releases — from a `.deb`)
 
 ```bash
 npm run tauri build -- --bundles deb
@@ -141,11 +144,12 @@ cp src-tauri/target/release/bundle/deb/*.deb flatpak/emobie.deb
 
 flatpak install -y flathub org.gnome.Platform//50 org.gnome.Sdk//50
 flatpak-builder --force-clean --user --repo=flatpak/repo flatpak/build-dir \
-  flatpak/io.github.asafelobotomy.Emobie.yml
+  flatpak/io.github.asafelobotomy.Emobie.deb.yml
 flatpak build-bundle flatpak/repo emobie.flatpak io.github.asafelobotomy.Emobie
 flatpak install --user emobie.flatpak
 ```
 
+A separate **source-build** manifest ([`flatpak/io.github.asafelobotomy.Emobie.yml`](flatpak/io.github.asafelobotomy.Emobie.yml)) is prepared for a future Flathub submission. Flathub listing is **deferred** until the checklist in [`docs/FLATHUB.md`](docs/FLATHUB.md) is green.
 ---
 
 ## Releases

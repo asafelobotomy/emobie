@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { load, type Store } from "@tauri-apps/plugin-store";
 import {
   DEFAULT_PREFERENCES,
+  type Macro,
   type Preferences,
   type ThemeMode,
   type EmojiSize,
@@ -132,6 +133,60 @@ export function usePreferences() {
     (sortBy: SortBy) => update({ sortBy }),
     [update],
   );
+  const setShowShortcodeMacros = useCallback(
+    (showShortcodeMacros: boolean) => update({ showShortcodeMacros }),
+    [update],
+  );
+  const setAutoPasteOnCopy = useCallback(
+    (autoPasteOnCopy: boolean) => update({ autoPasteOnCopy }),
+    [update],
+  );
+  const setExpandAsYouType = useCallback(
+    (expandAsYouType: boolean) => update({ expandAsYouType }),
+    [update],
+  );
+  const setCheckUpdatesOnStartup = useCallback(
+    (checkUpdatesOnStartup: boolean) => update({ checkUpdatesOnStartup }),
+    [update],
+  );
+  const setDismissedUpdateVersion = useCallback(
+    (dismissedUpdateVersion: string | null) =>
+      update({ dismissedUpdateVersion }),
+    [update],
+  );
+
+  const upsertMacro = useCallback(
+    (macro: Macro) => {
+      setPrefs((current) => {
+        const without = current.macros.filter((item) => item.id !== macro.id);
+        const clash = without.some((item) => item.trigger === macro.trigger);
+        if (clash) return current;
+        const next = { ...current, macros: [...without, macro] };
+        persist(next);
+        return next;
+      });
+    },
+    [persist],
+  );
+
+  const removeMacro = useCallback(
+    (id: string) => {
+      setPrefs((current) => {
+        const next = {
+          ...current,
+          macros: current.macros.filter((item) => item.id !== id),
+        };
+        persist(next);
+        return next;
+      });
+    },
+    [persist],
+  );
+
+  const setMacros = useCallback(
+    (macros: Macro[]) => update({ macros }),
+    [update],
+  );
 
   const pushRecent = useCallback(
     (emoji: string) => {
@@ -207,6 +262,14 @@ export function usePreferences() {
     setStartMinimizedToTray,
     setAllowMultipleInstances,
     setSortBy,
+    setShowShortcodeMacros,
+    setAutoPasteOnCopy,
+    setExpandAsYouType,
+    setCheckUpdatesOnStartup,
+    setDismissedUpdateVersion,
+    upsertMacro,
+    removeMacro,
+    setMacros,
     pushRecent,
     clearRecents,
     clearUsageStats,

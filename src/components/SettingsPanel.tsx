@@ -2,14 +2,17 @@ import { useEffect, useId, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { SkinTonePicker } from "./SkinTonePicker";
 import { HotkeyCapture } from "./HotkeyCapture";
+import { MacrosSettings } from "./MacrosSettings";
 import {
   SORT_OPTIONS,
+  type Macro,
   type Preferences,
   type ThemeMode,
   type EmojiSize,
   type SortBy,
 } from "../types/preferences";
 import type { SkinTone } from "../data/loadEmojis";
+import type { InputHelperStatus } from "../lib/inputHelper";
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -20,6 +23,15 @@ type SettingsPanelProps = {
   autostartError: string | null;
   prefsError: string | null;
   trayUnavailable?: boolean;
+  trayDetail?: string | null;
+  updateInfo?: {
+    current: string;
+    latest: string | null;
+    newerAvailable: boolean;
+    releaseUrl: string | null;
+    detail: string;
+  } | null;
+  inputStatus: InputHelperStatus | null;
   onClose: () => void;
   onTheme: (theme: ThemeMode) => void;
   onEmojiSize: (size: EmojiSize) => void;
@@ -31,6 +43,13 @@ type SettingsPanelProps = {
   onStartMinimizedToTray: (enabled: boolean) => void;
   onAllowMultipleInstances: (enabled: boolean) => void;
   onSortBy: (sortBy: SortBy) => void;
+  onShowShortcodeMacros: (value: boolean) => void;
+  onAutoPasteOnCopy: (value: boolean) => void;
+  onExpandAsYouType: (value: boolean) => void;
+  onCheckUpdatesOnStartup: (value: boolean) => void;
+  onDismissUpdate: (version: string) => void;
+  onOpenRelease: (url: string) => void;
+  onSetMacros: (macros: Macro[]) => void;
   onClearRecents: () => void;
   onClearUsageStats: () => void;
 };
@@ -47,6 +66,9 @@ export function SettingsPanel({
   autostartError,
   prefsError,
   trayUnavailable,
+  trayDetail,
+  updateInfo,
+  inputStatus,
   onClose,
   onTheme,
   onEmojiSize,
@@ -58,6 +80,13 @@ export function SettingsPanel({
   onStartMinimizedToTray,
   onAllowMultipleInstances,
   onSortBy,
+  onShowShortcodeMacros,
+  onAutoPasteOnCopy,
+  onExpandAsYouType,
+  onCheckUpdatesOnStartup,
+  onDismissUpdate,
+  onOpenRelease,
+  onSetMacros,
   onClearRecents,
   onClearUsageStats,
 }: SettingsPanelProps) {
@@ -142,9 +171,48 @@ export function SettingsPanel({
           <p className="settings-hint">
             System tray unavailable — closing the window quits the app. Use Quit
             below when you want to exit.
+            {trayDetail ? ` (${trayDetail})` : ""}
           </p>
         ) : null}
         {prefsError ? <p className="settings-error">{prefsError}</p> : null}
+
+        {updateInfo?.newerAvailable ? (
+          <div className="settings-update-banner">
+            <p className="settings-hint">
+              {updateInfo.detail} (you have v{updateInfo.current})
+            </p>
+            <div className="settings-actions">
+              {updateInfo.releaseUrl ? (
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={() => onOpenRelease(updateInfo.releaseUrl!)}
+                >
+                  Open release
+                </button>
+              ) : null}
+              {updateInfo.latest ? (
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => onDismissUpdate(updateInfo.latest!)}
+                >
+                  Dismiss
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="settings-row settings-toggle-row">
+          <label htmlFor="check-updates">Check for updates on startup</label>
+          <input
+            id="check-updates"
+            type="checkbox"
+            checked={prefs.checkUpdatesOnStartup}
+            onChange={(event) => onCheckUpdatesOnStartup(event.target.checked)}
+          />
+        </div>
 
         <div className="settings-row">
           <label htmlFor="theme">Theme</label>
@@ -261,6 +329,18 @@ export function SettingsPanel({
           value={prefs.hotkey}
           error={hotkeyError}
           onChange={onHotkey}
+        />
+
+        <MacrosSettings
+          macros={prefs.macros}
+          showShortcodeMacros={prefs.showShortcodeMacros}
+          autoPasteOnCopy={prefs.autoPasteOnCopy}
+          expandAsYouType={prefs.expandAsYouType}
+          inputStatus={inputStatus}
+          onShowShortcodes={onShowShortcodeMacros}
+          onAutoPaste={onAutoPasteOnCopy}
+          onExpandAsYouType={onExpandAsYouType}
+          onSetMacros={onSetMacros}
         />
 
         <div className="settings-actions">

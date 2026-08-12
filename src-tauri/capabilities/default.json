@@ -18,10 +18,18 @@
     "core:window:allow-close",
     "store:default",
     "clipboard-manager:allow-write-text",
+    "clipboard-manager:allow-read-text",
     "allow-set-launch-on-startup",
     "allow-is-launch-on-startup",
     "allow-is-tray-available",
+    "allow-tray-status",
+    "allow-check-for-updates",
+    "allow-open-release-page",
     "allow-release-single-instance-lock",
-    "allow-quit-app"
+    "allow-quit-app",
+    "allow-input-helper-status",
+    "allow-input-helper-set-enabled",
+    "allow-input-helper-sync-matches",
+    "allow-input-helper-inject-paste"
   ]
 }

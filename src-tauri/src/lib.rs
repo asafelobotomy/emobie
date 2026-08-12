@@ -1,16 +1,23 @@
 use tauri::{AppHandle, Manager, State, WindowEvent};
 
 mod autostart;
+mod input_helper;
 mod prefs;
 mod tray;
+mod updates;
 
 const FLATPAK_APP_ID: &str = "io.github.asafelobotomy.Emobie";
 
-pub struct TrayAvailable(pub bool);
+pub struct TrayAvailable(pub tray::TrayStatus);
 
 #[tauri::command]
 fn is_tray_available(tray: State<'_, TrayAvailable>) -> bool {
-    tray.0
+    tray.0.available
+}
+
+#[tauri::command]
+fn tray_status(tray: State<'_, TrayAvailable>) -> tray::TrayStatus {
+    tray.0.clone()
 }
 
 #[tauri::command]
@@ -61,13 +68,17 @@ pub fn run() {
         .setup(move |app| {
             #[cfg(desktop)]
             {
-                let tray_ok = tray::setup(app, allow_multiple);
-                app.manage(TrayAvailable(tray_ok));
+                let status = tray::setup(app, allow_multiple);
+                let tray_ok = status.available;
+                app.manage(TrayAvailable(status));
                 apply_startup_visibility(app, tray_ok);
             }
             #[cfg(not(desktop))]
             {
-                app.manage(TrayAvailable(false));
+                app.manage(TrayAvailable(tray::TrayStatus {
+                    available: false,
+                    detail: "Tray is desktop-only.".into(),
+                }));
             }
             Ok(())
         })
@@ -76,7 +87,7 @@ pub fn run() {
                 let tray_ok = window
                     .app_handle()
                     .try_state::<TrayAvailable>()
-                    .map(|state| state.0)
+                    .map(|state| state.0.available)
                     .unwrap_or(false);
                 if tray_ok {
                     api.prevent_close();
@@ -90,8 +101,15 @@ pub fn run() {
             autostart::set_launch_on_startup,
             autostart::is_launch_on_startup,
             is_tray_available,
+            tray_status,
             release_single_instance_lock,
             quit_app,
+            input_helper::input_helper_status,
+            input_helper::input_helper_set_enabled,
+            input_helper::input_helper_sync_matches,
+            input_helper::input_helper_inject_paste,
+            updates::check_for_updates,
+            updates::open_release_page,
         ])
         .run(tauri::generate_context!())
         .expect("error while running emobie");

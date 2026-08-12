@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
+import type { Macro } from "../types/preferences";
 
 async function toggleVisibility() {
   const window = getCurrentWindow();
@@ -14,43 +15,101 @@ async function toggleVisibility() {
   }
 }
 
-export function useGlobalHotkey(hotkey: string, enabled: boolean) {
-  const registeredRef = useRef<string | null>(null);
+export type MacroHotkeyBinding = {
+  hotkey: string;
+  expansion: string;
+};
+
+async function unregisterAll(keys: string[]) {
+  for (const key of keys) {
+    try {
+      await unregister(key);
+    } catch {
+      // ignore stale shortcuts
+    }
+  }
+}
+
+export function useGlobalHotkeys(options: {
+  summonHotkey: string;
+  summonEnabled: boolean;
+  macros: Macro[];
+  onMacroHotkey: (expansion: string) => void | Promise<void>;
+  ready: boolean;
+}) {
+  const registeredRef = useRef<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const onMacroRef = useRef(options.onMacroHotkey);
+  onMacroRef.current = options.onMacroHotkey;
+
+  const macroBindings: MacroHotkeyBinding[] = options.macros
+    .filter((macro) => macro.enabled && macro.hotkey)
+    .map((macro) => ({
+      hotkey: macro.hotkey as string,
+      expansion: macro.expansion,
+    }));
+
+  const bindingKey = macroBindings
+    .map((item) => `${item.hotkey}\0${item.expansion}`)
+    .join("|");
 
   useEffect(() => {
-    if (!enabled || !hotkey) return;
+    if (!options.ready) return;
 
     let cancelled = false;
 
     const setup = async () => {
-      if (registeredRef.current) {
+      await unregisterAll(registeredRef.current);
+      registeredRef.current = [];
+
+      const next: string[] = [];
+      let firstError: string | null = null;
+
+      if (options.summonEnabled && options.summonHotkey) {
         try {
-          await unregister(registeredRef.current);
-        } catch {
-          // ignore unregister failures for stale shortcuts
+          await register(options.summonHotkey, async (event) => {
+            if (event.state === "Pressed") {
+              await toggleVisibility();
+            }
+          });
+          next.push(options.summonHotkey);
+        } catch (err) {
+          console.error("Failed to register summon hotkey", err);
+          firstError = "Could not register hotkey — try another shortcut.";
         }
-        registeredRef.current = null;
       }
 
-      try {
-        await register(hotkey, async (event) => {
-          if (event.state === "Pressed") {
-            await toggleVisibility();
+      const used = new Set(next);
+      for (const binding of macroBindings) {
+        if (used.has(binding.hotkey)) {
+          if (!firstError) {
+            firstError = `Macro hotkey ${binding.hotkey} conflicts with another shortcut.`;
           }
-        });
-        if (!cancelled) {
-          registeredRef.current = hotkey;
-          setError(null);
-        } else {
-          await unregister(hotkey);
+          continue;
         }
-      } catch (err) {
-        console.error("Failed to register hotkey", hotkey, err);
-        if (!cancelled) {
-          setError("Could not register hotkey — try another shortcut.");
+        try {
+          const expansion = binding.expansion;
+          await register(binding.hotkey, async (event) => {
+            if (event.state === "Pressed") {
+              await onMacroRef.current(expansion);
+            }
+          });
+          next.push(binding.hotkey);
+          used.add(binding.hotkey);
+        } catch (err) {
+          console.error("Failed to register macro hotkey", binding.hotkey, err);
+          if (!firstError) {
+            firstError = `Could not register macro hotkey ${binding.hotkey}.`;
+          }
         }
       }
+
+      if (cancelled) {
+        await unregisterAll(next);
+        return;
+      }
+      registeredRef.current = next;
+      setError(firstError);
     };
 
     void setup();
@@ -58,12 +117,28 @@ export function useGlobalHotkey(hotkey: string, enabled: boolean) {
     return () => {
       cancelled = true;
       const current = registeredRef.current;
-      if (current) {
-        void unregister(current).catch(() => undefined);
-        registeredRef.current = null;
-      }
+      registeredRef.current = [];
+      void unregisterAll(current);
     };
-  }, [hotkey, enabled]);
+    // bindingKey captures macro hotkey+expansion changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    options.ready,
+    options.summonEnabled,
+    options.summonHotkey,
+    bindingKey,
+  ]);
 
   return error;
+}
+
+/** Back-compat wrapper used if anything still imports the old name. */
+export function useGlobalHotkey(hotkey: string, enabled: boolean) {
+  return useGlobalHotkeys({
+    summonHotkey: hotkey,
+    summonEnabled: enabled,
+    macros: [],
+    onMacroHotkey: () => undefined,
+    ready: enabled || Boolean(hotkey),
+  });
 }

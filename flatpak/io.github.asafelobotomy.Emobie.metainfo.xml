@@ -3,7 +3,7 @@
   <id>io.github.asafelobotomy.Emobie</id>
   <launchable type="desktop-id">io.github.asafelobotomy.Emobie.desktop</launchable>
   <name>emobie</name>
-  <summary>Compact emoji palette for content creators</summary>
+  <summary>Browse and copy emoji fast</summary>
   <developer id="io.github.asafelobotomy">
     <name>aSafeLobotomy</name>
   </developer>
@@ -28,20 +28,15 @@
     <control>keyboard</control>
     <display_length compare="ge">360</display_length>
   </recommends>
-  <supports>
-    <control>pointing</control>
-    <control>keyboard</control>
-  </supports>
   <description>
     <p>
-      Emobie is a compact Linux-first emoji palette for content creators.
-      Browse the full Unicode emoji set, favorite what you use most, copy with
-      one click, pin above other windows, and summon Emobie with a global hotkey
-      or the system tray.
+      emobie is a compact emoji palette for Linux. Search the full Unicode set,
+      favorite what you use most, copy with one click, pin the window above
+      other apps, and summon it from a global hotkey or the system tray.
     </p>
     <p>
       Resize freely between horizontal, square, and vertical layouts. Preferences
-      cover theme, emoji size, skin tone, recent history, and hotkey binding.
+      cover theme, emoji size, skin tone, recent history, sort order, and hotkey.
     </p>
   </description>
   <categories>
@@ -50,8 +45,16 @@
   </categories>
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/asafelobotomy/emobie/main/branding/emobie-icon.png</image>
-      <caption>emobie — compact emoji palette</caption>
+      <image>https://raw.githubusercontent.com/asafelobotomy/emobie/main/branding/screenshots/01-browse.png</image>
+      <caption>Browse favorites and copy with one click</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/asafelobotomy/emobie/main/branding/screenshots/02-smileys.png</image>
+      <caption>Jump between emoji categories</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/asafelobotomy/emobie/main/branding/screenshots/03-dark.png</image>
+      <caption>Dark theme with recent emoji strip</caption>
     </screenshot>
   </screenshots>
   <releases>

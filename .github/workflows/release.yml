@@ -156,8 +156,10 @@ jobs:
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           bundle: emobie-${{ needs.prepare.outputs.version }}-x86_64.flatpak
-          manifest-path: flatpak/io.github.asafelobotomy.Emobie.yml
-          cache-key: flatpak-builder-${{ github.sha }}
+          # Deb-wrap for GitHub Releases. Flathub-bound source build:
+          # flatpak/io.github.asafelobotomy.Emobie.yml (see docs/FLATHUB.md).
+          manifest-path: flatpak/io.github.asafelobotomy.Emobie.deb.yml
+          cache-key: flatpak-builder-deb-${{ github.sha }}
           branch: stable
           arch: x86_64
 

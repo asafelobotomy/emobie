@@ -5,11 +5,21 @@ type HotkeyCaptureProps = {
   value: string;
   error: string | null;
   onChange: (hotkey: string) => void;
+  label?: string;
+  hint?: string;
+  allowClear?: boolean;
 };
 
 export { formatHotkey } from "../lib/formatHotkey";
 
-export function HotkeyCapture({ value, error, onChange }: HotkeyCaptureProps) {
+export function HotkeyCapture({
+  value,
+  error,
+  onChange,
+  label = "Global hotkey",
+  hint,
+  allowClear = false,
+}: HotkeyCaptureProps) {
   const [capturing, setCapturing] = useState(false);
   const [draftHotkey, setDraftHotkey] = useState(value);
   const [hotkeyHint, setHotkeyHint] = useState<string | null>(null);
@@ -65,23 +75,39 @@ export function HotkeyCapture({ value, error, onChange }: HotkeyCaptureProps) {
   return (
     <div className="settings-row">
       <label className="settings-label" id="hotkey-label">
-        Global hotkey
+        {label}
       </label>
-      <button
-        type="button"
-        className={`hotkey-capture${capturing ? " active" : ""}`}
-        onClick={startCapture}
-        aria-pressed={capturing}
-        aria-labelledby="hotkey-label"
-      >
-        {capturing ? "Press a shortcut…" : draftHotkey}
-      </button>
+      <div className="hotkey-capture-row">
+        <button
+          type="button"
+          className={`hotkey-capture${capturing ? " active" : ""}`}
+          onClick={startCapture}
+          aria-pressed={capturing}
+          aria-labelledby="hotkey-label"
+        >
+          {capturing
+            ? "Press a shortcut…"
+            : draftHotkey || "None"}
+        </button>
+        {allowClear && draftHotkey ? (
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              setDraftHotkey("");
+              onChange("");
+            }}
+          >
+            Clear
+          </button>
+        ) : null}
+      </div>
       {hotkeyHint ? (
         <p className="settings-hint">{hotkeyHint}</p>
       ) : (
         <p className="settings-hint">
-          Letters and numbers need Ctrl, Alt, or Meta (Shift alone is not
-          enough). Function keys and punctuation can stand alone.
+          {hint ??
+            "Letters and numbers need Ctrl, Alt, or Meta (Shift alone is not enough). Function keys and punctuation can stand alone."}
         </p>
       )}
       {error ? <p className="settings-error">{error}</p> : null}

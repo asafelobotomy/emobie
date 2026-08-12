@@ -30,7 +30,7 @@
 }
 
 .settings-panel {
-  width: min(100%, 340px);
+  width: min(100%, 400px);
   max-height: 100%;
   overflow: auto;
   background: var(--bg-elevated);
@@ -83,6 +83,16 @@
 
 .settings-hint-block {
   margin: -6px 0 12px;
+}
+
+.settings-update-banner {
+  margin-bottom: 12px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .settings-error {
