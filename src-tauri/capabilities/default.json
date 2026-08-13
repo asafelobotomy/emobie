@@ -30,6 +30,8 @@
     "allow-input-helper-status",
     "allow-input-helper-set-enabled",
     "allow-input-helper-sync-matches",
-    "allow-input-helper-inject-paste"
+    "allow-input-helper-inject-paste",
+    "allow-input-helper-ensure-started",
+    "allow-input-helper-run-access-setup"
   ]
 }

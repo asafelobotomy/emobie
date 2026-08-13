@@ -9,7 +9,7 @@ type MacroListProps = {
   summonHotkey: string;
   flashKey: string | null;
   emptyMessage: string;
-  onCopy: (expansion: string) => void;
+  onCopy: (expansion: string, flashKey: string) => void;
   onUpsert: (macro: Macro) => void;
   onRemove: (id: string) => void;
 };
@@ -59,11 +59,9 @@ export function MacroList({
               type="button"
               role="listitem"
               className={
-                flashKey === macro.expansion
-                  ? "macro-card flash"
-                  : "macro-card"
+                flashKey === macro.id ? "macro-card flash" : "macro-card"
               }
-              onClick={() => onCopy(macro.expansion)}
+              onClick={() => onCopy(macro.expansion, macro.id)}
               onContextMenu={(event) => {
                 if (macro.source !== "custom") return;
                 event.preventDefault();

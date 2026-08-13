@@ -6,6 +6,7 @@ import { CategoryNav } from "./components/CategoryNav";
 import { EmojiGrid } from "./components/EmojiGrid";
 import { MacroList } from "./components/MacroList";
 import { RecentStrip } from "./components/RecentStrip";
+import { FirstRunSetup } from "./components/FirstRunSetup";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { WindowResizeHandles } from "./components/WindowResizeHandles";
 import {
@@ -26,6 +27,7 @@ import { useTheme } from "./hooks/useTheme";
 import { useWindowDecorations } from "./hooks/useWindowDecorations";
 import { useAutostart } from "./hooks/useAutostart";
 import { useAllowMultipleInstances } from "./hooks/useAllowMultipleInstances";
+import { useFirstRunSetup } from "./hooks/useFirstRunSetup";
 import {
   openReleasePage,
   useUpdateCheck,
@@ -63,6 +65,7 @@ function App() {
     setExpandAsYouType,
     setCheckUpdatesOnStartup,
     setDismissedUpdateVersion,
+    setInputHelperSetupSeen,
     upsertMacro,
     removeMacro,
     setMacros,
@@ -82,6 +85,15 @@ function App() {
   const [inputStatus, setInputStatus] = useState<InputHelperStatus | null>(
     null,
   );
+  const markSetupSeen = useCallback(() => {
+    setInputHelperSetupSeen(true);
+  }, [setInputHelperSetupSeen]);
+  const { open: firstRunOpen, finish: finishFirstRun } = useFirstRunSetup({
+    ready,
+    setupSeen: prefs.inputHelperSetupSeen,
+    onStatus: setInputStatus,
+    onMarkSeen: markSetupSeen,
+  });
   const pinnedRef = useRef(prefs.pinned);
   pinnedRef.current = prefs.pinned;
 
@@ -108,18 +120,26 @@ function App() {
   const flashKey = textFlash ?? emojiFlash;
   const copyError = textCopyError ?? emojiCopyError;
 
+  // Auto-paste hides the palette; skip when pinned or tray is missing.
+  const autoPasteOpts = useMemo(() => {
+    if (!prefs.autoPasteOnCopy || prefs.pinned || trayUnavailable) {
+      return { autoPaste: false as const };
+    }
+    return { autoPaste: true as const, hideForPaste: true as const };
+  }, [prefs.autoPasteOnCopy, prefs.pinned, trayUnavailable]);
+
   const copyMacro = useCallback(
-    (text: string) => {
-      void copyText(text, { autoPaste: prefs.autoPasteOnCopy });
+    (text: string, flashKey?: string) => {
+      void copyText(text, { ...autoPasteOpts, flashKey });
     },
-    [copyText, prefs.autoPasteOnCopy],
+    [copyText, autoPasteOpts],
   );
 
   const copyEmojiWithPaste = useCallback(
     (emoji: string) => {
-      void copyEmoji(emoji, { autoPaste: prefs.autoPasteOnCopy });
+      void copyEmoji(emoji, autoPasteOpts);
     },
-    [copyEmoji, prefs.autoPasteOnCopy],
+    [copyEmoji, autoPasteOpts],
   );
 
   const hotkeyError = useGlobalHotkeys({
@@ -184,43 +204,13 @@ function App() {
 
   useEffect(() => {
     if (!ready) return;
-    let cancelled = false;
-    const refresh = () => {
-      void invoke<InputHelperStatus>("input_helper_status")
-        .then((status) => {
-          if (!cancelled) setInputStatus(status);
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setInputStatus({
-              daemon: false,
-              canInject: false,
-              canListen: false,
-              detail: "Input helper unavailable.",
-            });
-          }
-        });
-    };
-    refresh();
-    const timer = window.setInterval(refresh, 5000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [ready]);
-
-  useEffect(() => {
-    if (!ready) return;
-    const matches = expansionMatches(mergedMacros);
-    void invoke("input_helper_sync_matches", { matches }).catch(() => undefined);
     void invoke("input_helper_set_enabled", {
       enabled: prefs.expandAsYouType,
     }).catch(() => undefined);
-  }, [
-    ready,
-    mergedMacros,
-    prefs.expandAsYouType,
-  ]);
+    if (!prefs.expandAsYouType) return;
+    const matches = expansionMatches(mergedMacros);
+    void invoke("input_helper_sync_matches", { matches }).catch(() => undefined);
+  }, [ready, mergedMacros, prefs.expandAsYouType]);
 
   const togglePin = useCallback(() => {
     setPinned(!pinnedRef.current);
@@ -375,10 +365,17 @@ function App() {
             });
           }}
           onSetMacros={setMacros}
+          onInputStatus={setInputStatus}
           onClearRecents={clearRecents}
           onClearUsageStats={clearUsageStats}
         />
       ) : null}
+      <FirstRunSetup
+        open={firstRunOpen}
+        status={inputStatus}
+        onStatus={setInputStatus}
+        onDone={finishFirstRun}
+      />
     </div>
   );
 }

@@ -1,20 +1,28 @@
 # Changelog
 
-All notable changes to Emobie are documented in this file.
+All notable changes to emobie are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-08-13
+
 ### Added
 
 - Startup check against GitHub Releases for newer versions (toggle in Settings; dismissible)
 - Text macros: Macros nav category, in-pane Add (+), per-macro hotkeys, emoji shortcodes + common emoticons (`:)`, `;')`, …), Espanso-ish YAML import/export
 - Optional auto-paste on copy and as-you-type expansion via host helper `emobie-inputd` ([`docs/MACROS.md`](docs/MACROS.md))
+- Secure `emobie-inputd` auto-start: systemd `--user` unit, owner-only socket + peer UID checks, Settings “Start input helper”, install/setup scripts
+- First-launch setup dialog to start the input helper and optionally grant keyboard access
 - Flatpak socket access to `$XDG_RUNTIME_DIR/emobie` for the host input helper (no `--device=input`)
 - Flathub-bound offline source Flatpak manifest (`cargo-sources` / `node-sources`) alongside the GitHub Releases `.deb` wrap
 - App screenshots and Flathub readiness checklist ([`docs/FLATHUB.md`](docs/FLATHUB.md)); submission remains deferred
+
+### Changed
+
+- Brand spelling normalized to lowercase `emobie` (product name, Flatpak app id `io.github.asafelobotomy.emobie`, docs, and packaging paths)
 
 ### Fixed
 
@@ -99,7 +107,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Hotkeys accept any shortcut except bare letter/number keys (those still need a modifier)
-- Linux tray uses StatusNotifierItem so left-click shows Emobie; right-click opens the menu
+- Linux tray uses StatusNotifierItem so left-click shows emobie; right-click opens the menu
 
 ## [0.5.3] - 2026-08-05
 
@@ -133,7 +141,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adaptive layouts for horizontal, square, and vertical window shapes
 - Compact chrome mode that keeps at least two emoji rows visible
 - Light / dark / system themes and emoji size preferences
-- Flatpak packaging (`io.github.asafelobotomy.Emobie`)
+- Flatpak packaging (`io.github.asafelobotomy.emobie`)
 - GitHub Actions release workflow that builds `.deb` + `.flatpak` artifacts
 
 ### Fixed
@@ -144,7 +152,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Horizontal mouse-wheel scrolling in wide layouts
 - Tray icon temp path for Flatpak-friendly sandboxing
 
-[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.4...HEAD
+[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.5...HEAD
+[0.6.5]: https://github.com/asafelobotomy/emobie/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/asafelobotomy/emobie/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/asafelobotomy/emobie/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/asafelobotomy/emobie/compare/v0.6.1...v0.6.2

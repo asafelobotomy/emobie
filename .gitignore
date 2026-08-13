@@ -12,7 +12,7 @@ dist
 dist-release
 dist-ssr
 *.local
-# Tauri generates these; Emobie is Linux-first and does not ship mobile bundles
+# Tauri generates these; emobie is Linux-first and does not ship mobile bundles
 src-tauri/icons/android/
 src-tauri/icons/ios/
 
@@ -27,6 +27,7 @@ repo/
 
 # Rust build outputs (host helper and other crates/)
 crates/**/target/
+src-tauri/inputd-bundle/
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

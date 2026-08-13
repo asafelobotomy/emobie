@@ -120,6 +120,7 @@ export function normalizePreferences(
       merged.dismissedUpdateVersion.trim()
         ? merged.dismissedUpdateVersion.trim()
         : null,
+    inputHelperSetupSeen: Boolean(merged.inputHelperSetupSeen),
     recentMax: Math.min(96, Math.max(8, Number(merged.recentMax) || 32)),
   };
 }

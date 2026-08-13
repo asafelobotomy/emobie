@@ -40,4 +40,4 @@ trap 'if [[ "$MOVED_NODE_MODULES" -eq 1 && -d /tmp/emobie-node_modules.flatpak-g
 flatpak-node-generator npm package-lock.json -o flatpak/node-sources.json
 
 echo "Done."
-echo "Remember to bump the git tag/commit in flatpak/io.github.asafelobotomy.Emobie.yml when packaging a new release."
+echo "Remember to bump the git tag/commit in flatpak/io.github.asafelobotomy.emobie.yml when packaging a new release."

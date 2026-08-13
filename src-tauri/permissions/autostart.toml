@@ -25,7 +25,7 @@ commands.allow = ["check_for_updates"]
 
 [[permission]]
 identifier = "allow-open-release-page"
-description = "Allows opening the Emobie GitHub release page"
+description = "Allows opening the emobie GitHub release page"
 commands.allow = ["open_release_page"]
 
 [[permission]]
@@ -57,3 +57,13 @@ commands.allow = ["input_helper_sync_matches"]
 identifier = "allow-input-helper-inject-paste"
 description = "Allows requesting a Ctrl+V paste injection"
 commands.allow = ["input_helper_inject_paste"]
+
+[[permission]]
+identifier = "allow-input-helper-ensure-started"
+description = "Allows starting emobie-inputd via systemd or a trusted local binary"
+commands.allow = ["input_helper_ensure_started"]
+
+[[permission]]
+identifier = "allow-input-helper-run-access-setup"
+description = "Allows launching the pkexec keyboard-access setup script"
+commands.allow = ["input_helper_run_access_setup"]

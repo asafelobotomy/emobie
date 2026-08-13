@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
 import { EmojiButton } from "./EmojiButton";
-import type { EmobieEmoji } from "../data/loadEmojis";
+import type { emobieEmoji } from "../data/loadEmojis";
 import type { ScrollAxis } from "../hooks/useLayoutMode";
 
 type EmojiGridProps = {
-  emojis: EmobieEmoji[];
+  emojis: emobieEmoji[];
   flashKey: string | null;
   favorites: string[];
   scrollAxis: ScrollAxis;

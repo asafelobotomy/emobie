@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import type { Macro } from "../types/preferences";
+import type { InputHelperStatus } from "../lib/inputHelper";
 import {
   exportMacrosYaml,
   importMacrosYaml,
@@ -8,32 +10,37 @@ import {
 type MacrosSettingsProps = {
   macros: Macro[];
   showShortcodeMacros: boolean;
-  autoPasteOnCopy: boolean;
   expandAsYouType: boolean;
-  inputStatus: {
-    daemon: boolean;
-    canInject: boolean;
-    canListen: boolean;
-    detail: string;
-  } | null;
+  inputStatus: InputHelperStatus | null;
   onShowShortcodes: (value: boolean) => void;
-  onAutoPaste: (value: boolean) => void;
   onExpandAsYouType: (value: boolean) => void;
   onSetMacros: (macros: Macro[]) => void;
+  onInputStatus: (status: InputHelperStatus) => void;
 };
+
+function helperStatusLabel(status: InputHelperStatus | null): string {
+  if (!status) return "Checking input helper…";
+  if (status.daemon && status.canListen) {
+    return `Helper running (listen + paste). ${status.detail}`;
+  }
+  if (status.daemon && !status.canListen) {
+    return `Helper running, but keyboard access is missing. ${status.detail}`;
+  }
+  return status.detail;
+}
 
 export function MacrosSettings({
   macros,
   showShortcodeMacros,
-  autoPasteOnCopy,
   expandAsYouType,
   inputStatus,
   onShowShortcodes,
-  onAutoPaste,
   onExpandAsYouType,
   onSetMacros,
+  onInputStatus,
 }: MacrosSettingsProps) {
   const [ioMessage, setIoMessage] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
 
   const exportYaml = () => {
     const text = exportMacrosYaml(macros);
@@ -64,17 +71,57 @@ export function MacrosSettings({
     }
   };
 
-  const daemonReady = Boolean(inputStatus?.daemon);
-  const canInject = Boolean(inputStatus?.canInject);
+  const startHelper = async () => {
+    setStarting(true);
+    try {
+      const status = await invoke<InputHelperStatus>(
+        "input_helper_ensure_started",
+      );
+      onInputStatus(status);
+      setIoMessage(status.daemon ? "Input helper started." : status.detail);
+    } catch (error) {
+      setIoMessage(
+        error instanceof Error ? error.message : "Could not start helper.",
+      );
+    } finally {
+      setStarting(false);
+    }
+  };
+
   const canListen = Boolean(inputStatus?.canListen);
+  const daemonReady = Boolean(inputStatus?.daemon);
 
   return (
     <div className="macros-settings">
       <h3 className="settings-section-title">Macros</h3>
       <p className="settings-hint settings-hint-block">
         Add and edit macros from the Macros category (+). Import and export
-        stay here.
+        stay here. Auto-paste lives under Clipboard above.
       </p>
+
+      <p className="settings-hint settings-hint-block">
+        {helperStatusLabel(inputStatus)}
+      </p>
+      {!daemonReady ? (
+        <div className="settings-actions macros-io-actions">
+          <button
+            type="button"
+            className="btn primary"
+            disabled={starting}
+            onClick={() => void startHelper()}
+          >
+            {starting ? "Starting…" : "Start input helper"}
+          </button>
+        </div>
+      ) : null}
+      {daemonReady && !canListen ? (
+        <p className="settings-hint settings-hint-block">
+          As-you-type needs keyboard access. On the host run{" "}
+          <code>pkexec /usr/share/emobie/setup-input-access.sh</code> (or{" "}
+          <code>packaging/setup-input-access.sh</code>), then log out/in.
+          Group membership is sensitive.
+        </p>
+      ) : null}
 
       <div className="settings-row settings-toggle-row">
         <label htmlFor="show-shortcodes">Show emoji shortcodes</label>
@@ -87,23 +134,6 @@ export function MacrosSettings({
       </div>
 
       <div className="settings-row settings-toggle-row">
-        <label htmlFor="auto-paste">Auto-paste on copy</label>
-        <input
-          id="auto-paste"
-          type="checkbox"
-          checked={autoPasteOnCopy}
-          disabled={!canInject && !autoPasteOnCopy}
-          onChange={(event) => onAutoPaste(event.target.checked)}
-        />
-      </div>
-      {!canInject ? (
-        <p className="settings-hint settings-hint-block">
-          Auto-paste needs the host input helper (
-          {inputStatus?.detail ?? "not available"}).
-        </p>
-      ) : null}
-
-      <div className="settings-row settings-toggle-row">
         <label htmlFor="expand-as-you-type">Expand as you type</label>
         <input
           id="expand-as-you-type"
@@ -111,14 +141,14 @@ export function MacrosSettings({
           checked={expandAsYouType}
           disabled={!canListen && !expandAsYouType}
           onChange={(event) => {
-            if (event.target.checked && !daemonReady) return;
+            if (event.target.checked && !canListen) return;
             onExpandAsYouType(event.target.checked);
           }}
         />
       </div>
       <p className="settings-hint settings-hint-block">
-        Watches keystrokes to expand triggers. Requires emobie-inputd.
-        {inputStatus ? ` ${inputStatus.detail}` : ""}
+        Watches keystrokes to expand triggers. Off by default. Requires
+        emobie-inputd with input-group access.
       </p>
 
       <div className="settings-actions macros-io-actions">

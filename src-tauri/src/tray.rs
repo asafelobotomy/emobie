@@ -4,7 +4,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
 pub const PIN_EVENT: &str = "tray-pin-toggle";
-const FLATPAK_APP_ID: &str = "io.github.asafelobotomy.Emobie";
+const FLATPAK_APP_ID: &str = "io.github.asafelobotomy.emobie";
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,7 +35,7 @@ mod linux {
     use ksni::{Category, Icon, MenuItem, ToolTip, Tray};
     use tauri::{AppHandle, Emitter, Manager};
 
-    struct EmobieTray {
+    struct AppTray {
         app: AppHandle,
         icons: Vec<Icon>,
         id: String,
@@ -70,7 +70,7 @@ mod linux {
         std::env::var_os("FLATPAK_ID").is_some()
     }
 
-    impl Tray for EmobieTray {
+    impl Tray for AppTray {
         fn id(&self) -> String {
             self.id.clone()
         }
@@ -137,7 +137,7 @@ mod linux {
     }
 
     #[allow(dead_code)]
-    pub struct TrayGuard(ksni::blocking::Handle<EmobieTray>);
+    pub struct TrayGuard(ksni::blocking::Handle<AppTray>);
 
     pub fn setup(app: &tauri::App, unique_id: bool) -> Result<(), String> {
         let handle = app.handle().clone();
@@ -146,7 +146,7 @@ mod linux {
             return Err("failed to decode tray icon".into());
         }
 
-        let tray = EmobieTray {
+        let tray = AppTray {
             app: handle,
             icons,
             id: tray_id(unique_id),

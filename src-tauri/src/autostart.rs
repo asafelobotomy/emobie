@@ -7,7 +7,7 @@ use std::fs;
 use std::path::PathBuf;
 
 const APP_NAME: &str = "emobie";
-const FLATPAK_APP_ID: &str = "io.github.asafelobotomy.Emobie";
+const FLATPAK_APP_ID: &str = "io.github.asafelobotomy.emobie";
 const LEGACY_DESKTOP: &str = "emobie.desktop";
 
 fn is_flatpak() -> bool {

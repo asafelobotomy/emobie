@@ -157,8 +157,8 @@ jobs:
         with:
           bundle: emobie-${{ needs.prepare.outputs.version }}-x86_64.flatpak
           # Deb-wrap for GitHub Releases. Flathub-bound source build:
-          # flatpak/io.github.asafelobotomy.Emobie.yml (see docs/FLATHUB.md).
-          manifest-path: flatpak/io.github.asafelobotomy.Emobie.deb.yml
+          # flatpak/io.github.asafelobotomy.emobie.yml (see docs/FLATHUB.md).
+          manifest-path: flatpak/io.github.asafelobotomy.emobie.deb.yml
           cache-key: flatpak-builder-deb-${{ github.sha }}
           branch: stable
           arch: x86_64
@@ -191,7 +191,7 @@ jobs:
           chmod +x scripts/extract-changelog.sh
           NOTES_FILE="release-notes.md"
           {
-            echo "## Emobie ${VERSION}"
+            echo "## emobie ${VERSION}"
             echo
             ./scripts/extract-changelog.sh "${VERSION}"
             echo
@@ -206,7 +206,7 @@ jobs:
             echo
             echo '```bash'
             echo "flatpak install --user emobie-${VERSION}-x86_64.flatpak"
-            echo "flatpak run io.github.asafelobotomy.Emobie"
+            echo "flatpak run io.github.asafelobotomy.emobie"
             echo '```'
             echo
             echo "### Install AppImage"
@@ -237,7 +237,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
-          name: Emobie ${{ needs.prepare.outputs.version }}
+          name: emobie ${{ needs.prepare.outputs.version }}
           body_path: release-notes.md
           files: release-files/*
           draft: false

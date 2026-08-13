@@ -1,12 +1,12 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Emobie",
-  "version": "0.6.4",
+  "productName": "emobie",
+  "version": "0.6.5",
   "identifier": "com.emobie.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "npm run build && bash scripts/stage-inputd.sh",
     "frontendDist": "../dist"
   },
   "app": {
@@ -41,7 +41,12 @@
     "linux": {
       "deb": {
         "files": {
-          "/usr/share/metainfo/io.github.asafelobotomy.Emobie.metainfo.xml": "../flatpak/io.github.asafelobotomy.Emobie.metainfo.xml"
+          "/usr/share/metainfo/io.github.asafelobotomy.emobie.metainfo.xml": "../flatpak/io.github.asafelobotomy.emobie.metainfo.xml",
+          "/usr/bin/emobie-inputd": "inputd-bundle/emobie-inputd",
+          "/usr/lib/systemd/user/emobie-inputd.service": "inputd-bundle/emobie-inputd.service",
+          "/usr/share/emobie/setup-input-access.sh": "inputd-bundle/setup-input-access.sh",
+          "/usr/share/emobie/99-emobie-input.rules": "inputd-bundle/99-emobie-input.rules",
+          "/usr/share/polkit-1/actions/io.github.asafelobotomy.emobie.inputd.policy": "inputd-bundle/io.github.asafelobotomy.emobie.inputd.policy"
         }
       },
       "rpm": {

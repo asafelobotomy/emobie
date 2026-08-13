@@ -9,6 +9,13 @@ pub fn can_open_uinput() -> bool {
         || std::path::Path::new("/dev/input/uinput").exists()
 }
 
+/// True when paste/inject is plausible in this session (compositor and/or uinput).
+pub fn can_inject() -> bool {
+    can_open_uinput()
+        || std::env::var_os("WAYLAND_DISPLAY").is_some()
+        || std::env::var_os("DISPLAY").is_some()
+}
+
 pub fn inject_ctrl_v() -> Result<(), String> {
     let mut enigo = Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
     enigo

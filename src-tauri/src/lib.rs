@@ -6,7 +6,7 @@ mod prefs;
 mod tray;
 mod updates;
 
-const FLATPAK_APP_ID: &str = "io.github.asafelobotomy.Emobie";
+const FLATPAK_APP_ID: &str = "io.github.asafelobotomy.emobie";
 
 pub struct TrayAvailable(pub tray::TrayStatus);
 
@@ -105,9 +105,11 @@ pub fn run() {
             release_single_instance_lock,
             quit_app,
             input_helper::input_helper_status,
+            input_helper::input_helper_ensure_started,
             input_helper::input_helper_set_enabled,
             input_helper::input_helper_sync_matches,
             input_helper::input_helper_inject_paste,
+            input_helper::input_helper_run_access_setup,
             updates::check_for_updates,
             updates::open_release_page,
         ])

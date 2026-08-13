@@ -7,9 +7,22 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 
 export type CopyTextOptions = {
-  /** When true, hide window and ask the input helper to paste. */
+  /**
+   * When true, copy then ask the input helper to paste.
+   * Hides the window only when `hideForPaste` is also true.
+   */
   autoPaste?: boolean;
+  /** Hide before paste so the previous app receives Ctrl+V. */
+  hideForPaste?: boolean;
+  /** Value used for UI flash matching; defaults to the copied text. */
+  flashKey?: string;
 };
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
 
 async function hideWindowForPaste() {
   try {
@@ -19,7 +32,20 @@ async function hideWindowForPaste() {
   }
 }
 
-async function tryAutoPaste(text: string): Promise<string | null> {
+async function showWindowAfterPaste() {
+  try {
+    const window = getCurrentWindow();
+    await window.show();
+    await window.setFocus();
+  } catch {
+    // ignore
+  }
+}
+
+async function tryAutoPaste(
+  text: string,
+  hideForPaste: boolean,
+): Promise<string | null> {
   let previous: string | null = null;
   try {
     previous = await readText();
@@ -34,19 +60,29 @@ async function tryAutoPaste(text: string): Promise<string | null> {
     return "Copy failed";
   }
 
-  await hideWindowForPaste();
+  // Let clipboard IPC finish before hide — wry can abort if the webview is
+  // torn down mid custom-protocol response.
+  await delay(100);
+
+  if (hideForPaste) {
+    await hideWindowForPaste();
+    await delay(60);
+  }
 
   try {
     await invoke("input_helper_inject_paste");
   } catch (error) {
     console.error("Auto-paste inject failed", error);
+    if (hideForPaste) {
+      await showWindowAfterPaste();
+    }
     return "Copied — paste unavailable";
   }
 
   if (previous !== null && previous !== text) {
     window.setTimeout(() => {
       void writeText(previous).catch(() => undefined);
-    }, 400);
+    }, 500);
   }
   return null;
 }
@@ -67,11 +103,12 @@ export function useCopyText(onCopied?: (text: string) => void) {
 
   const copyText = useCallback(
     async (text: string, options: CopyTextOptions = {}) => {
+      const flashKeyValue = options.flashKey ?? text;
       const finishOk = (statusText: string | null) => {
         onCopied?.(text);
         setCopyError(statusText);
         setLastCopied(text);
-        setFlashKey(text);
+        setFlashKey(flashKeyValue);
         if (timerRef.current !== null) {
           window.clearTimeout(timerRef.current);
         }
@@ -83,7 +120,10 @@ export function useCopyText(onCopied?: (text: string) => void) {
       };
 
       if (options.autoPaste) {
-        const pasteError = await tryAutoPaste(text);
+        const pasteError = await tryAutoPaste(
+          text,
+          options.hideForPaste !== false,
+        );
         if (pasteError === "Copy failed") {
           setCopyError(pasteError);
           setLastCopied(null);

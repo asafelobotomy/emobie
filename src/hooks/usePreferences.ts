@@ -154,6 +154,10 @@ export function usePreferences() {
       update({ dismissedUpdateVersion }),
     [update],
   );
+  const setInputHelperSetupSeen = useCallback(
+    (inputHelperSetupSeen: boolean) => update({ inputHelperSetupSeen }),
+    [update],
+  );
 
   const upsertMacro = useCallback(
     (macro: Macro) => {
@@ -267,6 +271,7 @@ export function usePreferences() {
     setExpandAsYouType,
     setCheckUpdatesOnStartup,
     setDismissedUpdateVersion,
+    setInputHelperSetupSeen,
     upsertMacro,
     removeMacro,
     setMacros,

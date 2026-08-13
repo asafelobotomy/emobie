@@ -9,7 +9,7 @@ import { extraEmoticonsFor } from "./extraEmoticons";
 
 export type SkinTone = 0 | 1 | 2 | 3 | 4 | 5;
 
-export type EmobieEmoji = {
+export type emobieEmoji = {
   emoji: string;
   label: string;
   hexcode: string;
@@ -80,7 +80,7 @@ function mergeEmoticons(
   return result;
 }
 
-function buildEmojis(): EmobieEmoji[] {
+function buildEmojis(): emobieEmoji[] {
   const emojiData = data as EmojibaseEmoji[];
 
   return emojiData
@@ -106,7 +106,7 @@ function buildEmojis(): EmobieEmoji[] {
     .sort((a, b) => a.order - b.order);
 }
 
-export const EMOJIS: EmobieEmoji[] = buildEmojis();
+export const EMOJIS: emobieEmoji[] = buildEmojis();
 
 export const CATEGORIES: Category[] = messages.groups
   .filter((group) => !SKIP_GROUPS.has(group.key))
@@ -117,7 +117,7 @@ export const CATEGORIES: Category[] = messages.groups
     icon: CATEGORY_ICONS[group.key] ?? "✨",
   }));
 
-export function applySkinTone(emoji: EmobieEmoji, tone: SkinTone): string {
+export function applySkinTone(emoji: emobieEmoji, tone: SkinTone): string {
   if (tone === 0 || !emoji.skins?.length) {
     return emoji.emoji;
   }
@@ -156,9 +156,9 @@ export const NAV_CATEGORIES: Category[] = [
 ];
 
 function sortFavoritesFirst(
-  emojis: EmobieEmoji[],
+  emojis: emobieEmoji[],
   favoriteHexcodes: string[],
-): EmobieEmoji[] {
+): emobieEmoji[] {
   if (favoriteHexcodes.length === 0) return emojis;
 
   const favoriteSet = new Set(favoriteHexcodes);
@@ -189,8 +189,8 @@ export type EmojiSortContext = {
 };
 
 function compareBySort(
-  a: EmobieEmoji,
-  b: EmobieEmoji,
+  a: emobieEmoji,
+  b: emobieEmoji,
   ctx: EmojiSortContext,
 ): number {
   switch (ctx.sortBy) {
@@ -220,10 +220,10 @@ function compareBySort(
 }
 
 function applySort(
-  emojis: EmobieEmoji[],
+  emojis: emobieEmoji[],
   favoriteHexcodes: string[],
   ctx: EmojiSortContext,
-): EmobieEmoji[] {
+): emobieEmoji[] {
   if (ctx.sortBy === "default") {
     return sortFavoritesFirst(emojis, favoriteHexcodes);
   }
@@ -240,7 +240,7 @@ export function searchEmojis(
     usageCounts: {},
     firstUsedAt: {},
   },
-): EmobieEmoji[] {
+): emobieEmoji[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
 
@@ -271,11 +271,11 @@ export function emojisForCategory(
     usageCounts: {},
     firstUsedAt: {},
   },
-): EmobieEmoji[] {
+): emobieEmoji[] {
   if (groupId === FAVORITES_CATEGORY_ID) {
     const favorites = favoriteHexcodes
       .map((hexcode) => EMOJIS.find((emoji) => emoji.hexcode === hexcode))
-      .filter((emoji): emoji is EmobieEmoji => Boolean(emoji))
+      .filter((emoji): emoji is emobieEmoji => Boolean(emoji))
       .map((emoji) => ({
         ...emoji,
         emoji: applySkinTone(emoji, tone),
@@ -297,7 +297,7 @@ export function emojisForCategory(
   return applySort(categoryEmojis, favoriteHexcodes, sortCtx);
 }
 
-export function findEmojiByChar(char: string): EmobieEmoji | undefined {
+export function findEmojiByChar(char: string): emobieEmoji | undefined {
   return EMOJIS.find(
     (emoji) =>
       emoji.emoji === char ||

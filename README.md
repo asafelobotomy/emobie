@@ -44,10 +44,10 @@ Grab the latest build from
 ```bash
 # Flatpak (after downloading the release bundle)
 flatpak install --user emobie-*-x86_64.flatpak
-flatpak run io.github.asafelobotomy.Emobie
+flatpak run io.github.asafelobotomy.emobie
 ```
 
-App ID: `io.github.asafelobotomy.Emobie`
+App ID: `io.github.asafelobotomy.emobie`
 
 ---
 
@@ -60,7 +60,7 @@ App ID: `io.github.asafelobotomy.Emobie`
 | **Macros** | Custom trigger → expansion cards (+ to add), shortcodes + emoticons (`:)`, `;')`, …), per-macro hotkeys, YAML import/export |
 | **Updates** | Optional startup check against GitHub Releases (dismissible notice in Settings) |
 | **Copy** | One-click clipboard copy; optional auto-paste when the host input helper is available |
-| **Expand** | Optional as-you-type expansion via `emobie-inputd` (off by default; see [docs/MACROS.md](docs/MACROS.md)) |
+| **Expand** | Optional as-you-type via host `emobie-inputd` (systemd --user auto-start; off by default; see [docs/MACROS.md](docs/MACROS.md)) |
 | **Summon** | Global hotkey (default `Ctrl+Shift+Space`; letters/numbers need a modifier) and system tray |
 | **Layout** | Resize freely — horizontal, square, or vertical; frameless by default (optional title bar in Settings) |
 | **Pin** | Always-on-top from the toolbar or tray |
@@ -144,12 +144,12 @@ cp src-tauri/target/release/bundle/deb/*.deb flatpak/emobie.deb
 
 flatpak install -y flathub org.gnome.Platform//50 org.gnome.Sdk//50
 flatpak-builder --force-clean --user --repo=flatpak/repo flatpak/build-dir \
-  flatpak/io.github.asafelobotomy.Emobie.deb.yml
-flatpak build-bundle flatpak/repo emobie.flatpak io.github.asafelobotomy.Emobie
+  flatpak/io.github.asafelobotomy.emobie.deb.yml
+flatpak build-bundle flatpak/repo emobie.flatpak io.github.asafelobotomy.emobie
 flatpak install --user emobie.flatpak
 ```
 
-A separate **source-build** manifest ([`flatpak/io.github.asafelobotomy.Emobie.yml`](flatpak/io.github.asafelobotomy.Emobie.yml)) is prepared for a future Flathub submission. Flathub listing is **deferred** until the checklist in [`docs/FLATHUB.md`](docs/FLATHUB.md) is green.
+A separate **source-build** manifest ([`flatpak/io.github.asafelobotomy.emobie.yml`](flatpak/io.github.asafelobotomy.emobie.yml)) is prepared for a future Flathub submission. Flathub listing is **deferred** until the checklist in [`docs/FLATHUB.md`](docs/FLATHUB.md) is green.
 ---
 
 ## Releases
@@ -158,8 +158,8 @@ Tags matching `vX.Y.Z` run GitHub Actions to publish **`.deb`**, **`.rpm`**, **A
 
 ```bash
 # Keep package.json, Cargo.toml, and tauri.conf.json versions in sync
-git tag v0.6.4
-git push origin v0.6.4
+git tag v0.6.5
+git push origin v0.6.5
 ```
 
 Or run the **Release** workflow from the Actions tab.
@@ -171,7 +171,7 @@ Or run the **Release** workflow from the Actions tab.
 - Global shortcuts and tray icons can differ on Wayland vs X11 depending on your compositor.
 - emobie copies to the clipboard only — it does not inject into the focused app.
 - Flatpak preferences live under  
-  `~/.var/app/io.github.asafelobotomy.Emobie/data/com.emobie.app/`.
+  `~/.var/app/io.github.asafelobotomy.emobie/data/com.emobie.app/`.
 
 ---
 

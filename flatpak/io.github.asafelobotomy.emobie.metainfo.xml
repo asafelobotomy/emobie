@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>io.github.asafelobotomy.Emobie</id>
-  <launchable type="desktop-id">io.github.asafelobotomy.Emobie.desktop</launchable>
+  <id>io.github.asafelobotomy.emobie</id>
+  <launchable type="desktop-id">io.github.asafelobotomy.emobie.desktop</launchable>
   <name>emobie</name>
   <summary>Browse and copy emoji fast</summary>
   <developer id="io.github.asafelobotomy">
@@ -58,6 +58,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.5" date="2026-08-13">
+      <description>
+        <p>Normalize branding to lowercase emobie, including the Flatpak app id, and ship macros with the host input helper.</p>
+      </description>
+    </release>
     <release version="0.6.4" date="2026-08-07">
       <description>
         <p>Ship .rpm and AppImage packages on GitHub Releases alongside .deb and Flatpak.</p>

@@ -4,9 +4,12 @@ mod matcher;
 mod protocol;
 
 use matcher::TriggerTrie;
+use nix::sys::socket::{getsockopt, sockopt::PeerCredentials};
+use nix::unistd::getuid;
 use protocol::{Request, Response};
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
+use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -16,25 +19,36 @@ fn runtime_dir() -> PathBuf {
     if let Ok(dir) = std::env::var("XDG_RUNTIME_DIR") {
         return PathBuf::from(dir).join("emobie");
     }
-    PathBuf::from("/tmp/emobie")
+    // Tests / broken sessions only — production binds under XDG_RUNTIME_DIR.
+    PathBuf::from(format!("/tmp/emobie-{}", getuid()))
 }
 
 fn socket_path() -> PathBuf {
     if let Ok(path) = std::env::var("EMOBIE_INPUTD_SOCKET") {
         return PathBuf::from(path);
     }
-    let system = PathBuf::from("/run/emobie/emobie-inputd.sock");
-    if system.parent().is_some_and(|p| p.exists()) {
-        return system;
-    }
     runtime_dir().join("emobie-inputd.sock")
 }
 
-fn ensure_parent(path: &Path) -> std::io::Result<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
+fn ensure_runtime_dir(dir: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(dir)?;
+    let mut perms = fs::metadata(dir)?.permissions();
+    perms.set_mode(0o700);
+    fs::set_permissions(dir, perms)?;
     Ok(())
+}
+
+fn chmod_path(path: &Path, mode: u32) -> std::io::Result<()> {
+    let mut perms = fs::metadata(path)?.permissions();
+    perms.set_mode(mode);
+    fs::set_permissions(path, perms)
+}
+
+fn peer_uid_allowed(stream: &UnixStream) -> bool {
+    match getsockopt(stream, PeerCredentials) {
+        Ok(cred) => cred.uid() == getuid().as_raw(),
+        Err(_) => false,
+    }
 }
 
 fn handle_client(
@@ -107,15 +121,18 @@ fn handle_client(
 
 fn main() {
     let path = socket_path();
-    let _ = ensure_parent(&path);
+    if let Some(parent) = path.parent() {
+        if let Err(err) = ensure_runtime_dir(parent) {
+            eprintln!("failed to create {}: {err}", parent.display());
+            std::process::exit(1);
+        }
+    }
     let _ = fs::remove_file(&path);
 
     let enabled = Arc::new(AtomicBool::new(false));
     let trie = Arc::new(Mutex::new(TriggerTrie::default()));
     let stop = Arc::new(AtomicBool::new(false));
-    // Paste uses enigo (compositor / uinput backends). Listen needs evdev.
-    let can_inject = true;
-    let _ = inject::can_open_uinput();
+    let can_inject = inject::can_inject();
     let can_listen = listen::can_listen();
 
     listen::spawn_listener(enabled.clone(), trie.clone(), stop.clone());
@@ -124,11 +141,16 @@ fn main() {
         eprintln!("failed to bind {}: {err}", path.display());
         std::process::exit(1);
     });
+    if let Err(err) = chmod_path(&path, 0o600) {
+        eprintln!("warning: could not chmod socket: {err}");
+    }
     println!("emobie-inputd listening on {}", path.display());
 
     let stop_flag = stop.clone();
+    let sock_cleanup = path.clone();
     let _ = ctrlc::set_handler(move || {
         stop_flag.store(true, Ordering::Relaxed);
+        let _ = fs::remove_file(&sock_cleanup);
     });
 
     for stream in listener.incoming() {
@@ -137,6 +159,10 @@ fn main() {
         }
         match stream {
             Ok(stream) => {
+                if !peer_uid_allowed(&stream) {
+                    eprintln!("rejected non-owner peer on socket");
+                    continue;
+                }
                 let enabled = enabled.clone();
                 let trie = trie.clone();
                 std::thread::spawn(move || {

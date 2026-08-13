@@ -11,8 +11,8 @@ Official process: [Submission](https://docs.flathub.org/docs/for-app-authors/sub
 
 | File | Role |
 |------|------|
-| [`flatpak/io.github.asafelobotomy.Emobie.yml`](../flatpak/io.github.asafelobotomy.Emobie.yml) | **Flathub-bound** offline source build (cargo + npm) |
-| [`flatpak/io.github.asafelobotomy.Emobie.deb.yml`](../flatpak/io.github.asafelobotomy.Emobie.deb.yml) | GitHub Releases Flatpak (unwraps `.deb`) |
+| [`flatpak/io.github.asafelobotomy.emobie.yml`](../flatpak/io.github.asafelobotomy.emobie.yml) | **Flathub-bound** offline source build (cargo + npm) |
+| [`flatpak/io.github.asafelobotomy.emobie.deb.yml`](../flatpak/io.github.asafelobotomy.emobie.deb.yml) | GitHub Releases Flatpak (unwraps `.deb`) |
 | [`flatpak/cargo-sources.json`](../flatpak/cargo-sources.json) / [`node-sources.json`](../flatpak/node-sources.json) | Offline dependency manifests |
 | [`flatpak/shared-modules`](../flatpak/shared-modules) | AppIndicator shared module (git submodule) |
 
@@ -28,7 +28,7 @@ Then bump `tag` / `commit` in the source manifest to the release being packaged.
 ## Remaining before Flathub
 
 1. **Autostart portal:** Source Flatpak finish-args omit `xdg-config/autostart` (linter rejects it). Migrate [`src-tauri/src/autostart.rs`](../src-tauri/src/autostart.rs) to the XDG Autostart / Background portal so launch-on-startup works without that permission.
-2. **Tray own-name:** Source Flatpak does not request `--own-name=org.kde.StatusNotifierItem.*` (Flathub rejects wildcards). Emobie disables dbus name ownership inside Flatpak (`ksni::disable_dbus_name`) so Cinnamon/Mint `xapp-sn-watcher` can still host the icon. Confirm tray on Mint with System Tray applet enabled.
+2. **Tray own-name:** Source Flatpak does not request `--own-name=org.kde.StatusNotifierItem.*` (Flathub rejects wildcards). emobie disables dbus name ownership inside Flatpak (`ksni::disable_dbus_name`) so Cinnamon/Mint `xapp-sn-watcher` can still host the icon. Confirm tray on Mint with System Tray applet enabled.
 3. **Screenshot refresh:** Re-capture without transient “tray unavailable” banners once tray is solid in the packaging under test.
 4. **Input helper:** Macros UI ships in Flatpak; as-you-type / auto-paste need host `emobie-inputd` via `--filesystem=xdg-run/emobie` (no `--device=input`). See [`docs/MACROS.md`](MACROS.md).
 5. **Sustained releases / human PR:** See checklist below.
@@ -44,14 +44,14 @@ flatpak install -y --user flathub org.flatpak.Builder \
   org.freedesktop.Sdk.Extension.node22//25.08
 
 flatpak run --command=flatpak-builder-lint org.flatpak.Builder \
-  manifest flatpak/io.github.asafelobotomy.Emobie.yml
+  manifest flatpak/io.github.asafelobotomy.emobie.yml
 
 # Full offline source build (slow; uses flathub-build helper):
 flatpak run --command=flathub-build --filesystem="$(pwd)" --filesystem=/tmp \
   --share=network org.flatpak.Builder \
-  --install flatpak/io.github.asafelobotomy.Emobie.yml
+  --install flatpak/io.github.asafelobotomy.emobie.yml
 
-flatpak run io.github.asafelobotomy.Emobie
+flatpak run io.github.asafelobotomy.emobie
 ```
 
 Smoke after install: tray show/hide, hotkey, copy. Launch-on-startup needs Autostart portal work (see above) before Flathub.
@@ -72,7 +72,7 @@ Open a Flathub PR **only when all are true**:
 
 - Flathub requires OSS apps to **build from source** (this repo’s source manifest).
 - Flathub disallows AI-authored submission PRs and generally AI-generated apps; exceptions may apply to mature, well-maintained projects. Do not scrub history—sustain human maintenance and answer reviewers honestly if asked.
-- When ready: fork `flathub/flathub`, branch from `new-pr`, PR title `Add io.github.asafelobotomy.Emobie`. **Do not** have an agent open or write that PR.
+- When ready: fork `flathub/flathub`, branch from `new-pr`, PR title `Add io.github.asafelobotomy.emobie`. **Do not** have an agent open or write that PR.
 
 ## Screenshot refresh
 

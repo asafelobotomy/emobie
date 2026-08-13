@@ -149,14 +149,25 @@
   font-family: var(--font-brand);
 }
 
-.macro-dialog textarea {
-  width: 100%;
-  resize: vertical;
-  min-height: 64px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--ink);
-  padding: 8px;
-  font: inherit;
+.first-run-dialog {
+  width: min(24rem, 100%);
+}
+
+.first-run-steps {
+  margin: 0 0 12px;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.first-run-steps li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.first-run-backdrop {
+  z-index: 50;
 }

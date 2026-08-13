@@ -50,6 +50,7 @@ type SettingsPanelProps = {
   onDismissUpdate: (version: string) => void;
   onOpenRelease: (url: string) => void;
   onSetMacros: (macros: Macro[]) => void;
+  onInputStatus: (status: InputHelperStatus) => void;
   onClearRecents: () => void;
   onClearUsageStats: () => void;
 };
@@ -87,6 +88,7 @@ export function SettingsPanel({
   onDismissUpdate,
   onOpenRelease,
   onSetMacros,
+  onInputStatus,
   onClearRecents,
   onClearUsageStats,
 }: SettingsPanelProps) {
@@ -331,16 +333,47 @@ export function SettingsPanel({
           onChange={onHotkey}
         />
 
+        <h3 className="settings-section-title">Clipboard</h3>
+        <div className="settings-row settings-toggle-row">
+          <label htmlFor="auto-paste">Auto-paste on copy</label>
+          <input
+            id="auto-paste"
+            type="checkbox"
+            checked={prefs.autoPasteOnCopy}
+            onChange={(event) => {
+              const enabled = event.target.checked;
+              onAutoPasteOnCopy(enabled);
+              if (enabled) {
+                void invoke<InputHelperStatus>("input_helper_ensure_started")
+                  .then(onInputStatus)
+                  .catch(() => undefined);
+              }
+            }}
+          />
+        </div>
+        <p className="settings-hint settings-hint-block">
+          When on, emobie hides after copy and pastes into the previous app
+          (Ctrl+V). Turn this off to only copy to the clipboard. Skipped while
+          pinned or if the system tray is unavailable.
+        </p>
+        {inputStatus ? (
+          <p className="settings-hint settings-hint-block">
+            Input helper:{" "}
+            {inputStatus.daemon
+              ? `running — ${inputStatus.detail}`
+              : inputStatus.detail}
+          </p>
+        ) : null}
+
         <MacrosSettings
           macros={prefs.macros}
           showShortcodeMacros={prefs.showShortcodeMacros}
-          autoPasteOnCopy={prefs.autoPasteOnCopy}
           expandAsYouType={prefs.expandAsYouType}
           inputStatus={inputStatus}
           onShowShortcodes={onShowShortcodeMacros}
-          onAutoPaste={onAutoPasteOnCopy}
           onExpandAsYouType={onExpandAsYouType}
           onSetMacros={onSetMacros}
+          onInputStatus={onInputStatus}
         />
 
         <div className="settings-actions">

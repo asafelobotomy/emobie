@@ -37,6 +37,8 @@ export type Preferences = {
   expandAsYouType: boolean;
   checkUpdatesOnStartup: boolean;
   dismissedUpdateVersion: string | null;
+  /** True after the user finishes or skips first-run input helper setup. */
+  inputHelperSetupSeen: boolean;
 };
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -61,6 +63,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   expandAsYouType: false,
   checkUpdatesOnStartup: true,
   dismissedUpdateVersion: null,
+  inputHelperSetupSeen: false,
 };
 
 export const SORT_OPTIONS: { value: SortBy; label: string }[] = [

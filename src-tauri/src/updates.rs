@@ -1,4 +1,4 @@
-//! Check GitHub Releases for a newer Emobie version.
+//! Check GitHub Releases for a newer emobie version.
 
 use serde::{Deserialize, Serialize};
 

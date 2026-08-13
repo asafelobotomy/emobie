@@ -279,7 +279,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 
 [[package]]
 name = "emobie-inputd"
-version = "0.6.4"
+version = "0.6.5"
 dependencies = [
  "arboard",
  "ctrlc",
@@ -869,6 +869,7 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
+ "memoffset 0.9.1",
 ]
 
 [[package]]
