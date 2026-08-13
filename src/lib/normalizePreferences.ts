@@ -1,6 +1,7 @@
 import {
   DEFAULT_PREFERENCES,
   type Macro,
+  type MacroTriggerMode,
   type Preferences,
   type ThemeMode,
   type EmojiSize,
@@ -71,6 +72,10 @@ const SORT_VALUES = new Set<SortBy>([
   "uses",
 ]);
 
+function normalizeTriggerMode(raw: unknown): MacroTriggerMode {
+  return raw === "immediate" ? "immediate" : "space";
+}
+
 export function normalizePreferences(
   saved: Partial<Preferences> | undefined,
 ): Preferences {
@@ -114,6 +119,7 @@ export function normalizePreferences(
     showShortcodeMacros: merged.showShortcodeMacros !== false,
     autoPasteOnCopy: Boolean(merged.autoPasteOnCopy),
     expandAsYouType: Boolean(merged.expandAsYouType),
+    expandTriggerMode: normalizeTriggerMode(merged.expandTriggerMode),
     checkUpdatesOnStartup: merged.checkUpdatesOnStartup !== false,
     dismissedUpdateVersion:
       typeof merged.dismissedUpdateVersion === "string" &&

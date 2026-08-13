@@ -1,4 +1,5 @@
 use enigo::{Direction, Enigo, Key, Keyboard, Settings};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::thread;
 use std::time::Duration;
 
@@ -16,37 +17,54 @@ pub fn can_inject() -> bool {
         || std::env::var_os("DISPLAY").is_some()
 }
 
+fn with_enigo<F, T>(f: F) -> Result<T, String>
+where
+    F: FnOnce(&mut Enigo) -> Result<T, String>,
+{
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        let mut enigo = Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
+        f(&mut enigo)
+    }));
+    match result {
+        Ok(inner) => inner,
+            Err(_) => Err("input injection backend panicked".into()),
+    }
+}
+
 pub fn inject_ctrl_v() -> Result<(), String> {
-    let mut enigo = Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
-    enigo
-        .key(Key::Control, Direction::Press)
-        .map_err(|e| e.to_string())?;
-    thread::sleep(KEY_GAP);
-    enigo
-        .key(Key::Unicode('v'), Direction::Click)
-        .map_err(|e| e.to_string())?;
-    thread::sleep(KEY_GAP);
-    enigo
-        .key(Key::Control, Direction::Release)
-        .map_err(|e| e.to_string())?;
-    Ok(())
+    with_enigo(|enigo| {
+        enigo
+            .key(Key::Control, Direction::Press)
+            .map_err(|e| e.to_string())?;
+        thread::sleep(KEY_GAP);
+        enigo
+            .key(Key::Unicode('v'), Direction::Click)
+            .map_err(|e| e.to_string())?;
+        thread::sleep(KEY_GAP);
+        enigo
+            .key(Key::Control, Direction::Release)
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    })
 }
 
 pub fn inject_backspaces(count: usize) -> Result<(), String> {
-    let mut enigo = Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
-    for _ in 0..count {
-        enigo
-            .key(Key::Backspace, Direction::Click)
-            .map_err(|e| e.to_string())?;
-        thread::sleep(KEY_GAP);
-    }
-    Ok(())
+    with_enigo(|enigo| {
+        for _ in 0..count {
+            enigo
+                .key(Key::Backspace, Direction::Click)
+                .map_err(|e| e.to_string())?;
+            thread::sleep(KEY_GAP);
+        }
+        Ok(())
+    })
 }
 
 pub fn inject_ascii(text: &str) -> Result<(), String> {
-    let mut enigo = Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
-    enigo.text(text).map_err(|e| e.to_string())?;
-    Ok(())
+    with_enigo(|enigo| {
+        enigo.text(text).map_err(|e| e.to_string())?;
+        Ok(())
+    })
 }
 
 pub fn expand_trigger(trigger_chars: usize, expansion: &str) -> Result<(), String> {

@@ -8,4 +8,5 @@ export type InputHelperStatus = {
 export type InputMatch = {
   trigger: string;
   expansion: string;
+  mode: "immediate" | "space";
 };

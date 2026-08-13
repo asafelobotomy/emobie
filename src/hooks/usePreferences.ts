@@ -3,6 +3,7 @@ import { load, type Store } from "@tauri-apps/plugin-store";
 import {
   DEFAULT_PREFERENCES,
   type Macro,
+  type MacroTriggerMode,
   type Preferences,
   type ThemeMode,
   type EmojiSize,
@@ -145,6 +146,10 @@ export function usePreferences() {
     (expandAsYouType: boolean) => update({ expandAsYouType }),
     [update],
   );
+  const setExpandTriggerMode = useCallback(
+    (expandTriggerMode: MacroTriggerMode) => update({ expandTriggerMode }),
+    [update],
+  );
   const setCheckUpdatesOnStartup = useCallback(
     (checkUpdatesOnStartup: boolean) => update({ checkUpdatesOnStartup }),
     [update],
@@ -269,6 +274,7 @@ export function usePreferences() {
     setShowShortcodeMacros,
     setAutoPasteOnCopy,
     setExpandAsYouType,
+    setExpandTriggerMode,
     setCheckUpdatesOnStartup,
     setDismissedUpdateVersion,
     setInputHelperSetupSeen,

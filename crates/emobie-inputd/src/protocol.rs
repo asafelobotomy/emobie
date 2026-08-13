@@ -1,9 +1,19 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum TriggerMode {
+    #[default]
+    Immediate,
+    Space,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchRule {
     pub trigger: String,
     pub expansion: String,
+    #[serde(default)]
+    pub mode: TriggerMode,
 }
 
 #[derive(Debug, Deserialize)]

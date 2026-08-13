@@ -60,7 +60,20 @@ fi
 usermod -aG "$GROUP" "$TARGET_USER"
 udevadm control --reload-rules
 udevadm trigger --subsystem-match=input || true
+# Session-local ACL so expand can work before the next login refreshes groups.
+if command -v setfacl >/dev/null; then
+  shopt -s nullglob
+  events=(/dev/input/event*)
+  if ((${#events[@]})); then
+    setfacl -m "u:${TARGET_USER}:r" "${events[@]}" || true
+  fi
+  if [[ -e /dev/uinput ]]; then
+    setfacl -m "u:${TARGET_USER}:rw" /dev/uinput || true
+  fi
+  shopt -u nullglob
+fi
 
 echo "Added $TARGET_USER to $GROUP and installed udev rules."
-echo "Log out and back in (or reboot) before expand-as-you-type can read keyboards."
+echo "Restart emobie-inputd (or emobie) to pick up keyboard access now."
+echo "Log out and back in (or reboot) so new sessions inherit $GROUP without ACLs."
 echo "Membership in $GROUP is sensitive — it grants keyboard event access."

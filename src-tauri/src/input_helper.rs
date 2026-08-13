@@ -15,6 +15,12 @@ pub struct InputHelperStatus {
 pub struct InputMatch {
     pub trigger: String,
     pub expansion: String,
+    #[serde(default = "immediate_mode")]
+    pub mode: String,
+}
+
+fn immediate_mode() -> String {
+    "immediate".into()
 }
 
 #[cfg(unix)]
@@ -23,10 +29,10 @@ mod unix_helper {
     use serde::Deserialize;
     use std::io::{BufRead, BufReader, Write};
     use std::os::unix::net::UnixStream;
-use std::path::PathBuf;
-use std::process::{Command, Stdio};
-use std::thread;
-use std::time::Duration;
+    use std::path::PathBuf;
+    use std::process::{Command, Stdio};
+    use std::thread;
+    use std::time::Duration;
 
     #[derive(Deserialize)]
     pub struct DaemonResponse {
@@ -197,17 +203,17 @@ use std::time::Duration;
     #[cfg(target_os = "linux")]
     pub fn native_inject_paste() -> Result<(), String> {
         use enigo::{Direction, Enigo, Key, Keyboard, Settings};
-        let mut enigo = Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
-        enigo
-            .key(Key::Control, Direction::Press)
-            .map_err(|e| e.to_string())?;
-        enigo
-            .key(Key::Unicode('v'), Direction::Click)
-            .map_err(|e| e.to_string())?;
-        enigo
-            .key(Key::Control, Direction::Release)
-            .map_err(|e| e.to_string())?;
-        Ok(())
+        use std::panic::{catch_unwind, AssertUnwindSafe};
+        match catch_unwind(AssertUnwindSafe(|| {
+            let mut enigo = Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
+            enigo.key(Key::Control, Direction::Press).map_err(|e| e.to_string())?;
+            enigo.key(Key::Unicode('v'), Direction::Click).map_err(|e| e.to_string())?;
+            enigo.key(Key::Control, Direction::Release).map_err(|e| e.to_string())?;
+            Ok(())
+        })) {
+            Ok(inner) => inner,
+            Err(_) => Err("input injection backend panicked".into()),
+        }
     }
 
     #[cfg(not(target_os = "linux"))]

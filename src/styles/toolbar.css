@@ -1,4 +1,6 @@
 .toolbar {
+  container-type: inline-size;
+  container-name: toolbar;
   flex: 0 0 auto;
   display: flex;
   flex-wrap: nowrap;
@@ -53,11 +55,23 @@
   height: 18px;
 }
 
-.toolbar-search {
-  flex: 1 1 auto;
-  min-width: 0;
+.toolbar-cluster {
   display: flex;
   align-items: center;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.toolbar-search {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.toolbar.is-searching .toolbar-search {
+  flex: 1 1 auto;
 }
 
 .search {
@@ -75,6 +89,10 @@
   box-shadow: var(--shadow);
 }
 
+.toolbar.is-searching .search {
+  max-width: none;
+}
+
 .search:focus {
   border-color: var(--accent);
 }
@@ -83,12 +101,18 @@
   flex: 0 0 auto;
 }
 
-.toolbar-actions {
+.toolbar-secondary-actions,
+.toolbar-window-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-left: auto;
+  gap: 2px;
   flex: 0 0 auto;
+}
+
+.toolbar-window-actions {
+  margin-left: 2px;
+  position: relative;
+  z-index: 1;
 }
 
 .icon-btn {
@@ -100,6 +124,7 @@
   color: var(--ink-muted);
   display: grid;
   place-items: center;
+  flex: 0 0 auto;
   transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
@@ -112,6 +137,35 @@
   background: var(--accent-soft);
   border-color: color-mix(in srgb, var(--accent) 35%, transparent);
   color: var(--accent);
+}
+
+.icon-btn.window-btn-close:hover {
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
+  color: var(--danger);
+}
+
+/* Drop minimize before it crowds pin/settings. */
+@container toolbar (max-width: 340px) {
+  .window-btn-minimize {
+    display: none;
+  }
+}
+
+/* When searching in a tight window, keep the field and drop pin/settings. */
+@container toolbar (max-width: 300px) {
+  .toolbar.is-searching .toolbar-secondary-actions {
+    display: none;
+  }
+
+  .toolbar.is-searching .brand-name {
+    display: none;
+  }
+}
+
+@container toolbar (max-width: 240px) {
+  .toolbar.is-searching .brand {
+    display: none;
+  }
 }
 
 .app[data-compact="true"] .toolbar {

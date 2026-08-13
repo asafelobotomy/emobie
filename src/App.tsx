@@ -63,6 +63,7 @@ function App() {
     setShowShortcodeMacros,
     setAutoPasteOnCopy,
     setExpandAsYouType,
+    setExpandTriggerMode,
     setCheckUpdatesOnStartup,
     setDismissedUpdateVersion,
     setInputHelperSetupSeen,
@@ -208,9 +209,9 @@ function App() {
       enabled: prefs.expandAsYouType,
     }).catch(() => undefined);
     if (!prefs.expandAsYouType) return;
-    const matches = expansionMatches(mergedMacros);
+    const matches = expansionMatches(mergedMacros, prefs.expandTriggerMode);
     void invoke("input_helper_sync_matches", { matches }).catch(() => undefined);
-  }, [ready, mergedMacros, prefs.expandAsYouType]);
+  }, [ready, mergedMacros, prefs.expandAsYouType, prefs.expandTriggerMode]);
 
   const togglePin = useCallback(() => {
     setPinned(!pinnedRef.current);
@@ -292,6 +293,7 @@ function App() {
           onTogglePin={togglePin}
           onOpenSettings={() => setSettingsOpen(true)}
           frameless={frameless}
+          trayUnavailable={trayUnavailable}
         />
         <div className="body">
           <CategoryNav
@@ -309,6 +311,7 @@ function App() {
               summonHotkey={prefs.hotkey}
               flashKey={flashKey}
               emptyMessage={emptyMessage}
+              searchActive={query.trim().length > 0}
               onCopy={copyMacro}
               onUpsert={upsertMacro}
               onRemove={removeMacro}
@@ -357,6 +360,7 @@ function App() {
           onShowShortcodeMacros={setShowShortcodeMacros}
           onAutoPasteOnCopy={setAutoPasteOnCopy}
           onExpandAsYouType={setExpandAsYouType}
+          onExpandTriggerMode={setExpandTriggerMode}
           onCheckUpdatesOnStartup={setCheckUpdatesOnStartup}
           onDismissUpdate={(version) => setDismissedUpdateVersion(version)}
           onOpenRelease={(url) => {

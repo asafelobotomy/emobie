@@ -1,10 +1,101 @@
 .macro-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   /* Always scroll vertically — side-panel layout sets data-scroll=x for emoji grids. */
   overflow-x: hidden !important;
   overflow-y: auto !important;
+}
+
+.macro-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.macro-section-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.macro-section-heading h3 {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 650;
+  font-family: var(--font-brand);
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.macro-section-empty {
+  margin: 0;
+  padding: 6px 4px;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--ink-muted);
+}
+
+.macro-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 2px;
+}
+
+.macro-category {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.macro-category .macro-card-grid {
+  padding-left: 12px;
+}
+
+.macro-disclosure {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  padding: 2px 4px;
+  border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.macro-disclosure:hover {
+  background: var(--bg-muted);
+}
+
+.macro-disclosure-chevron {
+  width: 0.7rem;
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  color: var(--ink-muted);
+  line-height: 1;
+}
+
+.macro-disclosure-icon {
+  flex: 0 0 auto;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.macro-disclosure-label {
+  font-size: 0.78rem;
+  font-weight: 650;
+  font-family: var(--font-brand);
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .macro-list-toolbar {
@@ -12,26 +103,26 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 2px 4px 0;
+  padding: 0 2px;
   flex-shrink: 0;
 }
 
 .macro-list-count {
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   color: var(--ink-muted);
 }
 
 .macro-add-btn {
-  min-width: 2rem;
-  padding: 0.2rem 0.65rem;
-  font-size: 1.1rem;
-  line-height: 1.2;
+  min-width: 1.7rem;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.95rem;
+  line-height: 1.15;
 }
 
 .macro-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(5.25rem, 1fr));
+  gap: 5px;
   align-content: start;
 }
 
@@ -39,13 +130,13 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 6px;
-  min-height: 4.5rem;
+  gap: 3px;
+  min-height: 3.1rem;
   text-align: left;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 8px;
   background: color-mix(in srgb, var(--bg) 70%, var(--accent-soft));
-  padding: 10px;
+  padding: 6px 7px;
   color: var(--ink);
   font: inherit;
   cursor: pointer;
@@ -59,8 +150,8 @@
 }
 
 .macro-card-output {
-  font-size: 1.35rem;
-  line-height: 1.25;
+  font-size: 0.92rem;
+  line-height: 1.2;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -71,7 +162,7 @@
 
 .macro-card-trigger {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.78rem;
+  font-size: 0.65rem;
   color: var(--accent);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -80,15 +171,18 @@
 
 .macro-card .macro-badge {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  font-size: 0.62rem;
+  top: 4px;
+  right: 4px;
+  font-size: 0.55rem;
   color: var(--ink-muted);
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 1px 5px;
+  padding: 0 4px;
   white-space: nowrap;
   background: var(--bg);
+  max-width: 46%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .macro-badge {
@@ -147,6 +241,50 @@
   margin: 0 0 10px;
   font-size: 1rem;
   font-family: var(--font-brand);
+}
+
+.macro-trigger-mode {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.macro-trigger-mode:disabled {
+  opacity: 0.55;
+}
+
+.macro-trigger-mode legend {
+  padding: 0 4px;
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+}
+
+.macro-trigger-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.macro-trigger-mode:disabled .macro-trigger-option {
+  cursor: default;
+}
+
+.macro-trigger-option span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.macro-trigger-option small {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+  font-weight: 400;
 }
 
 .first-run-dialog {

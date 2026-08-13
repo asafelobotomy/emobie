@@ -6,6 +6,7 @@ import { MacrosSettings } from "./MacrosSettings";
 import {
   SORT_OPTIONS,
   type Macro,
+  type MacroTriggerMode,
   type Preferences,
   type ThemeMode,
   type EmojiSize,
@@ -46,6 +47,7 @@ type SettingsPanelProps = {
   onShowShortcodeMacros: (value: boolean) => void;
   onAutoPasteOnCopy: (value: boolean) => void;
   onExpandAsYouType: (value: boolean) => void;
+  onExpandTriggerMode: (value: MacroTriggerMode) => void;
   onCheckUpdatesOnStartup: (value: boolean) => void;
   onDismissUpdate: (version: string) => void;
   onOpenRelease: (url: string) => void;
@@ -56,9 +58,9 @@ type SettingsPanelProps = {
 };
 
 function getFocusable(panel: HTMLElement): HTMLElement[] {
-  return Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-    (el) => !el.hasAttribute("disabled") && el.offsetParent !== null,
-  );
+  return Array.from(
+    panel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+  ).filter((el) => !el.hasAttribute("disabled") && el.offsetParent !== null);
 }
 
 export function SettingsPanel({
@@ -84,6 +86,7 @@ export function SettingsPanel({
   onShowShortcodeMacros,
   onAutoPasteOnCopy,
   onExpandAsYouType,
+  onExpandTriggerMode,
   onCheckUpdatesOnStartup,
   onDismissUpdate,
   onOpenRelease,
@@ -97,11 +100,8 @@ export function SettingsPanel({
 
   useEffect(() => {
     const previouslyFocused = document.activeElement as HTMLElement | null;
-    const focusable = panelRef.current
-      ? getFocusable(panelRef.current)
-      : [];
+    const focusable = panelRef.current ? getFocusable(panelRef.current) : [];
     focusable[0]?.focus();
-
     return () => {
       previouslyFocused?.focus?.();
     };
@@ -155,9 +155,7 @@ export function SettingsPanel({
       className="settings-overlay"
       role="presentation"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
+        if (event.target === event.currentTarget) onClose();
       }}
     >
       <div
@@ -168,7 +166,6 @@ export function SettingsPanel({
         aria-labelledby={titleId}
       >
         <h2 id={titleId}>Preferences</h2>
-
         {trayUnavailable ? (
           <p className="settings-hint">
             System tray unavailable — closing the window quits the app. Use Quit
@@ -369,9 +366,11 @@ export function SettingsPanel({
           macros={prefs.macros}
           showShortcodeMacros={prefs.showShortcodeMacros}
           expandAsYouType={prefs.expandAsYouType}
+          expandTriggerMode={prefs.expandTriggerMode}
           inputStatus={inputStatus}
           onShowShortcodes={onShowShortcodeMacros}
           onExpandAsYouType={onExpandAsYouType}
+          onExpandTriggerMode={onExpandTriggerMode}
           onSetMacros={onSetMacros}
           onInputStatus={onInputStatus}
         />

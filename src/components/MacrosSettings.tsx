@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { Macro } from "../types/preferences";
+import type { Macro, MacroTriggerMode } from "../types/preferences";
 import type { InputHelperStatus } from "../lib/inputHelper";
 import {
   exportMacrosYaml,
@@ -11,9 +11,11 @@ type MacrosSettingsProps = {
   macros: Macro[];
   showShortcodeMacros: boolean;
   expandAsYouType: boolean;
+  expandTriggerMode: MacroTriggerMode;
   inputStatus: InputHelperStatus | null;
   onShowShortcodes: (value: boolean) => void;
   onExpandAsYouType: (value: boolean) => void;
+  onExpandTriggerMode: (value: MacroTriggerMode) => void;
   onSetMacros: (macros: Macro[]) => void;
   onInputStatus: (status: InputHelperStatus) => void;
 };
@@ -33,9 +35,11 @@ export function MacrosSettings({
   macros,
   showShortcodeMacros,
   expandAsYouType,
+  expandTriggerMode,
   inputStatus,
   onShowShortcodes,
   onExpandAsYouType,
+  onExpandTriggerMode,
   onSetMacros,
   onInputStatus,
 }: MacrosSettingsProps) {
@@ -91,6 +95,10 @@ export function MacrosSettings({
   const canListen = Boolean(inputStatus?.canListen);
   const daemonReady = Boolean(inputStatus?.daemon);
 
+  const setMode = (mode: MacroTriggerMode) => {
+    onExpandTriggerMode(mode);
+  };
+
   return (
     <div className="macros-settings">
       <h3 className="settings-section-title">Macros</h3>
@@ -140,6 +148,11 @@ export function MacrosSettings({
           type="checkbox"
           checked={expandAsYouType}
           disabled={!canListen && !expandAsYouType}
+          title={
+            !canListen
+              ? "Needs keyboard access (emobie-input group). Run setup, then log out/in."
+              : undefined
+          }
           onChange={(event) => {
             if (event.target.checked && !canListen) return;
             onExpandAsYouType(event.target.checked);
@@ -148,8 +161,42 @@ export function MacrosSettings({
       </div>
       <p className="settings-hint settings-hint-block">
         Watches keystrokes to expand triggers. Off by default. Requires
-        emobie-inputd with input-group access.
+        emobie-inputd with keyboard access
+        {!canListen
+          ? " — toggle stays off until setup-input-access.sh succeeds and you log out/in."
+          : "."}
       </p>
+
+      <fieldset
+        className="macro-trigger-mode"
+        disabled={!expandAsYouType}
+      >
+        <legend>Expand when</legend>
+        <label className="macro-trigger-option">
+          <input
+            type="radio"
+            name="expand-trigger-mode"
+            checked={expandTriggerMode === "immediate"}
+            onChange={() => setMode("immediate")}
+          />
+          <span>
+            As you type
+            <small>Fires as soon as the trigger is complete</small>
+          </span>
+        </label>
+        <label className="macro-trigger-option">
+          <input
+            type="radio"
+            name="expand-trigger-mode"
+            checked={expandTriggerMode === "space"}
+            onChange={() => setMode("space")}
+          />
+          <span>
+            After Space
+            <small>Waits for Space, then replaces trigger + Space</small>
+          </span>
+        </label>
+      </fieldset>
 
       <div className="settings-actions macros-io-actions">
         <button type="button" className="btn" onClick={exportYaml}>

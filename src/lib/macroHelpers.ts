@@ -1,8 +1,10 @@
-import type { Macro } from "../types/preferences.ts";
+import type { Macro, MacroTriggerMode } from "../types/preferences.ts";
 
 export type MacroEntry = Macro & {
   source: "custom" | "shortcode";
   label?: string;
+  /** Emojibase group id for shortcode macros. */
+  group?: number;
 };
 
 export function shortcodeTrigger(code: string): string {
@@ -25,12 +27,14 @@ export function searchMacros(macros: MacroEntry[], query: string): MacroEntry[] 
 
 export function expansionMatches(
   macros: MacroEntry[],
-): { trigger: string; expansion: string }[] {
+  mode: MacroTriggerMode,
+): { trigger: string; expansion: string; mode: MacroTriggerMode }[] {
   return macros
     .filter((macro) => macro.enabled)
     .map((macro) => ({
       trigger: macro.trigger,
       expansion: macro.expansion,
+      mode,
     }));
 }
 

@@ -43,6 +43,7 @@ export function buildShortcodeMacros(skinTone: SkinTone): MacroEntry[] {
         enabled: true,
         source: "shortcode",
         label: emoji.label,
+        group: emoji.group,
       });
     }
     for (const emoticon of emoji.emoticons) {
@@ -54,6 +55,7 @@ export function buildShortcodeMacros(skinTone: SkinTone): MacroEntry[] {
         enabled: true,
         source: "shortcode",
         label: emoji.label,
+        group: emoji.group,
       });
     }
   }

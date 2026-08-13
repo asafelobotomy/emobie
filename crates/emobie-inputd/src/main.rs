@@ -72,7 +72,11 @@ fn handle_client(
                 can_inject,
                 can_listen,
                 enabled.load(Ordering::Relaxed),
-                "emobie-inputd running",
+                if can_listen {
+                    "emobie-inputd running"
+                } else {
+                    "running, but keyboard access missing — run setup-input-access.sh then log out/in"
+                },
             ),
             Ok(Request::SetEnabled { enabled: value }) => {
                 enabled.store(value, Ordering::Relaxed);
@@ -88,9 +92,9 @@ fn handle_client(
                 )
             }
             Ok(Request::SyncMatches { matches }) => {
-                let pairs: Vec<(String, String)> = matches
+                let pairs: Vec<(String, String, protocol::TriggerMode)> = matches
                     .into_iter()
-                    .map(|m| (m.trigger, m.expansion))
+                    .map(|m| (m.trigger, m.expansion, m.mode))
                     .collect();
                 if let Ok(mut guard) = trie.lock() {
                     guard.load(&pairs);

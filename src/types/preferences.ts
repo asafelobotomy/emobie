@@ -4,6 +4,9 @@ export type ThemeMode = "system" | "light" | "dark";
 export type EmojiSize = "sm" | "md" | "lg";
 export type SortBy = "default" | "name" | "type" | "dateAdded" | "uses";
 
+/** When expand-as-you-type is on: fire immediately, or only after Space. */
+export type MacroTriggerMode = "immediate" | "space";
+
 export type Macro = {
   id: string;
   trigger: string;
@@ -35,6 +38,8 @@ export type Preferences = {
   showShortcodeMacros: boolean;
   autoPasteOnCopy: boolean;
   expandAsYouType: boolean;
+  /** How expand-as-you-type matches triggers (global). */
+  expandTriggerMode: MacroTriggerMode;
   checkUpdatesOnStartup: boolean;
   dismissedUpdateVersion: string | null;
   /** True after the user finishes or skips first-run input helper setup. */
@@ -61,6 +66,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   showShortcodeMacros: true,
   autoPasteOnCopy: false,
   expandAsYouType: false,
+  expandTriggerMode: "space",
   checkUpdatesOnStartup: true,
   dismissedUpdateVersion: null,
   inputHelperSetupSeen: false,

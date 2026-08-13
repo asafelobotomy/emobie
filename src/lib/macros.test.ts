@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { normalizeMacros, normalizePreferences } from "./normalizePreferences.ts";
 import {
+  expansionMatches,
   findHotkeyConflict,
   findTriggerConflict,
   searchMacros,
@@ -31,6 +32,12 @@ describe("normalizePreferences macros", () => {
     assert.equal(prefs.showShortcodeMacros, true);
     assert.equal(prefs.autoPasteOnCopy, false);
     assert.equal(prefs.expandAsYouType, false);
+    assert.equal(prefs.expandTriggerMode, "space");
+  });
+
+  it("accepts immediate expand trigger mode", () => {
+    const prefs = normalizePreferences({ expandTriggerMode: "immediate" });
+    assert.equal(prefs.expandTriggerMode, "immediate");
   });
 });
 
@@ -63,6 +70,21 @@ describe("macros helpers", () => {
     assert.equal(searchMacros(list, ":sig").length, 1);
     assert.equal(searchMacros(list, ":)").length, 1);
     assert.equal(searchMacros(list, "zzzz").length, 0);
+  });
+
+  it("applies global trigger mode to sync matches", () => {
+    const list: MacroEntry[] = [
+      {
+        id: "1",
+        trigger: ":sig",
+        expansion: "Hi",
+        hotkey: null,
+        enabled: true,
+        source: "custom",
+      },
+    ];
+    assert.equal(expansionMatches(list, "space")[0].mode, "space");
+    assert.equal(expansionMatches(list, "immediate")[0].mode, "immediate");
   });
 });
 

@@ -186,10 +186,16 @@ pub fn spawn_listener(
                                 guard.match_suffix(&buffer)
                             };
                             if let Some((len, expansion)) = hit {
-                                let _ = inject::expand_trigger(len, &expansion);
                                 for _ in 0..len {
                                     buffer.pop();
                                 }
+                                // Never expand on the listen thread: enigo/backends can
+                                // panic or hang and would permanently stop key capture.
+                                thread::spawn(move || {
+                                    if let Err(err) = inject::expand_trigger(len, &expansion) {
+                                        eprintln!("expand failed: {err}");
+                                    }
+                                });
                             }
                         }
                     }
