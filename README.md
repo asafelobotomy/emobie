@@ -4,6 +4,8 @@
 
 <h1 align="center">emobie</h1>
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/U5R225QZH3)
+
 <p align="center">
   <strong>Compact Linux-first emoji palette for content creators</strong>
 </p>
