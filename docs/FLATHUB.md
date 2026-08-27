@@ -27,8 +27,8 @@ Then bump `tag` / `commit` in the source manifest to the release being packaged.
 
 ## Remaining before Flathub
 
-1. **Autostart portal:** Source Flatpak finish-args omit `xdg-config/autostart` (linter rejects it). Migrate [`src-tauri/src/autostart.rs`](../src-tauri/src/autostart.rs) to the XDG Autostart / Background portal so launch-on-startup works without that permission.
-2. **Tray own-name:** Source Flatpak does not request `--own-name=org.kde.StatusNotifierItem.*` (Flathub rejects wildcards). emobie disables dbus name ownership inside Flatpak (`ksni::disable_dbus_name`) so Cinnamon/Mint `xapp-sn-watcher` can still host the icon. Confirm tray on Mint with System Tray applet enabled.
+1. **Autostart portal:** Source Flatpak finish-args omit `xdg-config/autostart` (linter rejects it). [`src-tauri/src/autostart.rs`](../src-tauri/src/autostart.rs) now prefers the XDG **Background** portal under Flatpak (with desktop-file fallback when the sandbox can write autostart). Re-verify portal UX on GNOME/KDE before submission.
+2. **Tray own-name:** Source Flatpak does not request `--own-name=org.kde.StatusNotifierItem.*` (Flathub rejects wildcards). emobie disables dbus name ownership inside Flatpak (`ksni::disable_dbus_name`) so Cinnamon/Mint `xapp-sn-watcher` can still host the icon. Confirm tray on Mint with System Tray applet enabled; on GNOME confirm an AppIndicator extension.
 3. **Screenshot refresh:** Re-capture without transient “tray unavailable” banners once tray is solid in the packaging under test.
 4. **Input helper:** Macros UI ships in Flatpak; as-you-type / auto-paste need host `emobie-inputd` via `--filesystem=xdg-run/emobie` (no `--device=input`). See [`docs/MACROS.md`](MACROS.md).
 5. **Sustained releases / human PR:** See checklist below.
@@ -63,7 +63,7 @@ Open a Flathub PR **only when all are true**:
 - [x] Source-build Flatpak builds offline and runs (`flathub-build` + smoke) — proven locally on 2026-08-07
 - [ ] `flatpak-builder-lint` clean on **repo** after screenshots are on `main` (manifest lint already clean)
 - [ ] Real screenshots without transient error banners; AppStream validates against live URLs
-- [ ] Autostart portal migration complete; tray confirmed without StatusNotifierItem `--own-name`
+- [ ] Autostart portal verified on GNOME/KDE Flatpak; tray confirmed without StatusNotifierItem `--own-name`
 - [ ] Multiple stable tagged releases with a non-trivial maintenance window since first public release
 - [ ] Maintainer ready to open and drive the PR **without** AI-authored submission text
 - [ ] Regenerated `node-sources.json` / `cargo-sources.json` match the release tag in the manifest

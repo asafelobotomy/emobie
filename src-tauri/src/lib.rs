@@ -107,6 +107,7 @@ pub fn run() {
             release_single_instance_lock,
             quit_app,
             pin::apply_window_pin,
+            pin::pin_capability,
             input_helper::input_helper_status,
             input_helper::input_helper_ensure_started,
             input_helper::input_helper_set_enabled,
@@ -115,6 +116,7 @@ pub fn run() {
             input_helper::input_helper_run_access_setup,
             updates::check_for_updates,
             updates::open_release_page,
+            updates::apply_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running emobie");

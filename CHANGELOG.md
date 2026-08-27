@@ -7,11 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-08-27
+
 ### Added
 
 - Settings → Text expansion: optional **Keep Space after expansion** (`.hi` + Space → `hiya `)
 - RPM packages ship the same `emobie-inputd` assets as `.deb`
 - Flatpak: `xdg-data/emobie:ro` + host Grant path; KWin talk-name for Plasma pin
+- Linux distro/DE guide ([`docs/LINUX.md`](docs/LINUX.md)); Arch PKGBUILD stub ([`packaging/arch/PKGBUILD`](packaging/arch/PKGBUILD))
+- Flatpak launch-on-startup via XDG Background portal (desktop-file fallback when allowed)
+- Settings hints for limited Wayland pin and GNOME AppIndicator tray
+- In-app updater: download the matching GitHub release asset and install (deb/rpm/AppImage/Flatpak)
+- Ubuntu + Ubuntu Mono as the app typeface (body, headings, brand, monospace triggers)
 
 ### Changed
 
@@ -25,12 +32,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- AppImage bundling on Arch/CachyOS: set `NO_STRIP` (and `APPIMAGE_EXTRACT_AND_RUN`) so linuxdeploy no longer fails on `.relr.dyn`
 - Pin (always-on-top) on Plasma Wayland via KWin `keepAbove` (GTK keep-above is a no-op there)
+- Flatpak Plasma pin calls host `qdbus` via `flatpak-spawn --host`
 - Pin is re-applied after show/focus so it survives hide-to-tray
 - Trailing spaces in expansions are typed as Space key events (more reliable than text inject)
 - setfacl failures are reported instead of claiming ACLs always applied
 - Flatpak Grant looks for the host-staged setup script via `flatpak-spawn --host`
-- Flathub source manifest tag bumped to v0.6.5
+- Flathub source manifest tag bumped to v0.6.6
+- README notes updated for paste/expand and GNOME tray
 
 ## [0.6.5] - 2026-08-13
 
@@ -177,7 +187,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Horizontal mouse-wheel scrolling in wide layouts
 - Tray icon temp path for Flatpak-friendly sandboxing
 
-[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.5...HEAD
+[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.6...HEAD
+[0.6.6]: https://github.com/asafelobotomy/emobie/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/asafelobotomy/emobie/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/asafelobotomy/emobie/compare/v0.6.3...v0.6.4
 [0.6.3]: https://github.com/asafelobotomy/emobie/compare/v0.6.2...v0.6.3

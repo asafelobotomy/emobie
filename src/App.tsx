@@ -21,7 +21,7 @@ import type { InputHelperStatus } from "./lib/inputHelper";
 import { usePreferences } from "./hooks/usePreferences";
 import { useLayoutMode } from "./hooks/useLayoutMode";
 import { useCopyEmoji, useCopyText } from "./hooks/useCopyEmoji";
-import { useAlwaysOnTop } from "./hooks/useAlwaysOnTop";
+import { useAlwaysOnTop, usePinCapability } from "./hooks/useAlwaysOnTop";
 import { useGlobalHotkeys } from "./hooks/useGlobalHotkey";
 import { useTheme } from "./hooks/useTheme";
 import { useWindowDecorations } from "./hooks/useWindowDecorations";
@@ -34,9 +34,11 @@ import {
   useUpdateCheck,
   type TrayStatus,
 } from "./hooks/useUpdateCheck";
-import "@fontsource/outfit/400.css";
-import "@fontsource/outfit/600.css";
-import "@fontsource/fraunces/600.css";
+import "@fontsource/ubuntu/400.css";
+import "@fontsource/ubuntu/500.css";
+import "@fontsource/ubuntu/700.css";
+import "@fontsource/ubuntu-mono/400.css";
+import "@fontsource/ubuntu-mono/700.css";
 import "./styles/tokens.css";
 import "./styles/app.css";
 import "./styles/resize.css";
@@ -102,6 +104,7 @@ function App() {
 
   useTheme(prefs.theme);
   useAlwaysOnTop(prefs.pinned, ready);
+  const pinCapability = usePinCapability(ready);
   useWindowDecorations(prefs.showTitleBar, ready);
   const autostartError = useAutostart(prefs.launchOnStartup, ready);
   useAllowMultipleInstances(prefs.allowMultipleInstances, ready);
@@ -346,6 +349,7 @@ function App() {
           prefsError={prefsError}
           trayUnavailable={trayUnavailable}
           trayDetail={trayDetail}
+          pinCapability={pinCapability}
           updateInfo={updateInfo}
           inputStatus={inputStatus}
           onClose={() => setSettingsOpen(false)}

@@ -1,6 +1,6 @@
 [package]
 name = "emobie"
-version = "0.6.5"
+version = "0.6.6"
 description = "emobie — compact emoji palette for content creators"
 authors = ["aSafeLobotomy"]
 edition = "2021"
@@ -27,6 +27,8 @@ ksni = { version = "0.3", features = ["blocking"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 # Match emobie-inputd: skip libei (enigo 0.3 panics without RemoteDesktop portal).
 enigo = { version = "0.3", default-features = false, features = ["x11rb", "wayland"] }
+ashpd = { version = "0.11", features = ["tokio"] }
+tokio = { version = "1", features = ["rt", "macros"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"

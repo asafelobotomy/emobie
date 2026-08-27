@@ -97,6 +97,11 @@ jobs:
         run: npm ci
 
       - name: Build Tauri deb, rpm, and AppImage
+        env:
+          # linuxdeploy's bundled strip fails on modern ELF (.relr.dyn) libs.
+          NO_STRIP: "true"
+          # Avoid FUSE mount issues when running the linuxdeploy AppImage itself.
+          APPIMAGE_EXTRACT_AND_RUN: "1"
         run: npm run tauri build -- --bundles deb,rpm,appimage
 
       - name: Stage package artifacts

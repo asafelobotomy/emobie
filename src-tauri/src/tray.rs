@@ -163,7 +163,8 @@ mod linux {
             .spawn()
             .map_err(|err| {
                 format!(
-                    "{err} (Cinnamon: enable System Tray applet; Mint uses xapp-sn-watcher)"
+                    "{err} (GNOME: install AppIndicator/KStatusNotifierItem extension; \
+Cinnamon: enable System Tray applet; Mint: xapp-sn-watcher)"
                 )
             })?;
 

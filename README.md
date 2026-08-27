@@ -38,10 +38,12 @@ Grab the latest build from
 
 | Format | Best for | How |
 |--------|----------|-----|
-| **Flatpak** | Sandboxed desktop install | `flatpak install --user emobie-*-x86_64.flatpak` |
-| **`.deb`** | Debian / Ubuntu / Mint | `sudo apt install ./emobie_*_amd64.deb` |
-| **`.rpm`** | Fedora / RHEL / openSUSE | `sudo dnf install ./emobie-*-1.x86_64.rpm` |
-| **AppImage** | Portable, no install | `chmod +x emobie_*.AppImage && ./emobie_*.AppImage` — for text expansion also run `bash packaging/install-inputd-user.sh` (AppImage does not ship the helper) |
+| **Flatpak** | Sandboxed desktop install | `flatpak install --user emobie-*-x86_64.flatpak` — for text expansion also run `bash packaging/install-inputd-user.sh` on the host |
+| **`.deb`** | Debian / Ubuntu / Mint / Pop | `sudo apt install ./emobie_*_amd64.deb` |
+| **`.rpm`** | Fedora / RHEL / openSUSE | `sudo dnf install ./emobie-*-1.x86_64.rpm` (openSUSE: `zypper install …`) |
+| **AppImage** | Portable / Arch / CachyOS | `chmod +x emobie_*.AppImage && ./emobie_*.AppImage` — for text expansion also run `bash packaging/install-inputd-user.sh` |
+
+Arch / CachyOS / Manjaro: see [`docs/LINUX.md`](docs/LINUX.md) and optional [`packaging/arch/PKGBUILD`](packaging/arch/PKGBUILD).
 
 ```bash
 # Flatpak (after downloading the release bundle)
@@ -50,6 +52,8 @@ flatpak run io.github.asafelobotomy.emobie
 ```
 
 App ID: `io.github.asafelobotomy.emobie`
+
+Linux tray, pin, startup, and SELinux notes: [`docs/LINUX.md`](docs/LINUX.md).
 
 ---
 
@@ -60,7 +64,7 @@ App ID: `io.github.asafelobotomy.emobie`
 | **Catalog** | Full Unicode emoji set via emojibase, with categories and search (name, tags, shortcodes) |
 | **Favorites & recents** | Right-click to favorite; recent history with configurable size |
 | **Macros** | Custom trigger → expansion cards (+ to add), shortcodes + emoticons (`:)`, `;')`, …), per-macro hotkeys, YAML import/export |
-| **Updates** | Optional startup check against GitHub Releases (dismissible notice in Settings) |
+| **Updates** | Optional startup check; Settings can download and install the matching release asset (deb/rpm/AppImage/Flatpak) |
 | **Copy** | One-click clipboard copy; optional auto-paste when the host input helper is available |
 | **Expand** | Optional as-you-type via host `emobie-inputd` (systemd --user auto-start; off by default; see [docs/MACROS.md](docs/MACROS.md)) |
 | **Summon** | Global hotkey (default `Ctrl+Shift+Space`; letters/numbers need a modifier) and system tray |
@@ -128,14 +132,19 @@ npm run tauri build
 
 Artifacts land in `src-tauri/target/release/bundle/`.
 
+On Arch / CachyOS (and some other rolling distros), AppImage bundling needs
+`NO_STRIP=true` so linuxdeploy’s outdated `strip` doesn’t choke on `.relr.dyn`
+sections. If the linuxdeploy AppImage itself won’t run, also set
+`APPIMAGE_EXTRACT_AND_RUN=1`.
+
 ```bash
 # One format
 npm run tauri build -- --bundles deb
 npm run tauri build -- --bundles rpm
-npm run tauri build -- --bundles appimage
+NO_STRIP=true APPIMAGE_EXTRACT_AND_RUN=1 npm run tauri build -- --bundles appimage
 
-# All three
-npm run tauri build -- --bundles deb,rpm,appimage
+# All three (same env for AppImage)
+NO_STRIP=true APPIMAGE_EXTRACT_AND_RUN=1 npm run tauri build -- --bundles deb,rpm,appimage
 ```
 
 ### Flatpak (GitHub Releases — from a `.deb`)
@@ -160,8 +169,8 @@ Tags matching `vX.Y.Z` run GitHub Actions to publish **`.deb`**, **`.rpm`**, **A
 
 ```bash
 # Keep package.json, Cargo.toml, and tauri.conf.json versions in sync
-git tag v0.6.5
-git push origin v0.6.5
+git tag v0.6.6
+git push origin v0.6.6
 ```
 
 Or run the **Release** workflow from the Actions tab.
@@ -170,10 +179,11 @@ Or run the **Release** workflow from the Actions tab.
 
 ## Notes
 
-- Global shortcuts and tray icons can differ on Wayland vs X11 depending on your compositor.
-- emobie copies to the clipboard only — it does not inject into the focused app.
+- Global shortcuts and tray icons can differ on Wayland vs X11 depending on your compositor. On **GNOME**, install an AppIndicator / KStatusNotifierItem extension for the tray ([details](docs/LINUX.md)).
+- Optional **auto-paste** and **as-you-type expansion** inject keystrokes via host `emobie-inputd` (see [docs/MACROS.md](docs/MACROS.md)). Clipboard copy always works without the helper.
 - Flatpak preferences live under  
   `~/.var/app/io.github.asafelobotomy.emobie/data/com.emobie.app/`.
+- Pin is reliable on X11 and Plasma Wayland; other Wayland compositors may ignore it.
 
 ---
 

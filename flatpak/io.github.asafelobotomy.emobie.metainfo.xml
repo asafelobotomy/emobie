@@ -58,6 +58,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.6" date="2026-08-27">
+      <description>
+        <p>In-app updater, Ubuntu typeface, Linux distro/DE coverage (pin, Flatpak autostart, AppImage linuxdeploy fix), and text-expansion polish.</p>
+      </description>
+    </release>
     <release version="0.6.5" date="2026-08-13">
       <description>
         <p>Normalize branding to lowercase emobie, including the Flatpak app id, and ship macros with the host input helper.</p>

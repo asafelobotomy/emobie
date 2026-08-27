@@ -1,7 +1,7 @@
-//! Launch-on-startup registration that works for both native and Flatpak installs.
+//! Launch-on-startup registration for native installs and Flatpak.
 //!
-//! The stock `tauri-plugin-autostart` writes `Exec=/app/bin/...`, which the host
-//! session manager cannot run. Flatpak entries must use `flatpak run`.
+//! Native / GitHub Flatpak (with `xdg-config/autostart`): write a `.desktop` file.
+//! Flathub-constrained Flatpak: use the XDG Background portal (no autostart FS).
 
 use std::fs;
 use std::path::PathBuf;
@@ -9,6 +9,7 @@ use std::path::PathBuf;
 const APP_NAME: &str = "emobie";
 const FLATPAK_APP_ID: &str = "io.github.asafelobotomy.emobie";
 const LEGACY_DESKTOP: &str = "emobie.desktop";
+const MARKER_NAME: &str = "autostart-enabled";
 
 fn is_flatpak() -> bool {
     std::env::var_os("FLATPAK_ID").is_some()
@@ -26,6 +27,15 @@ fn desktop_path() -> Result<PathBuf, String> {
         LEGACY_DESKTOP.to_string()
     };
     Ok(autostart_dir()?.join(name))
+}
+
+fn marker_path() -> Option<PathBuf> {
+    let data = std::env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local").join("share"))
+        })?;
+    Some(data.join(FLATPAK_APP_ID).join(MARKER_NAME))
 }
 
 fn flatpak_desktop_contents() -> String {
@@ -64,32 +74,16 @@ Terminal=false
 }
 
 fn remove_legacy_entries(dir: &PathBuf) {
-    // Broken plugin entry used sandbox-only Exec=/app/bin/emobie
     let _ = fs::remove_file(dir.join(LEGACY_DESKTOP));
     if !is_flatpak() {
         let _ = fs::remove_file(dir.join(format!("{FLATPAK_APP_ID}.desktop")));
     }
 }
 
-#[tauri::command]
-pub fn is_launch_on_startup() -> Result<bool, String> {
-    let path = desktop_path()?;
-    if !path.is_file() {
-        return Ok(false);
-    }
-    if !is_flatpak() {
-        return Ok(true);
-    }
-    let contents = fs::read_to_string(&path).map_err(|err| err.to_string())?;
-    Ok(contents.contains("flatpak run") && contents.contains(FLATPAK_APP_ID))
-}
-
-#[tauri::command]
-pub fn set_launch_on_startup(enabled: bool) -> Result<(), String> {
+fn write_desktop_file(enabled: bool) -> Result<(), String> {
     let dir = autostart_dir()?;
-    fs::create_dir_all(&dir).map_err(|err| err.to_string())?;
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     remove_legacy_entries(&dir);
-
     let path = desktop_path()?;
     if enabled {
         let contents = if is_flatpak() {
@@ -97,9 +91,115 @@ pub fn set_launch_on_startup(enabled: bool) -> Result<(), String> {
         } else {
             native_desktop_contents()?
         };
-        fs::write(&path, contents).map_err(|err| err.to_string())?;
+        fs::write(&path, contents).map_err(|e| e.to_string())?;
     } else {
         let _ = fs::remove_file(&path);
     }
     Ok(())
+}
+
+fn desktop_file_enabled() -> Result<bool, String> {
+    let path = desktop_path()?;
+    if !path.is_file() {
+        return Ok(false);
+    }
+    if !is_flatpak() {
+        return Ok(true);
+    }
+    let contents = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    Ok(contents.contains("flatpak run") && contents.contains(FLATPAK_APP_ID))
+}
+
+fn marker_enabled() -> bool {
+    marker_path().is_some_and(|p| p.is_file())
+}
+
+fn set_marker(enabled: bool) {
+    let Some(path) = marker_path() else {
+        return;
+    };
+    if enabled {
+        if let Some(parent) = path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let _ = fs::write(&path, b"1\n");
+    } else {
+        let _ = fs::remove_file(&path);
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn set_via_background_portal(enabled: bool) -> Result<(), String> {
+    use ashpd::desktop::background::Background;
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    rt.block_on(async move {
+        let request = Background::request()
+            .reason("Launch emobie when you sign in")
+            .auto_start(enabled)
+            .command(["emobie"])
+            .dbus_activatable(false);
+        let response = request
+            .send()
+            .await
+            .map_err(|e| format!("Background portal: {e}"))?
+            .response()
+            .map_err(|e| format!("Background portal denied: {e}"))?;
+        if enabled && !response.auto_start() {
+            return Err(
+                "Autostart was not granted by the desktop portal. Check Settings → Apps."
+                    .into(),
+            );
+        }
+        Ok(())
+    })
+}
+
+#[cfg(not(target_os = "linux"))]
+fn set_via_background_portal(_enabled: bool) -> Result<(), String> {
+    Err("Background portal is Linux-only".into())
+}
+
+#[tauri::command]
+pub fn is_launch_on_startup() -> Result<bool, String> {
+    if is_flatpak() {
+        if marker_enabled() {
+            return Ok(true);
+        }
+        // GitHub Flatpak may still have a visible autostart desktop file.
+        if desktop_file_enabled().unwrap_or(false) {
+            return Ok(true);
+        }
+        return Ok(false);
+    }
+    desktop_file_enabled()
+}
+
+#[tauri::command]
+pub fn set_launch_on_startup(enabled: bool) -> Result<(), String> {
+    if is_flatpak() {
+        match set_via_background_portal(enabled) {
+            Ok(()) => {
+                set_marker(enabled);
+                // Best-effort desktop file when the sandbox can write autostart.
+                let _ = write_desktop_file(enabled);
+                return Ok(());
+            }
+            Err(portal_err) => {
+                // GitHub Flatpak finish-args allow xdg-config/autostart:create.
+                match write_desktop_file(enabled) {
+                    Ok(()) => {
+                        set_marker(enabled);
+                        return Ok(());
+                    }
+                    Err(_) => return Err(portal_err),
+                }
+            }
+        }
+    }
+    write_desktop_file(enabled)
 }

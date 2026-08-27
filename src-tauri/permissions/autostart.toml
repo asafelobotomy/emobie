@@ -29,6 +29,11 @@ description = "Allows opening the emobie GitHub release page"
 commands.allow = ["open_release_page"]
 
 [[permission]]
+identifier = "allow-apply-update"
+description = "Allows downloading and installing a matching GitHub release asset"
+commands.allow = ["apply_update"]
+
+[[permission]]
 identifier = "allow-release-single-instance-lock"
 description = "Allows releasing the single-instance lock when multiple instances are enabled"
 commands.allow = ["release_single_instance_lock"]
@@ -42,6 +47,11 @@ commands.allow = ["quit_app"]
 identifier = "allow-apply-window-pin"
 description = "Allows applying always-on-top / compositor keep-above for the pin button"
 commands.allow = ["apply_window_pin"]
+
+[[permission]]
+identifier = "allow-pin-capability"
+description = "Allows reading whether pin is reliable on this compositor"
+commands.allow = ["pin_capability"]
 
 [[permission]]
 identifier = "allow-input-helper-status"

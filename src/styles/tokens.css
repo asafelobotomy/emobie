@@ -1,8 +1,10 @@
 :root {
   color-scheme: light dark;
 
-  --font-ui: "Outfit", "Segoe UI", "Trebuchet MS", sans-serif;
-  --font-brand: "Fraunces", "Palatino Linotype", Georgia, serif;
+  --font-ui: "Ubuntu", "Segoe UI", "Noto Sans", sans-serif;
+  --font-brand: "Ubuntu", "Segoe UI", "Noto Sans", sans-serif;
+  --font-mono: "Ubuntu Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas,
+    monospace;
 
   --bg: #f3f6f4;
   --bg-elevated: #ffffff;
@@ -51,21 +53,62 @@ body,
 
 body {
   font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.4;
   background: var(--bg);
   color: var(--ink);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-brand);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+}
+
+h1 {
+  font-size: 1.35rem;
+}
+
+h2 {
+  font-size: 1.15rem;
+}
+
+h3 {
+  font-size: 1rem;
+}
+
+h4 {
+  font-size: 0.85rem;
+  font-weight: 500;
 }
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
   color: inherit;
 }
 
 button {
   cursor: pointer;
+}
+
+code,
+kbd,
+samp,
+pre,
+.mono {
+  font-family: var(--font-mono);
 }
 
 :root[data-size="sm"] {

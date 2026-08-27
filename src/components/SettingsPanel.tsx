@@ -4,6 +4,8 @@ import { SkinTonePicker } from "./SkinTonePicker";
 import { HotkeyCapture } from "./HotkeyCapture";
 import { MacrosSettings } from "./MacrosSettings";
 import { TextExpansionSettings } from "./TextExpansionSettings";
+import { SettingsLifecycleHints } from "./SettingsLifecycleHints";
+import { UpdateBanner } from "./UpdateBanner";
 import {
   SORT_OPTIONS,
   type Macro,
@@ -15,6 +17,8 @@ import {
 } from "../types/preferences";
 import type { SkinTone } from "../data/loadEmojis";
 import type { InputHelperStatus } from "../lib/inputHelper";
+import type { PinCapability } from "../hooks/useAlwaysOnTop";
+import type { UpdateCheckResult } from "../hooks/useUpdateCheck";
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -26,13 +30,8 @@ type SettingsPanelProps = {
   prefsError: string | null;
   trayUnavailable?: boolean;
   trayDetail?: string | null;
-  updateInfo?: {
-    current: string;
-    latest: string | null;
-    newerAvailable: boolean;
-    releaseUrl: string | null;
-    detail: string;
-  } | null;
+  pinCapability?: PinCapability | null;
+  updateInfo?: UpdateCheckResult | null;
   inputStatus: InputHelperStatus | null;
   onClose: () => void;
   onTheme: (theme: ThemeMode) => void;
@@ -72,6 +71,7 @@ export function SettingsPanel({
   prefsError,
   trayUnavailable,
   trayDetail,
+  pinCapability,
   updateInfo,
   inputStatus,
   onClose,
@@ -169,41 +169,23 @@ export function SettingsPanel({
         aria-labelledby={titleId}
       >
         <h2 id={titleId}>Preferences</h2>
-        {trayUnavailable ? (
-          <p className="settings-hint">
-            System tray unavailable — closing the window quits the app. Use Quit
-            below when you want to exit.
-            {trayDetail ? ` (${trayDetail})` : ""}
-          </p>
-        ) : null}
-        {prefsError ? <p className="settings-error">{prefsError}</p> : null}
+        <SettingsLifecycleHints
+          trayUnavailable={trayUnavailable}
+          trayDetail={trayDetail}
+          pinLimited={Boolean(
+            prefs.pinned && pinCapability && !pinCapability.reliable,
+          )}
+          pinDetail={pinCapability?.detail ?? null}
+          prefsError={prefsError}
+          autostartError={autostartError}
+        />
 
-        {updateInfo?.newerAvailable ? (
-          <div className="settings-update-banner">
-            <p className="settings-hint">
-              {updateInfo.detail} (you have v{updateInfo.current})
-            </p>
-            <div className="settings-actions">
-              {updateInfo.releaseUrl ? (
-                <button
-                  type="button"
-                  className="btn primary"
-                  onClick={() => onOpenRelease(updateInfo.releaseUrl!)}
-                >
-                  Open release
-                </button>
-              ) : null}
-              {updateInfo.latest ? (
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => onDismissUpdate(updateInfo.latest!)}
-                >
-                  Dismiss
-                </button>
-              ) : null}
-            </div>
-          </div>
+        {updateInfo ? (
+          <UpdateBanner
+            updateInfo={updateInfo}
+            onDismissUpdate={onDismissUpdate}
+            onOpenRelease={onOpenRelease}
+          />
         ) : null}
 
         <div className="settings-row settings-toggle-row">
@@ -248,9 +230,6 @@ export function SettingsPanel({
             onChange={(event) => onLaunchOnStartup(event.target.checked)}
           />
         </div>
-        {autostartError ? (
-          <p className="settings-error">{autostartError}</p>
-        ) : null}
 
         <div className="settings-row settings-toggle-row">
           <label htmlFor="start-minimized">Start minimized to system tray</label>

@@ -1,6 +1,17 @@
-//! Check GitHub Releases for a newer emobie version.
+//! GitHub Releases update check and simple package install.
+
+mod apply;
 
 use serde::{Deserialize, Serialize};
+
+pub use apply::InstallKind;
+
+use apply::ApplyUpdateResult;
+
+#[tauri::command]
+pub fn apply_update(download_url: String, asset_name: String) -> Result<ApplyUpdateResult, String> {
+    apply::apply_update(download_url, asset_name)
+}
 
 const REPO: &str = "asafelobotomy/emobie";
 const USER_AGENT: &str = concat!("emobie/", env!("CARGO_PKG_VERSION"));
@@ -13,6 +24,17 @@ pub struct UpdateCheckResult {
     pub newer_available: bool,
     pub release_url: Option<String>,
     pub detail: String,
+    /// Matching asset for this install, when auto-update is possible.
+    pub download_url: Option<String>,
+    pub asset_name: Option<String>,
+    pub install_kind: InstallKind,
+    pub can_auto_update: bool,
+}
+
+#[derive(Deserialize)]
+struct GithubAsset {
+    name: String,
+    browser_download_url: String,
 }
 
 #[derive(Deserialize)]
@@ -21,6 +43,8 @@ struct GithubRelease {
     html_url: String,
     draft: bool,
     prerelease: bool,
+    #[serde(default)]
+    assets: Vec<GithubAsset>,
 }
 
 fn parse_semver(raw: &str) -> Option<(u64, u64, u64)> {
@@ -45,9 +69,42 @@ fn is_newer(latest: &str, current: &str) -> bool {
     }
 }
 
+fn pick_asset<'a>(
+    assets: &'a [GithubAsset],
+    kind: InstallKind,
+) -> Option<&'a GithubAsset> {
+    let prefer = match kind {
+        InstallKind::Flatpak => [".flatpak"].as_slice(),
+        InstallKind::AppImage | InstallKind::Native => [".AppImage"].as_slice(),
+        InstallKind::Deb => [".deb"].as_slice(),
+        InstallKind::Rpm => [".rpm"].as_slice(),
+    };
+    assets.iter().find(|asset| {
+        prefer
+            .iter()
+            .any(|suffix| asset.name.ends_with(suffix))
+            && asset.browser_download_url.starts_with("https://github.com/")
+    })
+}
+
+fn offline_result(current: String, detail: &str, kind: InstallKind) -> UpdateCheckResult {
+    UpdateCheckResult {
+        current,
+        latest: None,
+        newer_available: false,
+        release_url: None,
+        detail: detail.into(),
+        download_url: None,
+        asset_name: None,
+        install_kind: kind,
+        can_auto_update: false,
+    }
+}
+
 #[tauri::command]
 pub fn check_for_updates() -> UpdateCheckResult {
     let current = env!("CARGO_PKG_VERSION").to_string();
+    let kind = apply::detect_install_kind();
     let url = format!("https://api.github.com/repos/{REPO}/releases/latest");
 
     let response = ureq::get(&url)
@@ -56,45 +113,42 @@ pub fn check_for_updates() -> UpdateCheckResult {
         .call();
 
     let Ok(response) = response else {
-        return UpdateCheckResult {
-            current,
-            latest: None,
-            newer_available: false,
-            release_url: None,
-            detail: "Could not reach GitHub Releases.".into(),
-        };
+        return offline_result(current, "Could not reach GitHub Releases.", kind);
     };
 
     let Ok(release) = response.into_json::<GithubRelease>() else {
-        return UpdateCheckResult {
-            current,
-            latest: None,
-            newer_available: false,
-            release_url: None,
-            detail: "Unexpected GitHub Releases response.".into(),
-        };
+        return offline_result(current, "Unexpected GitHub Releases response.", kind);
     };
 
     if release.draft || release.prerelease {
-        return UpdateCheckResult {
-            current,
-            latest: None,
-            newer_available: false,
-            release_url: None,
-            detail: "No stable release found.".into(),
-        };
+        return offline_result(current, "No stable release found.", kind);
     }
 
     let latest = release.tag_name.trim_start_matches('v').to_string();
     let newer = is_newer(&latest, &current);
+    let asset = if newer {
+        pick_asset(&release.assets, kind)
+    } else {
+        None
+    };
+    let can_auto = asset.is_some();
+
     UpdateCheckResult {
         newer_available: newer,
         release_url: Some(release.html_url),
         detail: if newer {
-            format!("Update available: v{latest}")
+            if can_auto {
+                format!("Update available: v{latest} — you can install it here")
+            } else {
+                format!("Update available: v{latest}")
+            }
         } else {
             format!("Up to date (v{current})")
         },
+        download_url: asset.map(|a| a.browser_download_url.clone()),
+        asset_name: asset.map(|a| a.name.clone()),
+        install_kind: kind,
+        can_auto_update: can_auto,
         latest: Some(latest),
         current,
     }

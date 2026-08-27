@@ -1,0 +1,63 @@
+# Maintainer PKGBUILD for Arch / CachyOS / Manjaro
+# Not published to AUR yet — use as a starting point.
+#
+# Build (from repo root after placing this file appropriately, or):
+#   cd packaging/arch && makepkg -si
+#
+# Prefer Flatpak/AppImage + packaging/install-inputd-user.sh for most users.
+
+pkgname=emobie
+pkgver=0.6.6
+pkgrel=1
+pkgdesc="Compact emoji palette with macros and optional text expansion"
+arch=('x86_64')
+url="https://github.com/asafelobotomy/emobie"
+license=('MIT')
+depends=(
+  'webkit2gtk-4.1'
+  'libayatana-appindicator'
+  'gtk3'
+  'openssl'
+)
+makedepends=('cargo' 'nodejs' 'npm' 'clang' 'lld')
+optdepends=(
+  'qt6-tools: qdbus6 for Plasma Wayland pin when using native build'
+)
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  npm ci --legacy-peer-deps
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  export CARGO_TARGET_DIR="$srcdir/target"
+  npm run tauri build -- --no-bundle
+  cargo build --release --manifest-path crates/emobie-inputd/Cargo.toml
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  install -Dm755 "src-tauri/target/release/emobie" "$pkgdir/usr/bin/emobie"
+  install -Dm755 "crates/emobie-inputd/target/release/emobie-inputd" \
+    "$pkgdir/usr/bin/emobie-inputd"
+  install -Dm644 packaging/systemd/emobie-inputd.service \
+    "$pkgdir/usr/lib/systemd/user/emobie-inputd.service"
+  install -Dm755 packaging/setup-input-access.sh \
+    "$pkgdir/usr/share/emobie/setup-input-access.sh"
+  install -Dm644 packaging/udev/99-emobie-input.rules \
+    "$pkgdir/usr/share/emobie/99-emobie-input.rules"
+  install -Dm644 packaging/polkit/io.github.asafelobotomy.emobie.inputd.policy \
+    "$pkgdir/usr/share/polkit-1/actions/io.github.asafelobotomy.emobie.inputd.policy"
+  install -Dm644 flatpak/io.github.asafelobotomy.emobie.desktop \
+    "$pkgdir/usr/share/applications/emobie.desktop"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
+
+post_install() {
+  echo "Enable the input helper: systemctl --user enable --now emobie-inputd.service"
+  echo "Grant keyboard access once via emobie Expand, or:"
+  echo "  pkexec /usr/share/emobie/setup-input-access.sh"
+}

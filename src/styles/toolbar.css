@@ -15,9 +15,9 @@
 
 .brand {
   font-family: var(--font-brand);
-  font-weight: 650;
-  font-size: 1.05rem;
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: 0.02em;
   color: var(--accent);
   white-space: nowrap;
   user-select: none;
