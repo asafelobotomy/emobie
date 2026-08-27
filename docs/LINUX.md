@@ -100,7 +100,7 @@ newer [GitHub Release](https://github.com/asafelobotomy/emobie/releases) exists.
 | AppImage | `.AppImage` | Replaces `$APPIMAGE` in place |
 | `.deb` | `.deb` | `pkexec apt-get install` / `dpkg -i` |
 | `.rpm` | `.rpm` | `pkexec dnf` / `zypper` / `rpm -Uvh` |
-| Native / other | `.AppImage` | Installs under `~/.local/bin/` |
+| Native / other | `.deb` | Extracts `usr/bin/emobie` → `~/.local/bin/emobie-bin` |
 
 Quit and relaunch after a successful update. Download URLs are limited to this
 repo’s `releases/download/` assets.

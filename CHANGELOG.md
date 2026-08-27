@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Native in-app updates install from the `.deb` into `~/.local/bin/emobie-bin` instead of an AppImage (avoids blank WebKit window on Wayland)
+- AppImage launcher sets `WEBKIT_DISABLE_DMABUF_RENDERER` / `WEBKIT_DISABLE_COMPOSITING_MODE` to reduce blank-window issues
+
 ## [0.6.6] - 2026-08-27
 
 ### Added

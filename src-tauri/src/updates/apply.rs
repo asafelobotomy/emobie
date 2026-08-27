@@ -192,13 +192,13 @@ fn install_appimage(path: &Path) -> Result<(), String> {
         perms.set_mode(0o755);
         fs::set_permissions(&dest, perms).map_err(|e| e.to_string())?;
     }
-    // Keep a stable launcher name when possible.
+    // Keep a stable launcher with WebKit workarounds (blank UI on some Wayland sessions).
     let launcher = dest
         .parent()
         .map(|p| p.join("emobie"))
         .ok_or_else(|| "invalid install path".to_string())?;
     let script = format!(
-        "#!/bin/sh\nexec \"{}\" \"$@\"\n",
+        "#!/bin/sh\nexport WEBKIT_DISABLE_DMABUF_RENDERER=1\nexport WEBKIT_DISABLE_COMPOSITING_MODE=1\nexec \"{}\" \"$@\"\n",
         dest.display()
     );
     fs::write(&launcher, script).map_err(|e| e.to_string())?;
@@ -211,6 +211,72 @@ fn install_appimage(path: &Path) -> Result<(), String> {
         perms.set_mode(0o755);
         fs::set_permissions(&launcher, perms).map_err(|e| e.to_string())?;
     }
+    Ok(())
+}
+
+fn install_native_from_deb(deb: &Path) -> Result<(), String> {
+    let work = cache_dir()?.join("native-extract");
+    let _ = fs::remove_dir_all(&work);
+    fs::create_dir_all(&work).map_err(|e| e.to_string())?;
+    run_checked(
+        Command::new("ar")
+            .arg("x")
+            .arg(deb)
+            .current_dir(&work),
+    )?;
+    let data_tar = fs::read_dir(&work)
+        .map_err(|e| e.to_string())?
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .find(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with("data.tar"))
+        })
+        .ok_or_else(|| "deb missing data.tar.*".to_string())?;
+    run_checked(
+        Command::new("tar")
+            .arg("xf")
+            .arg(&data_tar)
+            .current_dir(&work),
+    )?;
+    let extracted = work.join("usr/bin/emobie");
+    if !extracted.is_file() {
+        let _ = fs::remove_dir_all(&work);
+        return Err("deb did not contain usr/bin/emobie".into());
+    }
+    let bin_dir = std::env::var_os("XDG_BIN_HOME")
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/bin"))
+        })
+        .ok_or_else(|| "HOME is not set".to_string())?;
+    fs::create_dir_all(&bin_dir).map_err(|e| e.to_string())?;
+    let dest_bin = bin_dir.join("emobie-bin");
+    fs::copy(&extracted, &dest_bin).map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&dest_bin).map_err(|e| e.to_string())?.permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&dest_bin, perms).map_err(|e| e.to_string())?;
+    }
+    let launcher = bin_dir.join("emobie");
+    let script = format!(
+        "#!/bin/sh\nset -e\nBIN=\"{}\"\nif [ -x \"$BIN\" ]; then\n  exec \"$BIN\" \"$@\"\nfi\nexec flatpak run --user io.github.asafelobotomy.emobie \"$@\"\n",
+        dest_bin.display()
+    );
+    fs::write(&launcher, script).map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(&launcher)
+            .map_err(|e| e.to_string())?
+            .permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&launcher, perms).map_err(|e| e.to_string())?;
+    }
+    let _ = fs::remove_dir_all(&work);
     Ok(())
 }
 
@@ -264,8 +330,8 @@ pub fn apply_update(download_url: String, asset_name: String) -> Result<ApplyUpd
     let kind = detect_install_kind();
     let expected = match kind {
         InstallKind::Flatpak => ".flatpak",
-        InstallKind::AppImage | InstallKind::Native => ".AppImage",
-        InstallKind::Deb => ".deb",
+        InstallKind::AppImage => ".AppImage",
+        InstallKind::Native | InstallKind::Deb => ".deb",
         InstallKind::Rpm => ".rpm",
     };
     if !asset_name.ends_with(expected) {
@@ -280,24 +346,21 @@ pub fn apply_update(download_url: String, asset_name: String) -> Result<ApplyUpd
     download_asset(&download_url, &dest)?;
 
     let result = match kind {
-        InstallKind::Flatpak => install_flatpak(&dest).map(|_| {
-            ApplyUpdateResult {
-                ok: true,
-                detail: "Flatpak updated. Quit and relaunch emobie to finish.".into(),
-                restart_required: true,
-            }
+        InstallKind::Flatpak => install_flatpak(&dest).map(|_| ApplyUpdateResult {
+            ok: true,
+            detail: "Flatpak updated. Quit and relaunch emobie to finish.".into(),
+            restart_required: true,
         }),
-        InstallKind::AppImage | InstallKind::Native => install_appimage(&dest).map(|_| {
-            ApplyUpdateResult {
-                ok: true,
-                detail: if kind == InstallKind::Native {
-                    "Installed ~/.local/bin/emobie.AppImage (and emobie launcher). Quit and relaunch."
-                        .into()
-                } else {
-                    "AppImage replaced. Quit and relaunch emobie to finish.".into()
-                },
-                restart_required: true,
-            }
+        InstallKind::AppImage => install_appimage(&dest).map(|_| ApplyUpdateResult {
+            ok: true,
+            detail: "AppImage replaced. Quit and relaunch emobie to finish.".into(),
+            restart_required: true,
+        }),
+        InstallKind::Native => install_native_from_deb(&dest).map(|_| ApplyUpdateResult {
+            ok: true,
+            detail: "Installed ~/.local/bin/emobie-bin. Quit and relaunch emobie to finish."
+                .into(),
+            restart_required: true,
         }),
         InstallKind::Deb => install_deb(&dest).map(|_| ApplyUpdateResult {
             ok: true,

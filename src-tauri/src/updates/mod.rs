@@ -75,8 +75,10 @@ fn pick_asset<'a>(
 ) -> Option<&'a GithubAsset> {
     let prefer = match kind {
         InstallKind::Flatpak => [".flatpak"].as_slice(),
-        InstallKind::AppImage | InstallKind::Native => [".AppImage"].as_slice(),
-        InstallKind::Deb => [".deb"].as_slice(),
+        InstallKind::AppImage => [".AppImage"].as_slice(),
+        // Native ~/.local installs: extract the binary from the .deb (AppImage
+        // often blanks out under WebKit on Wayland).
+        InstallKind::Native | InstallKind::Deb => [".deb"].as_slice(),
         InstallKind::Rpm => [".rpm"].as_slice(),
     };
     assets.iter().find(|asset| {
