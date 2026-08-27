@@ -39,6 +39,11 @@ description = "Allows quitting the application from the UI"
 commands.allow = ["quit_app"]
 
 [[permission]]
+identifier = "allow-apply-window-pin"
+description = "Allows applying always-on-top / compositor keep-above for the pin button"
+commands.allow = ["apply_window_pin"]
+
+[[permission]]
 identifier = "allow-input-helper-status"
 description = "Allows querying emobie-inputd status"
 commands.allow = ["input_helper_status"]

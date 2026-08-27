@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { SkinTonePicker } from "./SkinTonePicker";
 import { HotkeyCapture } from "./HotkeyCapture";
 import { MacrosSettings } from "./MacrosSettings";
+import { TextExpansionSettings } from "./TextExpansionSettings";
 import {
   SORT_OPTIONS,
   type Macro,
@@ -48,6 +49,7 @@ type SettingsPanelProps = {
   onAutoPasteOnCopy: (value: boolean) => void;
   onExpandAsYouType: (value: boolean) => void;
   onExpandTriggerMode: (value: MacroTriggerMode) => void;
+  onExpandKeepTriggerSpace: (value: boolean) => void;
   onCheckUpdatesOnStartup: (value: boolean) => void;
   onDismissUpdate: (version: string) => void;
   onOpenRelease: (url: string) => void;
@@ -87,6 +89,7 @@ export function SettingsPanel({
   onAutoPasteOnCopy,
   onExpandAsYouType,
   onExpandTriggerMode,
+  onExpandKeepTriggerSpace,
   onCheckUpdatesOnStartup,
   onDismissUpdate,
   onOpenRelease,
@@ -353,37 +356,30 @@ export function SettingsPanel({
           (Ctrl+V). Turn this off to only copy to the clipboard. Skipped while
           pinned or if the system tray is unavailable.
         </p>
-        {inputStatus ? (
-          <p className="settings-hint settings-hint-block">
-            Input helper:{" "}
-            {inputStatus.daemon
-              ? `running — ${inputStatus.detail}`
-              : inputStatus.detail}
-          </p>
-        ) : null}
+
+        <TextExpansionSettings
+          expandAsYouType={prefs.expandAsYouType}
+          expandTriggerMode={prefs.expandTriggerMode}
+          expandKeepTriggerSpace={prefs.expandKeepTriggerSpace}
+          inputStatus={inputStatus}
+          onExpandAsYouType={onExpandAsYouType}
+          onExpandTriggerMode={onExpandTriggerMode}
+          onExpandKeepTriggerSpace={onExpandKeepTriggerSpace}
+          onInputStatus={onInputStatus}
+        />
 
         <MacrosSettings
           macros={prefs.macros}
           showShortcodeMacros={prefs.showShortcodeMacros}
-          expandAsYouType={prefs.expandAsYouType}
-          expandTriggerMode={prefs.expandTriggerMode}
-          inputStatus={inputStatus}
           onShowShortcodes={onShowShortcodeMacros}
-          onExpandAsYouType={onExpandAsYouType}
-          onExpandTriggerMode={onExpandTriggerMode}
           onSetMacros={onSetMacros}
-          onInputStatus={onInputStatus}
         />
 
         <div className="settings-actions">
           <button type="button" className="btn danger" onClick={onClearRecents}>
             Clear recents
           </button>
-          <button
-            type="button"
-            className="btn danger"
-            onClick={onClearUsageStats}
-          >
+          <button type="button" className="btn danger" onClick={onClearUsageStats}>
             Reset usage stats
           </button>
           <button type="button" className="btn" onClick={quitApp}>

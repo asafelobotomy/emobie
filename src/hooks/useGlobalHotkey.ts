@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import type { Macro } from "../types/preferences";
 
-async function toggleVisibility() {
+async function toggleVisibility(pinned: boolean) {
   const window = getCurrentWindow();
   const visible = await window.isVisible();
   if (visible) {
@@ -11,6 +12,11 @@ async function toggleVisibility() {
   } else {
     await window.unminimize();
     await window.show();
+    try {
+      await invoke("apply_window_pin", { pinned });
+    } catch {
+      await window.setAlwaysOnTop(pinned);
+    }
     await window.setFocus();
   }
 }
@@ -33,6 +39,8 @@ async function unregisterAll(keys: string[]) {
 export function useGlobalHotkeys(options: {
   summonHotkey: string;
   summonEnabled: boolean;
+  /** Re-applied when summon shows the window (WMs drop keep-above on hide). */
+  pinned?: boolean;
   macros: Macro[];
   onMacroHotkey: (expansion: string) => void | Promise<void>;
   ready: boolean;
@@ -41,6 +49,8 @@ export function useGlobalHotkeys(options: {
   const [error, setError] = useState<string | null>(null);
   const onMacroRef = useRef(options.onMacroHotkey);
   onMacroRef.current = options.onMacroHotkey;
+  const pinnedRef = useRef(options.pinned ?? false);
+  pinnedRef.current = options.pinned ?? false;
 
   const macroBindings: MacroHotkeyBinding[] = options.macros
     .filter((macro) => macro.enabled && macro.hotkey)
@@ -69,7 +79,7 @@ export function useGlobalHotkeys(options: {
         try {
           await register(options.summonHotkey, async (event) => {
             if (event.state === "Pressed") {
-              await toggleVisibility();
+              await toggleVisibility(pinnedRef.current);
             }
           });
           next.push(options.summonHotkey);

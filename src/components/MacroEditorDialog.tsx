@@ -20,7 +20,6 @@ type Draft = {
   trigger: string;
   expansion: string;
   hotkey: string | null;
-  enabled: boolean;
 };
 
 function toDraft(macro: Macro | null): Draft {
@@ -30,7 +29,6 @@ function toDraft(macro: Macro | null): Draft {
       trigger: "",
       expansion: "",
       hotkey: null,
-      enabled: true,
     };
   }
   return {
@@ -38,7 +36,6 @@ function toDraft(macro: Macro | null): Draft {
     trigger: macro.trigger,
     expansion: macro.expansion,
     hotkey: macro.hotkey,
-    enabled: macro.enabled,
   };
 }
 
@@ -100,7 +97,8 @@ export function MacroEditorDialog({
       trigger: draft.trigger.trim(),
       expansion: draft.expansion,
       hotkey: draft.hotkey,
-      enabled: draft.enabled,
+      // Expansion on/off is global (Settings → Text expansion).
+      enabled: initial?.enabled ?? true,
     });
   };
 
@@ -135,9 +133,13 @@ export function MacroEditorDialog({
             onChange={(event) =>
               setDraft({ ...draft, trigger: event.target.value })
             }
-            placeholder=":) or :sig"
+            placeholder=".hi or :) or :sig"
           />
         </div>
+        <p className="settings-hint settings-hint-block">
+          With Text expansion → After Space, type the trigger then Space to
+          expand (e.g. <code>.hi</code> then Space).
+        </p>
         <HotkeyCapture
           value={draft.hotkey ?? ""}
           error={null}
@@ -148,17 +150,6 @@ export function MacroEditorDialog({
             setDraft({ ...draft, hotkey: hotkey || null })
           }
         />
-        <div className="settings-row settings-toggle-row">
-          <label htmlFor="macro-dialog-enabled">Enabled</label>
-          <input
-            id="macro-dialog-enabled"
-            type="checkbox"
-            checked={draft.enabled}
-            onChange={(event) =>
-              setDraft({ ...draft, enabled: event.target.checked })
-            }
-          />
-        </div>
         {formError ? <p className="settings-error">{formError}</p> : null}
         <div className="settings-actions">
           {editing && onDelete && draft.id ? (

@@ -120,6 +120,7 @@ export function normalizePreferences(
     autoPasteOnCopy: Boolean(merged.autoPasteOnCopy),
     expandAsYouType: Boolean(merged.expandAsYouType),
     expandTriggerMode: normalizeTriggerMode(merged.expandTriggerMode),
+    expandKeepTriggerSpace: Boolean(merged.expandKeepTriggerSpace),
     checkUpdatesOnStartup: merged.checkUpdatesOnStartup !== false,
     dismissedUpdateVersion:
       typeof merged.dismissedUpdateVersion === "string" &&

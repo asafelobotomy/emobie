@@ -9,7 +9,7 @@ type Options = {
   onMarkSeen: () => void;
 };
 
-/** Ensures the input helper and opens first-run setup when needed. */
+/** Ensures the input helper on every launch and opens first-run setup when needed. */
 export function useFirstRunSetup({
   ready,
   setupSeen,
@@ -22,6 +22,7 @@ export function useFirstRunSetup({
     if (!ready) return;
     let cancelled = false;
 
+    // Always try to start emobie-inputd with the app (systemd enable --now or spawn).
     void invoke<InputHelperStatus>("input_helper_ensure_started")
       .then((status) => {
         if (cancelled) return;

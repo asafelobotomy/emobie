@@ -28,6 +28,7 @@
     "allow-open-release-page",
     "allow-release-single-instance-lock",
     "allow-quit-app",
+    "allow-apply-window-pin",
     "allow-input-helper-status",
     "allow-input-helper-set-enabled",
     "allow-input-helper-sync-matches",

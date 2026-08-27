@@ -39,9 +39,11 @@ bash packaging/install-inputd-user.sh
 ```
 
 This builds `emobie-inputd` into `~/.local/bin`, installs a user unit, and
-`enable --now`s it. emobie also calls `input_helper_ensure_started` on launch
-(and when enabling Auto-paste / Expand) to start the unit or spawn a trusted
-binary path if needed.
+emobie also calls `input_helper_ensure_started` on every launch (systemd
+`enable --now` or a trusted local binary) so the helper is up for paste and
+ready when you turn on expansion. Enabling **Expand as you type** starts the
+helper if needed, grants keyboard access with one Polkit prompt when missing,
+restarts the helper, and turns on keystroke listening immediately.
 
 ### Distro / .deb package
 
@@ -65,8 +67,15 @@ systemctl --user enable --now emobie-inputd.service
 
 ## Keyboard access (expand as you type)
 
-Daemon auto-start alone does **not** grant `/dev/input` access. One-time host
-setup:
+Daemon auto-start alone does **not** grant `/dev/input` access. Enabling
+**Expand as you type** (or first-run **Set up text expansion**) runs a one-time
+Polkit prompt that:
+
+1. Creates group `emobie-input`, installs udev rules, and adds your user
+2. Applies session ACLs with `setfacl` when available (no logout required)
+3. Restarts `emobie-inputd` so it can open keyboards immediately
+
+Manual host setup (same script):
 
 ```bash
 pkexec /usr/share/emobie/setup-input-access.sh
@@ -74,11 +83,19 @@ pkexec /usr/share/emobie/setup-input-access.sh
 pkexec env SUDO_USER="$USER" bash packaging/setup-input-access.sh
 ```
 
-Creates group `emobie-input`, installs udev rules, adds your user. **Log out
-and back in.** Group membership is sensitive (keyboard event read access).
+Log out/in only if ACLs are unavailable, so new sessions inherit the group.
+Group membership is sensitive (keyboard event read access).
 
-Expand-as-you-type stays **off by default** and only watches keys after you
-enable it in Settings.
+Under Flatpak, emobie tries `flatpak-spawn --host pkexec …`; if that fails,
+run the host command above, then retry Expand.
+
+Expand-as-you-type stays **off by default**. Enable it under
+**Settings → Text expansion**, and choose **After Space** to expand only when
+you finish a trigger with Space (for example type `.hi` then Space). Optionally
+enable **Keep Space after expansion** so `.hi` + Space becomes `hiya `
+(with a trailing space) instead of `hiya`.
+
+Built-in emoji shortcodes stay in **collapsed** sections on the Macros page.
 
 ## Build the helper manually
 

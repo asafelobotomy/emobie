@@ -16,7 +16,7 @@ import {
   emojisForCategory,
   searchEmojis,
 } from "./data/loadEmojis";
-import { expansionMatches, mergeMacros, searchMacros } from "./lib/macros";
+import { mergeMacros, searchMacros } from "./lib/macros";
 import type { InputHelperStatus } from "./lib/inputHelper";
 import { usePreferences } from "./hooks/usePreferences";
 import { useLayoutMode } from "./hooks/useLayoutMode";
@@ -28,6 +28,7 @@ import { useWindowDecorations } from "./hooks/useWindowDecorations";
 import { useAutostart } from "./hooks/useAutostart";
 import { useAllowMultipleInstances } from "./hooks/useAllowMultipleInstances";
 import { useFirstRunSetup } from "./hooks/useFirstRunSetup";
+import { useInputHelperSync } from "./hooks/useInputHelperSync";
 import {
   openReleasePage,
   useUpdateCheck,
@@ -64,6 +65,7 @@ function App() {
     setAutoPasteOnCopy,
     setExpandAsYouType,
     setExpandTriggerMode,
+    setExpandKeepTriggerSpace,
     setCheckUpdatesOnStartup,
     setDismissedUpdateVersion,
     setInputHelperSetupSeen,
@@ -146,6 +148,7 @@ function App() {
   const hotkeyError = useGlobalHotkeys({
     summonHotkey: prefs.hotkey,
     summonEnabled: ready && !prefs.allowMultipleInstances,
+    pinned: prefs.pinned,
     macros: prefs.macros,
     onMacroHotkey: copyMacro,
     ready,
@@ -203,15 +206,14 @@ function App() {
     };
   }, [ready]);
 
-  useEffect(() => {
-    if (!ready) return;
-    void invoke("input_helper_set_enabled", {
-      enabled: prefs.expandAsYouType,
-    }).catch(() => undefined);
-    if (!prefs.expandAsYouType) return;
-    const matches = expansionMatches(mergedMacros, prefs.expandTriggerMode);
-    void invoke("input_helper_sync_matches", { matches }).catch(() => undefined);
-  }, [ready, mergedMacros, prefs.expandAsYouType, prefs.expandTriggerMode]);
+  useInputHelperSync({
+    ready,
+    expandAsYouType: prefs.expandAsYouType,
+    expandTriggerMode: prefs.expandTriggerMode,
+    expandKeepTriggerSpace: prefs.expandKeepTriggerSpace,
+    macros: mergedMacros,
+    onStatus: setInputStatus,
+  });
 
   const togglePin = useCallback(() => {
     setPinned(!pinnedRef.current);
@@ -361,6 +363,7 @@ function App() {
           onAutoPasteOnCopy={setAutoPasteOnCopy}
           onExpandAsYouType={setExpandAsYouType}
           onExpandTriggerMode={setExpandTriggerMode}
+          onExpandKeepTriggerSpace={setExpandKeepTriggerSpace}
           onCheckUpdatesOnStartup={setCheckUpdatesOnStartup}
           onDismissUpdate={(version) => setDismissedUpdateVersion(version)}
           onOpenRelease={(url) => {

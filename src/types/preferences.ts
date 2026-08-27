@@ -40,6 +40,8 @@ export type Preferences = {
   expandAsYouType: boolean;
   /** How expand-as-you-type matches triggers (global). */
   expandTriggerMode: MacroTriggerMode;
+  /** When trigger mode is Space: re-type a Space after the expansion. */
+  expandKeepTriggerSpace: boolean;
   checkUpdatesOnStartup: boolean;
   dismissedUpdateVersion: string | null;
   /** True after the user finishes or skips first-run input helper setup. */
@@ -67,6 +69,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   autoPasteOnCopy: false,
   expandAsYouType: false,
   expandTriggerMode: "space",
+  expandKeepTriggerSpace: false,
   checkUpdatesOnStartup: true,
   dismissedUpdateVersion: null,
   inputHelperSetupSeen: false,

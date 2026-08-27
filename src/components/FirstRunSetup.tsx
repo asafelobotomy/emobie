@@ -9,6 +9,12 @@ type FirstRunSetupProps = {
   onDone: () => void;
 };
 
+function errorMessage(error: unknown): string {
+  if (typeof error === "string" && error.trim()) return error;
+  if (error instanceof Error && error.message) return error.message;
+  return "Setup failed or was cancelled.";
+}
+
 export function FirstRunSetup({
   open,
   status,
@@ -33,46 +39,32 @@ export function FirstRunSetup({
 
   if (!open) return null;
 
-  const startHelper = async () => {
+  const setupTextExpansion = async () => {
     setBusy(true);
     setMessage(null);
     try {
-      const next = await invoke<InputHelperStatus>(
-        "input_helper_ensure_started",
-      );
+      let next = await invoke<InputHelperStatus>("input_helper_ensure_started");
       onStatus(next);
-      setMessage(
-        next.daemon
-          ? "Input helper is running."
-          : next.detail || "Could not start the helper.",
-      );
+
+      if (!next.canListen) {
+        setMessage("Admin prompt next — grant keyboard access to continue.");
+        next = await invoke<InputHelperStatus>("input_helper_run_access_setup");
+        onStatus(next);
+      }
+
+      if (next.daemon && next.canListen) {
+        setMessage("Text expansion is ready — enable it anytime in Settings.");
+      } else {
+        setMessage(next.detail || "Could not finish setup.");
+      }
     } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Could not start the helper.",
-      );
+      setMessage(errorMessage(error));
     } finally {
       setBusy(false);
     }
   };
 
-  const runAccessSetup = async () => {
-    setBusy(true);
-    setMessage(null);
-    try {
-      const detail = await invoke<string>("input_helper_run_access_setup");
-      setMessage(detail);
-      const next = await invoke<InputHelperStatus>("input_helper_status");
-      onStatus(next);
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Keyboard access setup failed or was cancelled.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
+  const ready = Boolean(status?.daemon && status.canListen);
 
   return (
     <div className="macro-dialog-backdrop first-run-backdrop">
@@ -83,51 +75,42 @@ export function FirstRunSetup({
         aria-labelledby={titleId}
       >
         <h3 id={titleId}>Welcome to emobie</h3>
-        <p className="settings-hint settings-hint-block">
-          Optional setup for paste and text expansion. The helper runs as your
-          user and only watches keys after you enable Expand as you type.
-        </p>
+        <div className="first-run-body">
+          <p className="first-run-copy">
+            Optional setup for paste and text expansion. The helper runs as your
+            user and only watches keys after you enable Expand as you type.
+          </p>
 
-        <ol className="first-run-steps">
-          <li>
-            <strong>Start input helper</strong>
-            <p className="settings-hint">
-              Private socket for auto-paste and expansion.
-            </p>
-            <button
-              type="button"
-              className="btn primary"
-              disabled={busy || Boolean(status?.daemon)}
-              onClick={() => void startHelper()}
+          <button
+            type="button"
+            className="btn primary first-run-cta"
+            disabled={busy || ready}
+            onClick={() => void setupTextExpansion()}
+          >
+            {ready
+              ? "Text expansion ready"
+              : busy
+                ? "Working…"
+                : "Set up text expansion"}
+          </button>
+
+          <p className="first-run-copy">
+            Starts the input helper and may ask once for admin approval. Session
+            ACLs usually mean no logout.
+          </p>
+
+          {message ? (
+            <p
+              className={
+                ready ? "first-run-status" : "first-run-status is-error"
+              }
             >
-              {status?.daemon ? "Helper running" : "Start helper"}
-            </button>
-          </li>
-          <li>
-            <strong>Keyboard access</strong> (expand as you type)
-            <p className="settings-hint">
-              Admin prompt to join emobie-input, then log out/in. Skip if you
-              only need copy/paste.
+              {message}
             </p>
-            <button
-              type="button"
-              className="btn"
-              disabled={busy}
-              onClick={() => void runAccessSetup()}
-            >
-              Grant keyboard access
-            </button>
-            {status?.daemon && !status.canListen ? (
-              <p className="settings-hint">
-                Helper is up; finish keyboard setup and re-login if needed.
-              </p>
-            ) : null}
-          </li>
-        </ol>
+          ) : null}
+        </div>
 
-        {message ? <p className="settings-hint">{message}</p> : null}
-
-        <div className="settings-actions">
+        <div className="first-run-footer">
           <button type="button" className="btn" disabled={busy} onClick={onDone}>
             Skip for now
           </button>

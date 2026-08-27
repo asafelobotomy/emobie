@@ -39,7 +39,8 @@ impl TriggerTrie {
     /// Match against `buffer`.
     /// - `immediate`: fires as soon as the trigger is a suffix.
     /// - `space`: fires only when the buffer ends with `trigger` + Space; the
-    ///   Space is consumed and re-appended after the expansion.
+    ///   Space is consumed (not re-typed). Callers that want a trailing space
+    ///   should include it in `expansion`.
     pub fn match_suffix(&self, buffer: &str) -> Option<(usize, String)> {
         let chars: Vec<char> = buffer.chars().collect();
         if chars.is_empty() {
@@ -53,7 +54,7 @@ impl TriggerTrie {
             if let Some((len, expansion, mode)) = self.best_terminal(&without_space) {
                 if mode == TriggerMode::Space {
                     let erase = len + 1;
-                    best = Some((erase, format!("{expansion} ")));
+                    best = Some((erase, expansion));
                 }
             }
         }
@@ -126,6 +127,16 @@ mod tests {
         let mut trie = TriggerTrie::default();
         trie.insert(":sig", "signature", TriggerMode::Space);
         assert_eq!(trie.match_suffix("hello:sig"), None);
+        assert_eq!(
+            trie.match_suffix("hello:sig "),
+            Some((5, "signature".into()))
+        );
+    }
+
+    #[test]
+    fn space_mode_keeps_explicit_trailing_space_in_expansion() {
+        let mut trie = TriggerTrie::default();
+        trie.insert(":sig", "signature ", TriggerMode::Space);
         assert_eq!(
             trie.match_suffix("hello:sig "),
             Some((5, "signature ".into()))

@@ -28,14 +28,21 @@ export function searchMacros(macros: MacroEntry[], query: string): MacroEntry[] 
 export function expansionMatches(
   macros: MacroEntry[],
   mode: MacroTriggerMode,
+  keepTriggerSpace = false,
 ): { trigger: string; expansion: string; mode: MacroTriggerMode }[] {
   return macros
     .filter((macro) => macro.enabled)
-    .map((macro) => ({
-      trigger: macro.trigger,
-      expansion: macro.expansion,
-      mode,
-    }));
+    .map((macro) => {
+      const expansion =
+        mode === "space" && keepTriggerSpace && !macro.expansion.endsWith(" ")
+          ? `${macro.expansion} `
+          : macro.expansion;
+      return {
+        trigger: macro.trigger,
+        expansion,
+        mode,
+      };
+    });
 }
 
 export function findHotkeyConflict(

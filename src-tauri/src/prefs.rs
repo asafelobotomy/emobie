@@ -37,3 +37,7 @@ pub fn allow_multiple_instances() -> bool {
 pub fn start_minimized_to_tray() -> bool {
     pref_bool("startMinimizedToTray")
 }
+
+pub fn pinned() -> bool {
+    pref_bool("pinned")
+}

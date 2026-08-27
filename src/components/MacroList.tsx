@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CATEGORIES, type Category } from "../data/loadEmojis";
 import type { MacroEntry } from "../lib/macros";
 import type { Macro } from "../types/preferences";
@@ -150,6 +150,7 @@ export function MacroList({
   const [editor, setEditor] = useState<Macro | null | "new">(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState<Set<number>>(() => new Set());
+  const wasSearching = useRef(false);
 
   const { custom, shortcodes } = useMemo(() => {
     const nextCustom: MacroEntry[] = [];
@@ -167,12 +168,29 @@ export function MacroList({
   );
 
   useEffect(() => {
-    if (!searchActive || shortcodes.length === 0) return;
-    setEmojiOpen(true);
-    setOpenGroups(new Set(shortcodeGroups.map((group) => group.category.id)));
+    if (searchActive && shortcodes.length > 0) {
+      wasSearching.current = true;
+      setEmojiOpen(true);
+      setOpenGroups(
+        new Set(shortcodeGroups.map((group) => group.category.id)),
+      );
+      return;
+    }
+    if (wasSearching.current && !searchActive) {
+      wasSearching.current = false;
+      setEmojiOpen(false);
+      setOpenGroups(new Set());
+    }
   }, [searchActive, shortcodes.length, shortcodeGroups]);
 
   const nothingVisible = custom.length === 0 && shortcodes.length === 0;
+
+  const toggleEmojiSection = () => {
+    setEmojiOpen((open) => {
+      if (open) setOpenGroups(new Set());
+      return !open;
+    });
+  };
 
   const toggleGroup = (id: number) => {
     setOpenGroups((current) => {
@@ -245,11 +263,11 @@ export function MacroList({
               open={emojiOpen}
               label="Emoji macros"
               count={shortcodes.length}
-              onToggle={() => setEmojiOpen((open) => !open)}
+              onToggle={toggleEmojiSection}
             />
           </div>
           {emojiOpen ? (
-            <div className="macro-category-list">
+            <div className="macro-category-list" hidden={!emojiOpen}>
               {shortcodeGroups.map(({ category, macros: items }) => {
                 const open = openGroups.has(category.id);
                 const panelId = `macro-cat-${category.key}`;
@@ -269,6 +287,7 @@ export function MacroList({
                         className="macro-card-grid"
                         role="list"
                         aria-labelledby={`${panelId}-btn`}
+                        hidden={!open}
                       >
                         {items.map((macro) => (
                           <MacroCard

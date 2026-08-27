@@ -2,6 +2,7 @@ use tauri::{AppHandle, Manager, State, WindowEvent};
 
 mod autostart;
 mod input_helper;
+mod pin;
 mod prefs;
 mod tray;
 mod updates;
@@ -39,6 +40,7 @@ fn apply_startup_visibility(app: &tauri::App, tray_ok: bool) {
         let _ = window.hide();
     } else {
         let _ = window.show();
+        pin::apply_from_prefs(&window);
         let _ = window.set_focus();
     }
 }
@@ -104,6 +106,7 @@ pub fn run() {
             tray_status,
             release_single_instance_lock,
             quit_app,
+            pin::apply_window_pin,
             input_helper::input_helper_status,
             input_helper::input_helper_ensure_started,
             input_helper::input_helper_set_enabled,

@@ -15,6 +15,10 @@ cargo build --release --manifest-path "$ROOT/crates/emobie-inputd/Cargo.toml"
 install -m 755 "$ROOT/crates/emobie-inputd/target/release/$BIN_NAME" "$BIN_DIR/$BIN_NAME"
 install -m 755 "$ROOT/packaging/setup-input-access.sh" \
   "${XDG_DATA_HOME:-$HOME/.local/share}/emobie/setup-input-access.sh"
+install -m 644 "$ROOT/packaging/udev/99-emobie-input.rules" \
+  "${XDG_DATA_HOME:-$HOME/.local/share}/emobie/99-emobie-input.rules"
+install -m 644 "$ROOT/packaging/polkit/io.github.asafelobotomy.emobie.inputd.policy" \
+  "${XDG_DATA_HOME:-$HOME/.local/share}/emobie/io.github.asafelobotomy.emobie.inputd.policy"
 
 # User unit pointing at ~/.local/bin (not /usr/bin).
 cat >"$UNIT_DIR/$UNIT_NAME" <<EOF
@@ -42,4 +46,4 @@ echo "Enabled systemd --user unit: $UNIT_NAME"
 systemctl --user --no-pager --full status "$UNIT_NAME" || true
 echo
 echo "Socket: \${XDG_RUNTIME_DIR}/emobie/emobie-inputd.sock (mode 0600)."
-echo "As-you-type also needs input device access — run packaging/setup-input-access.sh (pkexec)."
+echo "As-you-type: enable Expand in Settings (one Polkit prompt for keyboard access)."

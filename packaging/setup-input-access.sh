@@ -7,9 +7,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GROUP="emobie-input"
 
-# Prefer staged/system assets; fall back to repo layout when run from source.
+# Prefer staged/system assets; fall back to user install and repo layout.
 if [[ -f /usr/share/emobie/99-emobie-input.rules ]]; then
   RULES_SRC="/usr/share/emobie/99-emobie-input.rules"
+elif [[ -f "$SCRIPT_DIR/99-emobie-input.rules" ]]; then
+  # packaging/install-inputd-user.sh stages rules next to this script.
+  RULES_SRC="$SCRIPT_DIR/99-emobie-input.rules"
 elif [[ -f "$SCRIPT_DIR/udev/99-emobie-input.rules" ]]; then
   RULES_SRC="$SCRIPT_DIR/udev/99-emobie-input.rules"
 elif [[ -f "$SCRIPT_DIR/../packaging/udev/99-emobie-input.rules" ]]; then
@@ -24,6 +27,8 @@ POLICY_DST="/usr/share/polkit-1/actions/io.github.asafelobotomy.emobie.inputd.po
 POLICY_SRC=""
 if [[ -f /usr/share/polkit-1/actions/io.github.asafelobotomy.emobie.inputd.policy ]]; then
   POLICY_SRC="" # already installed by package
+elif [[ -f "$SCRIPT_DIR/io.github.asafelobotomy.emobie.inputd.policy" ]]; then
+  POLICY_SRC="$SCRIPT_DIR/io.github.asafelobotomy.emobie.inputd.policy"
 elif [[ -f "$SCRIPT_DIR/polkit/io.github.asafelobotomy.emobie.inputd.policy" ]]; then
   POLICY_SRC="$SCRIPT_DIR/polkit/io.github.asafelobotomy.emobie.inputd.policy"
 elif [[ -f "$SCRIPT_DIR/../packaging/polkit/io.github.asafelobotomy.emobie.inputd.policy" ]]; then
@@ -32,10 +37,7 @@ fi
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Re-running with pkexec…"
-  exec pkexec env \
-    "SUDO_USER=${SUDO_USER:-$USER}" \
-    "PKEXEC_UID=${PKEXEC_UID:-$(id -u)}" \
-    bash "$0" "$@"
+  exec pkexec /usr/bin/bash "$0" "$@"
 fi
 
 TARGET_USER="${SUDO_USER:-}"
@@ -74,6 +76,7 @@ if command -v setfacl >/dev/null; then
 fi
 
 echo "Added $TARGET_USER to $GROUP and installed udev rules."
-echo "Restart emobie-inputd (or emobie) to pick up keyboard access now."
-echo "Log out and back in (or reboot) so new sessions inherit $GROUP without ACLs."
+echo "Session ACLs were applied when setfacl is available — restart emobie-inputd"
+echo "(or toggle Expand as you type) to use keyboard access without logging out."
+echo "Log out/in only if ACLs are unavailable, so new sessions inherit $GROUP."
 echo "Membership in $GROUP is sensitive — it grants keyboard event access."

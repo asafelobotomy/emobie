@@ -33,11 +33,17 @@ describe("normalizePreferences macros", () => {
     assert.equal(prefs.autoPasteOnCopy, false);
     assert.equal(prefs.expandAsYouType, false);
     assert.equal(prefs.expandTriggerMode, "space");
+    assert.equal(prefs.expandKeepTriggerSpace, false);
   });
 
   it("accepts immediate expand trigger mode", () => {
     const prefs = normalizePreferences({ expandTriggerMode: "immediate" });
     assert.equal(prefs.expandTriggerMode, "immediate");
+  });
+
+  it("accepts keep-trigger-space preference", () => {
+    const prefs = normalizePreferences({ expandKeepTriggerSpace: true });
+    assert.equal(prefs.expandKeepTriggerSpace, true);
   });
 });
 
@@ -85,6 +91,25 @@ describe("macros helpers", () => {
     ];
     assert.equal(expansionMatches(list, "space")[0].mode, "space");
     assert.equal(expansionMatches(list, "immediate")[0].mode, "immediate");
+  });
+
+  it("optionally appends a space after space-mode expansions", () => {
+    const list: MacroEntry[] = [
+      {
+        id: "1",
+        trigger: ".hi",
+        expansion: "hiya",
+        hotkey: null,
+        enabled: true,
+        source: "custom",
+      },
+    ];
+    assert.equal(expansionMatches(list, "space", false)[0].expansion, "hiya");
+    assert.equal(expansionMatches(list, "space", true)[0].expansion, "hiya ");
+    assert.equal(
+      expansionMatches(list, "immediate", true)[0].expansion,
+      "hiya",
+    );
   });
 });
 

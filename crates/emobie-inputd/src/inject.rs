@@ -67,14 +67,44 @@ pub fn inject_ascii(text: &str) -> Result<(), String> {
     })
 }
 
+fn inject_spaces(count: usize) -> Result<(), String> {
+    if count == 0 {
+        return Ok(());
+    }
+    with_enigo(|enigo| {
+        for _ in 0..count {
+            enigo
+                .key(Key::Space, Direction::Click)
+                .map_err(|e| e.to_string())?;
+            thread::sleep(KEY_GAP);
+        }
+        Ok(())
+    })
+}
+
+fn split_trailing_spaces(text: &str) -> (&str, usize) {
+    let trimmed = text.trim_end_matches(' ');
+    let spaces = text.len() - trimmed.len();
+    (trimmed, spaces)
+}
+
 pub fn expand_trigger(trigger_chars: usize, expansion: &str) -> Result<(), String> {
     inject_backspaces(trigger_chars)?;
-    if expansion.is_ascii() && expansion.chars().all(|c| !c.is_control() || c == '\n') {
-        // Prefer typing ASCII; fall back to clipboard paste for safety on failure.
-        if inject_ascii(expansion).is_ok() {
-            return Ok(());
+    let (body, trailing_spaces) = split_trailing_spaces(expansion);
+    if !body.is_empty() {
+        if body.is_ascii() && body.chars().all(|c| !c.is_control() || c == '\n') {
+            // Prefer typing ASCII; fall back to clipboard paste for safety on failure.
+            if inject_ascii(body).is_err() {
+                paste_expansion(body)?;
+            }
+        } else {
+            paste_expansion(body)?;
         }
     }
+    inject_spaces(trailing_spaces)
+}
+
+fn paste_expansion(expansion: &str) -> Result<(), String> {
     let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
     let previous = clipboard.get_text().ok();
     clipboard

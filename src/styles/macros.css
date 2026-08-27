@@ -289,6 +289,50 @@
 
 .first-run-dialog {
   width: min(24rem, 100%);
+  max-height: min(92%, 32rem);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.first-run-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.first-run-copy {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+.first-run-cta {
+  width: 100%;
+  justify-content: center;
+  text-align: center;
+}
+
+.first-run-status {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--ink-muted);
+}
+
+.first-run-status.is-error {
+  color: var(--danger);
+}
+
+.first-run-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
 }
 
 .first-run-steps {

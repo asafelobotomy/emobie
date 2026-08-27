@@ -17,6 +17,8 @@ pub fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
         let _ = window.show();
+        // Re-apply pin after show — WMs often clear keep-above on hide.
+        crate::pin::apply_from_prefs(&window);
         let _ = window.set_focus();
     }
 }

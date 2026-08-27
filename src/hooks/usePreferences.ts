@@ -150,6 +150,10 @@ export function usePreferences() {
     (expandTriggerMode: MacroTriggerMode) => update({ expandTriggerMode }),
     [update],
   );
+  const setExpandKeepTriggerSpace = useCallback(
+    (expandKeepTriggerSpace: boolean) => update({ expandKeepTriggerSpace }),
+    [update],
+  );
   const setCheckUpdatesOnStartup = useCallback(
     (checkUpdatesOnStartup: boolean) => update({ checkUpdatesOnStartup }),
     [update],
@@ -275,6 +279,7 @@ export function usePreferences() {
     setAutoPasteOnCopy,
     setExpandAsYouType,
     setExpandTriggerMode,
+    setExpandKeepTriggerSpace,
     setCheckUpdatesOnStartup,
     setDismissedUpdateVersion,
     setInputHelperSetupSeen,

@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Settings → Text expansion: optional **Keep Space after expansion** (`.hi` + Space → `hiya `)
+
+### Changed
+
+- Text expansion controls live under Settings → Text expansion (not per-macro)
+- Emoji shortcode macros stay collapsed unless searching or expanded
+- Space-terminated expansion is the recommended default (e.g. `.hi` then Space)
+- emobie-inputd starts with the app; enabling Expand as you type starts it if needed and turns listening on immediately
+- Enabling Expand (or first-run setup) prompts once for keyboard access, restarts the helper, and skips logout when session ACLs apply
+
+### Fixed
+
+- Pin (always-on-top) on Plasma Wayland via KWin `keepAbove` (GTK keep-above is a no-op there)
+- Pin is re-applied after show/focus so it survives hide-to-tray
+- Trailing spaces in expansions are typed as Space key events (more reliable than text inject)
+
 ## [0.6.5] - 2026-08-13
 
 ### Added

@@ -1,6 +1,7 @@
 [Unit]
 Description=emobie input helper (text expansion / paste)
 Documentation=https://github.com/asafelobotomy/emobie/blob/main/docs/MACROS.md
+PartOf=graphical-session.target
 
 [Service]
 Type=simple

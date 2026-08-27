@@ -1,7 +1,5 @@
 import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import type { Macro, MacroTriggerMode } from "../types/preferences";
-import type { InputHelperStatus } from "../lib/inputHelper";
+import type { Macro } from "../types/preferences";
 import {
   exportMacrosYaml,
   importMacrosYaml,
@@ -10,41 +8,17 @@ import {
 type MacrosSettingsProps = {
   macros: Macro[];
   showShortcodeMacros: boolean;
-  expandAsYouType: boolean;
-  expandTriggerMode: MacroTriggerMode;
-  inputStatus: InputHelperStatus | null;
   onShowShortcodes: (value: boolean) => void;
-  onExpandAsYouType: (value: boolean) => void;
-  onExpandTriggerMode: (value: MacroTriggerMode) => void;
   onSetMacros: (macros: Macro[]) => void;
-  onInputStatus: (status: InputHelperStatus) => void;
 };
-
-function helperStatusLabel(status: InputHelperStatus | null): string {
-  if (!status) return "Checking input helper…";
-  if (status.daemon && status.canListen) {
-    return `Helper running (listen + paste). ${status.detail}`;
-  }
-  if (status.daemon && !status.canListen) {
-    return `Helper running, but keyboard access is missing. ${status.detail}`;
-  }
-  return status.detail;
-}
 
 export function MacrosSettings({
   macros,
   showShortcodeMacros,
-  expandAsYouType,
-  expandTriggerMode,
-  inputStatus,
   onShowShortcodes,
-  onExpandAsYouType,
-  onExpandTriggerMode,
   onSetMacros,
-  onInputStatus,
 }: MacrosSettingsProps) {
   const [ioMessage, setIoMessage] = useState<string | null>(null);
-  const [starting, setStarting] = useState(false);
 
   const exportYaml = () => {
     const text = exportMacrosYaml(macros);
@@ -75,61 +49,13 @@ export function MacrosSettings({
     }
   };
 
-  const startHelper = async () => {
-    setStarting(true);
-    try {
-      const status = await invoke<InputHelperStatus>(
-        "input_helper_ensure_started",
-      );
-      onInputStatus(status);
-      setIoMessage(status.daemon ? "Input helper started." : status.detail);
-    } catch (error) {
-      setIoMessage(
-        error instanceof Error ? error.message : "Could not start helper.",
-      );
-    } finally {
-      setStarting(false);
-    }
-  };
-
-  const canListen = Boolean(inputStatus?.canListen);
-  const daemonReady = Boolean(inputStatus?.daemon);
-
-  const setMode = (mode: MacroTriggerMode) => {
-    onExpandTriggerMode(mode);
-  };
-
   return (
     <div className="macros-settings">
       <h3 className="settings-section-title">Macros</h3>
       <p className="settings-hint settings-hint-block">
-        Add and edit macros from the Macros category (+). Import and export
-        stay here. Auto-paste lives under Clipboard above.
+        Add and edit macros from the Macros category (+). Text expansion
+        options live in the section above.
       </p>
-
-      <p className="settings-hint settings-hint-block">
-        {helperStatusLabel(inputStatus)}
-      </p>
-      {!daemonReady ? (
-        <div className="settings-actions macros-io-actions">
-          <button
-            type="button"
-            className="btn primary"
-            disabled={starting}
-            onClick={() => void startHelper()}
-          >
-            {starting ? "Starting…" : "Start input helper"}
-          </button>
-        </div>
-      ) : null}
-      {daemonReady && !canListen ? (
-        <p className="settings-hint settings-hint-block">
-          As-you-type needs keyboard access. On the host run{" "}
-          <code>pkexec /usr/share/emobie/setup-input-access.sh</code> (or{" "}
-          <code>packaging/setup-input-access.sh</code>), then log out/in.
-          Group membership is sensitive.
-        </p>
-      ) : null}
 
       <div className="settings-row settings-toggle-row">
         <label htmlFor="show-shortcodes">Show emoji shortcodes</label>
@@ -140,63 +66,10 @@ export function MacrosSettings({
           onChange={(event) => onShowShortcodes(event.target.checked)}
         />
       </div>
-
-      <div className="settings-row settings-toggle-row">
-        <label htmlFor="expand-as-you-type">Expand as you type</label>
-        <input
-          id="expand-as-you-type"
-          type="checkbox"
-          checked={expandAsYouType}
-          disabled={!canListen && !expandAsYouType}
-          title={
-            !canListen
-              ? "Needs keyboard access (emobie-input group). Run setup, then log out/in."
-              : undefined
-          }
-          onChange={(event) => {
-            if (event.target.checked && !canListen) return;
-            onExpandAsYouType(event.target.checked);
-          }}
-        />
-      </div>
       <p className="settings-hint settings-hint-block">
-        Watches keystrokes to expand triggers. Off by default. Requires
-        emobie-inputd with keyboard access
-        {!canListen
-          ? " — toggle stays off until setup-input-access.sh succeeds and you log out/in."
-          : "."}
+        Built-in <code>:smile:</code> shortcodes and emoticons appear in
+        collapsed sections under Macros.
       </p>
-
-      <fieldset
-        className="macro-trigger-mode"
-        disabled={!expandAsYouType}
-      >
-        <legend>Expand when</legend>
-        <label className="macro-trigger-option">
-          <input
-            type="radio"
-            name="expand-trigger-mode"
-            checked={expandTriggerMode === "immediate"}
-            onChange={() => setMode("immediate")}
-          />
-          <span>
-            As you type
-            <small>Fires as soon as the trigger is complete</small>
-          </span>
-        </label>
-        <label className="macro-trigger-option">
-          <input
-            type="radio"
-            name="expand-trigger-mode"
-            checked={expandTriggerMode === "space"}
-            onChange={() => setMode("space")}
-          />
-          <span>
-            After Space
-            <small>Waits for Space, then replaces trigger + Space</small>
-          </span>
-        </label>
-      </fieldset>
 
       <div className="settings-actions macros-io-actions">
         <button type="button" className="btn" onClick={exportYaml}>
