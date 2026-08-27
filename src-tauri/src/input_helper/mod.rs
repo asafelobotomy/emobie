@@ -3,6 +3,8 @@
 use serde::{Deserialize, Serialize};
 
 #[cfg(unix)]
+mod access;
+#[cfg(unix)]
 mod unix;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -12,6 +14,9 @@ pub struct InputHelperStatus {
     pub can_inject: bool,
     pub can_listen: bool,
     pub detail: String,
+    /// True when running inside a Flatpak sandbox.
+    #[serde(default)]
+    pub flatpak: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,20 +31,26 @@ fn immediate_mode() -> String {
     "immediate".into()
 }
 
+#[cfg(not(unix))]
+fn offline_linux_only() -> InputHelperStatus {
+    InputHelperStatus {
+        daemon: false,
+        can_inject: false,
+        can_listen: false,
+        detail: "Input helper is Linux-only.".into(),
+        flatpak: false,
+    }
+}
+
 #[tauri::command]
 pub fn input_helper_status() -> InputHelperStatus {
     #[cfg(unix)]
     {
-        return unix::status();
+        return access::with_flatpak_flag(unix::status());
     }
     #[cfg(not(unix))]
     {
-        InputHelperStatus {
-            daemon: false,
-            can_inject: false,
-            can_listen: false,
-            detail: "Input helper is Linux-only.".into(),
-        }
+        offline_linux_only()
     }
 }
 
@@ -47,7 +58,7 @@ pub fn input_helper_status() -> InputHelperStatus {
 pub fn input_helper_ensure_started() -> InputHelperStatus {
     #[cfg(unix)]
     {
-        return unix::ensure_started();
+        return access::with_flatpak_flag(unix::ensure_started());
     }
     #[cfg(not(unix))]
     {
@@ -59,7 +70,7 @@ pub fn input_helper_ensure_started() -> InputHelperStatus {
 pub fn input_helper_set_enabled(enabled: bool) -> Result<InputHelperStatus, String> {
     #[cfg(unix)]
     {
-        return unix::set_enabled(enabled);
+        return unix::set_enabled(enabled).map(access::with_flatpak_flag);
     }
     #[cfg(not(unix))]
     {
@@ -72,17 +83,12 @@ pub fn input_helper_set_enabled(enabled: bool) -> Result<InputHelperStatus, Stri
 pub fn input_helper_sync_matches(matches: Vec<InputMatch>) -> Result<InputHelperStatus, String> {
     #[cfg(unix)]
     {
-        return unix::sync_matches(matches);
+        return unix::sync_matches(matches).map(access::with_flatpak_flag);
     }
     #[cfg(not(unix))]
     {
         let _ = matches;
-        Ok(InputHelperStatus {
-            daemon: false,
-            can_inject: false,
-            can_listen: false,
-            detail: "Input helper is Linux-only.".into(),
-        })
+        Ok(offline_linux_only())
     }
 }
 
@@ -102,7 +108,7 @@ pub fn input_helper_inject_paste() -> Result<(), String> {
 pub fn input_helper_run_access_setup() -> Result<InputHelperStatus, String> {
     #[cfg(unix)]
     {
-        return unix::run_access_setup();
+        return access::run_access_setup();
     }
     #[cfg(not(unix))]
     {

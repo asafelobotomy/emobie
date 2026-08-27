@@ -1,4 +1,9 @@
+//! Trigger matching from one or more keyboard event devices.
+//!
+//! Key → char mapping assumes a US QWERTY physical layout (evdev keycodes).
+
 use evdev::{Device, InputEventKind, Key};
+use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -32,6 +37,7 @@ fn list_keyboard_paths() -> Vec<PathBuf> {
             }
         }
     }
+    paths.sort();
     paths
 }
 
@@ -121,13 +127,130 @@ pub fn can_listen() -> bool {
     !list_keyboard_paths().is_empty()
 }
 
+fn handle_key(
+    key: Key,
+    value: i32,
+    shift: &mut bool,
+    enabled: &AtomicBool,
+    buffer: &Mutex<String>,
+    trie: &Mutex<TriggerTrie>,
+) {
+    if key == Key::KEY_LEFTSHIFT || key == Key::KEY_RIGHTSHIFT {
+        *shift = value != 0;
+        return;
+    }
+    if value != 1 {
+        return;
+    }
+    if !enabled.load(Ordering::Relaxed) {
+        if let Ok(mut guard) = buffer.lock() {
+            guard.clear();
+        }
+        return;
+    }
+    if key == Key::KEY_BACKSPACE {
+        if let Ok(mut guard) = buffer.lock() {
+            guard.pop();
+        }
+        return;
+    }
+    if key == Key::KEY_ENTER || key == Key::KEY_TAB {
+        if let Ok(mut guard) = buffer.lock() {
+            guard.clear();
+        }
+        return;
+    }
+    let Some(ch) = key_to_char(key, *shift) else {
+        return;
+    };
+
+    let hit = {
+        let Ok(mut guard) = buffer.lock() else {
+            return;
+        };
+        guard.push(ch);
+        if guard.len() > 128 {
+            let trim: String = guard.chars().skip(guard.len() - 96).collect();
+            *guard = trim;
+        }
+        let matched = {
+            let Ok(trie_guard) = trie.lock() else {
+                return;
+            };
+            trie_guard.match_suffix(&guard)
+        };
+        if let Some((len, expansion)) = matched {
+            for _ in 0..len {
+                guard.pop();
+            }
+            Some((len, expansion))
+        } else {
+            None
+        }
+    };
+
+    if let Some((len, expansion)) = hit {
+        // Never expand on the listen thread: enigo/backends can panic or hang.
+        thread::spawn(move || {
+            if let Err(err) = inject::expand_trigger(len, &expansion) {
+                eprintln!("expand failed: {err}");
+            }
+        });
+    }
+}
+
+fn spawn_device_thread(
+    path: PathBuf,
+    enabled: Arc<AtomicBool>,
+    trie: Arc<Mutex<TriggerTrie>>,
+    buffer: Arc<Mutex<String>>,
+    stop: Arc<AtomicBool>,
+    alive: Arc<Mutex<HashSet<PathBuf>>>,
+) {
+    thread::spawn(move || {
+        let result = (|| -> Result<(), ()> {
+            let mut device = Device::open(&path).map_err(|_| ())?;
+            let mut shift = false;
+            loop {
+                if stop.load(Ordering::Relaxed) {
+                    return Ok(());
+                }
+                let events = match device.fetch_events() {
+                    Ok(events) => events,
+                    Err(_) => {
+                        thread::sleep(Duration::from_millis(50));
+                        return Err(());
+                    }
+                };
+                for event in events {
+                    if let InputEventKind::Key(key) = event.kind() {
+                        handle_key(
+                            key,
+                            event.value(),
+                            &mut shift,
+                            &enabled,
+                            &buffer,
+                            &trie,
+                        );
+                    }
+                }
+            }
+        })();
+        let _ = result;
+        if let Ok(mut guard) = alive.lock() {
+            guard.remove(&path);
+        }
+    });
+}
+
 pub fn spawn_listener(
     enabled: Arc<AtomicBool>,
     trie: Arc<Mutex<TriggerTrie>>,
     stop: Arc<AtomicBool>,
 ) {
     thread::spawn(move || {
-        let mut buffer = String::new();
+        let buffer = Arc::new(Mutex::new(String::new()));
+        let alive = Arc::new(Mutex::new(HashSet::<PathBuf>::new()));
         loop {
             if stop.load(Ordering::Relaxed) {
                 break;
@@ -137,70 +260,27 @@ pub fn spawn_listener(
                 thread::sleep(Duration::from_secs(2));
                 continue;
             }
-            let Ok(mut device) = Device::open(&paths[0]) else {
-                thread::sleep(Duration::from_secs(1));
-                continue;
-            };
-            let mut shift = false;
-            loop {
-                if stop.load(Ordering::Relaxed) {
-                    return;
+            for path in paths {
+                let already = alive
+                    .lock()
+                    .map(|g| g.contains(&path))
+                    .unwrap_or(true);
+                if already {
+                    continue;
                 }
-                let events = match device.fetch_events() {
-                    Ok(events) => events,
-                    Err(_) => {
-                        thread::sleep(Duration::from_millis(50));
-                        break;
-                    }
-                };
-                for event in events {
-                    if let InputEventKind::Key(key) = event.kind() {
-                        let value = event.value();
-                        if key == Key::KEY_LEFTSHIFT || key == Key::KEY_RIGHTSHIFT {
-                            shift = value != 0;
-                            continue;
-                        }
-                        if value != 1 {
-                            continue;
-                        }
-                        if !enabled.load(Ordering::Relaxed) {
-                            buffer.clear();
-                            continue;
-                        }
-                        if key == Key::KEY_BACKSPACE {
-                            buffer.pop();
-                            continue;
-                        }
-                        if key == Key::KEY_ENTER || key == Key::KEY_TAB {
-                            buffer.clear();
-                            continue;
-                        }
-                        if let Some(ch) = key_to_char(key, shift) {
-                            buffer.push(ch);
-                            if buffer.len() > 128 {
-                                let trim: String = buffer.chars().skip(buffer.len() - 96).collect();
-                                buffer = trim;
-                            }
-                            let hit = {
-                                let guard = trie.lock().unwrap();
-                                guard.match_suffix(&buffer)
-                            };
-                            if let Some((len, expansion)) = hit {
-                                for _ in 0..len {
-                                    buffer.pop();
-                                }
-                                // Never expand on the listen thread: enigo/backends can
-                                // panic or hang and would permanently stop key capture.
-                                thread::spawn(move || {
-                                    if let Err(err) = inject::expand_trigger(len, &expansion) {
-                                        eprintln!("expand failed: {err}");
-                                    }
-                                });
-                            }
-                        }
-                    }
+                if let Ok(mut guard) = alive.lock() {
+                    guard.insert(path.clone());
                 }
+                spawn_device_thread(
+                    path,
+                    enabled.clone(),
+                    trie.clone(),
+                    buffer.clone(),
+                    stop.clone(),
+                    alive.clone(),
+                );
             }
+            thread::sleep(Duration::from_secs(2));
         }
     });
 }

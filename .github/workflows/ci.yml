@@ -44,6 +44,9 @@ jobs:
       - name: Check source file line limits
         run: bash scripts/check-loc.sh
 
+      - name: Check inputd packaging maps
+        run: bash scripts/check-inputd-packaging.sh
+
       - name: Unit tests
         run: npm test
 
@@ -52,3 +55,6 @@ jobs:
 
       - name: Cargo check
         run: cargo check --manifest-path src-tauri/Cargo.toml
+
+      - name: Input helper unit tests
+        run: cargo test --manifest-path crates/emobie-inputd/Cargo.toml

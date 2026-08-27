@@ -21,8 +21,10 @@ finish-args:
   - --share=network
   - --talk-name=org.kde.StatusNotifierWatcher
   - --talk-name=org.x.StatusNotifierWatcher
+  - --talk-name=org.kde.KWin
   # Optional host emobie-inputd socket (as-you-type / auto-paste). No --device=input.
   - --filesystem=xdg-run/emobie
+  - --filesystem=xdg-data/emobie:ro
   # GitHub Releases .deb wrap only: host autostart desktop entry.
   # Flathub-bound source manifest must not use this (Autostart portal instead).
   - --own-name=org.kde.StatusNotifierItem.*

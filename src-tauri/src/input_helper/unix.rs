@@ -2,7 +2,7 @@ use super::{InputHelperStatus, InputMatch};
 use serde::Deserialize;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
@@ -59,6 +59,7 @@ pub fn offline_status(detail: &str) -> InputHelperStatus {
         can_inject: native_fallback,
         can_listen: false,
         detail: detail.to_string(),
+        flatpak: false,
     }
 }
 
@@ -68,6 +69,7 @@ fn status_from_resp(resp: DaemonResponse) -> InputHelperStatus {
         can_inject: resp.can_inject,
         can_listen: resp.can_listen,
         detail: resp.detail,
+        flatpak: false,
     }
 }
 
@@ -165,23 +167,22 @@ pub fn ensure_started() -> InputHelperStatus {
 }
 
 /// Restart so can_listen re-opens devices after ACL/udev changes.
-    pub fn restart_helper() -> InputHelperStatus {
-        let _ = systemctl_user(&["restart", "emobie-inputd.service"]);
-        if wait_until_running(20).is_some() {
-            return status();
-        }
-        // Detached binary: stop listeners by removing the socket path, then respawn.
-        for path in candidate_sockets() {
-            let _ = std::fs::remove_file(&path);
-        }
-        thread::sleep(Duration::from_millis(200));
-        if try_spawn_detached() {
-            if let Some(status) = wait_until_running(20) {
-                return status;
-            }
-        }
-        ensure_started()
+pub fn restart_helper() -> InputHelperStatus {
+    let _ = systemctl_user(&["restart", "emobie-inputd.service"]);
+    if wait_until_running(20).is_some() {
+        return status();
     }
+    for path in candidate_sockets() {
+        let _ = std::fs::remove_file(&path);
+    }
+    thread::sleep(Duration::from_millis(200));
+    if try_spawn_detached() {
+        if let Some(status) = wait_until_running(20) {
+            return status;
+        }
+    }
+    ensure_started()
+}
 
 #[cfg(target_os = "linux")]
 pub fn native_inject_paste() -> Result<(), String> {
@@ -252,112 +253,4 @@ pub fn inject_paste() -> Result<(), String> {
             }
         }
     }
-}
-
-fn access_setup_scripts() -> Vec<PathBuf> {
-    let mut paths = vec![PathBuf::from("/usr/share/emobie/setup-input-access.sh")];
-    if let Ok(home) = std::env::var("HOME") {
-        paths.push(
-            PathBuf::from(home).join(".local/share/emobie/setup-input-access.sh"),
-        );
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            paths.push(dir.join("setup-input-access.sh"));
-            paths.push(dir.join("../../../packaging/setup-input-access.sh"));
-        }
-    }
-    paths
-}
-
-    fn host_setup_hint() -> String {
-        "On the host run: pkexec bash ~/.local/share/emobie/setup-input-access.sh \
-(or packaging/setup-input-access.sh), then retry.".into()
-    }
-
-    fn run_pkexec_script(script: &Path) -> Result<(), String> {
-        let script_str = script
-            .to_str()
-            .ok_or_else(|| "setup script path is not valid UTF-8".to_string())?;
-        let in_flatpak = std::env::var_os("FLATPAK_ID").is_some();
-
-        // Execute root-owned /usr/bin/bash with the script as an argument.
-        // pkexec refuses to run user-owned files as the program itself.
-        let mut cmd = if in_flatpak {
-            let mut c = Command::new("flatpak-spawn");
-            c.args(["--host", "pkexec", "/usr/bin/bash", script_str]);
-            c
-        } else {
-            let mut c = Command::new("pkexec");
-            c.args(["/usr/bin/bash", script_str]);
-            c
-        };
-
-        // Keep session vars so the Polkit agent can show a GUI prompt.
-        for key in [
-            "DISPLAY",
-            "WAYLAND_DISPLAY",
-            "XAUTHORITY",
-            "DBUS_SESSION_BUS_ADDRESS",
-            "XDG_RUNTIME_DIR",
-        ] {
-            if let Ok(value) = std::env::var(key) {
-                cmd.env(key, value);
-            }
-        }
-
-        let output = cmd
-            .stdin(Stdio::null())
-            .output()
-            .map_err(|e| {
-                if in_flatpak {
-                    format!("flatpak-spawn --host failed ({e}). {}", host_setup_hint())
-                } else {
-                    format!("Could not launch pkexec ({e}). {}", host_setup_hint())
-                }
-            })?;
-
-        if output.status.success() {
-            return Ok(());
-        }
-
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let detail = [stderr.trim(), stdout.trim()]
-            .into_iter()
-            .find(|s| !s.is_empty())
-            .unwrap_or("cancelled or failed");
-        Err(format!("Keyboard access setup: {detail}"))
-    }
-
-/// Polkit setup + restart helper; returns fresh status (can_listen after ACLs).
-pub fn run_access_setup() -> Result<InputHelperStatus, String> {
-    let script = access_setup_scripts()
-        .into_iter()
-        .find(|path| path.is_file())
-        .ok_or_else(|| {
-            if std::env::var_os("FLATPAK_ID").is_some() {
-                host_setup_hint()
-            } else {
-                "setup-input-access.sh not found — install the emobie package or run packaging/setup-input-access.sh".into()
-            }
-        })?;
-
-    run_pkexec_script(&script)?;
-    let mut status = restart_helper();
-    if status.can_listen {
-        status.detail =
-            "Keyboard access ready — Expand as you type can watch keys now.".into();
-    } else if status.daemon {
-        status.detail = format!(
-            "Helper restarted but keyboard devices are still closed. {}",
-            "If setfacl is unavailable, log out/in once so the emobie-input group applies."
-        );
-    } else {
-        status.detail = format!(
-            "Access script finished but helper is not running. {}",
-            status.detail
-        );
-    }
-    Ok(status)
 }

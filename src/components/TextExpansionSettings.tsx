@@ -40,6 +40,7 @@ export function TextExpansionSettings({
 
   const canListen = Boolean(inputStatus?.canListen);
   const daemonReady = Boolean(inputStatus?.daemon);
+  const isFlatpak = Boolean(inputStatus?.flatpak);
 
   const grantAccess = async (): Promise<InputHelperStatus> => {
     return invoke<InputHelperStatus>("input_helper_run_access_setup");
@@ -59,7 +60,11 @@ export function TextExpansionSettings({
       onInputStatus(status);
 
       if (!status.canListen) {
-        setMessage("Authorizing keyboard access…");
+        setMessage(
+          status.flatpak
+            ? "Looking for host keyboard-access setup…"
+            : "Authorizing keyboard access…",
+        );
         status = await grantAccess();
         onInputStatus(status);
       }
@@ -124,8 +129,9 @@ export function TextExpansionSettings({
         />
       </div>
       <p className="settings-hint settings-hint-block">
-        Starts emobie-inputd and turns on listening. If keyboard access is
-        missing, you get one admin prompt — no logout when session ACLs apply.
+        {isFlatpak
+          ? "Flatpak uses a host emobie-inputd. Install the helper on the host first (packaging/install-inputd-user.sh), then Grant runs pkexec on the host."
+          : "Starts emobie-inputd and turns on listening. If keyboard access is missing, you get one admin prompt — no logout when session ACLs apply."}
       </p>
 
       {daemonReady && !canListen ? (
@@ -139,6 +145,12 @@ export function TextExpansionSettings({
             {busy ? "Working…" : "Grant keyboard access"}
           </button>
         </div>
+      ) : null}
+      {!daemonReady && isFlatpak ? (
+        <p className="settings-hint settings-hint-block">
+          Host install:{" "}
+          <code>bash packaging/install-inputd-user.sh</code> then retry Expand.
+        </p>
       ) : null}
 
       <fieldset className="macro-trigger-mode" disabled={!expandAsYouType}>

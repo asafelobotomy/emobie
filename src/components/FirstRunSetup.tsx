@@ -65,6 +65,7 @@ export function FirstRunSetup({
   };
 
   const ready = Boolean(status?.daemon && status.canListen);
+  const isFlatpak = Boolean(status?.flatpak);
 
   return (
     <div className="macro-dialog-backdrop first-run-backdrop">
@@ -81,6 +82,14 @@ export function FirstRunSetup({
             user and only watches keys after you enable Expand as you type.
           </p>
 
+          {isFlatpak ? (
+            <p className="first-run-copy">
+              Flatpak build: install the host helper first (
+              <code>bash packaging/install-inputd-user.sh</code>
+              ), then continue — Grant uses a host admin prompt.
+            </p>
+          ) : null}
+
           <button
             type="button"
             className="btn primary first-run-cta"
@@ -95,8 +104,9 @@ export function FirstRunSetup({
           </button>
 
           <p className="first-run-copy">
-            Starts the input helper and may ask once for admin approval. Session
-            ACLs usually mean no logout.
+            {isFlatpak
+              ? "Starts the host input helper when available and may ask once for admin approval."
+              : "Starts the input helper and may ask once for admin approval. Session ACLs usually mean no logout."}
           </p>
 
           {message ? (

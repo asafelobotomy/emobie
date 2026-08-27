@@ -215,6 +215,13 @@ jobs:
             echo "chmod +x emobie_${VERSION}_amd64.AppImage"
             echo "./emobie_${VERSION}_amd64.AppImage"
             echo '```'
+            echo
+            echo "AppImage does not bundle \`emobie-inputd\`. For text expansion / auto-paste:"
+            echo
+            echo '```bash'
+            echo "bash packaging/install-inputd-user.sh"
+            echo "pkexec bash ~/.local/share/emobie/setup-input-access.sh"
+            echo '```'
           } > "$NOTES_FILE"
           cat "$NOTES_FILE"
 

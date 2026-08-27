@@ -54,6 +54,14 @@
         "compression": {
           "type": "zstd",
           "level": 3
+        },
+        "files": {
+          "/usr/share/metainfo/io.github.asafelobotomy.emobie.metainfo.xml": "../flatpak/io.github.asafelobotomy.emobie.metainfo.xml",
+          "/usr/bin/emobie-inputd": "inputd-bundle/emobie-inputd",
+          "/usr/lib/systemd/user/emobie-inputd.service": "inputd-bundle/emobie-inputd.service",
+          "/usr/share/emobie/setup-input-access.sh": "inputd-bundle/setup-input-access.sh",
+          "/usr/share/emobie/99-emobie-input.rules": "inputd-bundle/99-emobie-input.rules",
+          "/usr/share/polkit-1/actions/io.github.asafelobotomy.emobie.inputd.policy": "inputd-bundle/io.github.asafelobotomy.emobie.inputd.policy"
         }
       }
     }

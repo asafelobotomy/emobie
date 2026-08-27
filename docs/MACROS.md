@@ -86,8 +86,17 @@ pkexec env SUDO_USER="$USER" bash packaging/setup-input-access.sh
 Log out/in only if ACLs are unavailable, so new sessions inherit the group.
 Group membership is sensitive (keyboard event read access).
 
-Under Flatpak, emobie tries `flatpak-spawn --host pkexec …`; if that fails,
-run the host command above, then retry Expand.
+Under Flatpak, install the host helper first
+(`bash packaging/install-inputd-user.sh`), which stages
+`~/.local/share/emobie/setup-input-access.sh`. Expand/Grant then runs
+`flatpak-spawn --host pkexec …` against that host script. If Grant still fails,
+run the host `pkexec` command above and retry.
+
+**Layout note:** as-you-type matching maps keys assuming a US QWERTY physical
+layout. Triggers that need other layouts may not fire until mapping improves.
+
+**Pin:** always-on-top uses GTK keep-above (works on X11) and, on Plasma
+Wayland, KWin `keepAbove`. Other Wayland compositors may ignore pin.
 
 Expand-as-you-type stays **off by default**. Enable it under
 **Settings → Text expansion**, and choose **After Space** to expand only when

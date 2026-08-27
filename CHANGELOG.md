@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Settings → Text expansion: optional **Keep Space after expansion** (`.hi` + Space → `hiya `)
+- RPM packages ship the same `emobie-inputd` assets as `.deb`
+- Flatpak: `xdg-data/emobie:ro` + host Grant path; KWin talk-name for Plasma pin
 
 ### Changed
 
@@ -18,12 +20,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Space-terminated expansion is the recommended default (e.g. `.hi` then Space)
 - emobie-inputd starts with the app; enabling Expand as you type starts it if needed and turns listening on immediately
 - Enabling Expand (or first-run setup) prompts once for keyboard access, restarts the helper, and skips logout when session ACLs apply
+- Packaged setup uses `pkexec /usr/share/emobie/setup-input-access.sh` (matches Polkit policy)
+- emobie-inputd listens on all keyboard devices and refreshes `can_listen` on each status query
 
 ### Fixed
 
 - Pin (always-on-top) on Plasma Wayland via KWin `keepAbove` (GTK keep-above is a no-op there)
 - Pin is re-applied after show/focus so it survives hide-to-tray
 - Trailing spaces in expansions are typed as Space key events (more reliable than text inject)
+- setfacl failures are reported instead of claiming ACLs always applied
+- Flatpak Grant looks for the host-staged setup script via `flatpak-spawn --host`
+- Flathub source manifest tag bumped to v0.6.5
 
 ## [0.6.5] - 2026-08-13
 
@@ -32,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Startup check against GitHub Releases for newer versions (toggle in Settings; dismissible)
 - Text macros: Macros nav category, in-pane Add (+), per-macro hotkeys, emoji shortcodes + common emoticons (`:)`, `;')`, …), Espanso-ish YAML import/export
 - Optional auto-paste on copy and as-you-type expansion via host helper `emobie-inputd` ([`docs/MACROS.md`](docs/MACROS.md))
-- Secure `emobie-inputd` auto-start: systemd `--user` unit, owner-only socket + peer UID checks, Settings “Start input helper”, install/setup scripts
+- Secure `emobie-inputd` auto-start: systemd `--user` unit, owner-only socket + peer UID checks, install/setup scripts (helper starts with the app; Expand enables listening)
 - First-launch setup dialog to start the input helper and optionally grant keyboard access
 - Flatpak socket access to `$XDG_RUNTIME_DIR/emobie` for the host input helper (no `--device=input`)
 - Flathub-bound offline source Flatpak manifest (`cargo-sources` / `node-sources`) alongside the GitHub Releases `.deb` wrap

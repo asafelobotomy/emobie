@@ -118,3 +118,17 @@ fn paste_expansion(expansion: &str) -> Result<(), String> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::split_trailing_spaces;
+
+    #[test]
+    fn split_trailing_spaces_counts_ascii_spaces() {
+        assert_eq!(split_trailing_spaces("hiya"), ("hiya", 0));
+        assert_eq!(split_trailing_spaces("hiya "), ("hiya", 1));
+        assert_eq!(split_trailing_spaces("hiya  "), ("hiya", 2));
+        assert_eq!(split_trailing_spaces(" "), ("", 1));
+        assert_eq!(split_trailing_spaces(""), ("", 0));
+    }
+}

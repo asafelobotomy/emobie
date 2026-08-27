@@ -33,8 +33,12 @@ finish-args:
   # disables dbus name ownership inside Flatpak so Cinnamon/Mint xapp-sn-watcher works.
   - --talk-name=org.kde.StatusNotifierWatcher
   - --talk-name=org.x.StatusNotifierWatcher
+  # Plasma Wayland pin (KWin keepAbove); ignored on other compositors.
+  - --talk-name=org.kde.KWin
   # Optional host emobie-inputd socket (as-you-type / auto-paste). No --device=input.
   - --filesystem=xdg-run/emobie
+  # Host-staged setup script + rules from install-inputd-user.sh (Grant via flatpak-spawn --host).
+  - --filesystem=xdg-data/emobie:ro
   # Launch-on-startup uses the Autostart portal path long-term; do not grant
   # xdg-config/autostart filesystem (Flathub linter rejects it). See docs/FLATHUB.md.
 
@@ -55,8 +59,8 @@ modules:
     sources:
       - type: git
         url: https://github.com/asafelobotomy/emobie.git
-        tag: v0.6.4
-        commit: c5c851204d3b2f38fd41f0236e054f16edd00f4b
+        tag: v0.6.5
+        commit: 2833deef5b91e7d1b825b01983c3ccd61a03e79f
         x-checker-data:
           type: git
           tag-pattern: ^v([0-9]+(\.[0-9]+)*)$

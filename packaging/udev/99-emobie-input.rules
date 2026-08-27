@@ -1,4 +1,5 @@
 # Allow members of emobie-input to use uinput for paste/expansion inject.
 KERNEL=="uinput", GROUP="emobie-input", MODE="0660", OPTIONS+="static_node=uinput"
-# Readable keyboard event nodes for as-you-type matching.
+# Readable input event nodes for as-you-type matching.
+# Broad KERNEL=="event*" is intentional (keyboards vary); group membership is sensitive.
 KERNEL=="event*", SUBSYSTEM=="input", GROUP="emobie-input", MODE="0640"

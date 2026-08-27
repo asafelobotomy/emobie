@@ -41,7 +41,7 @@ Grab the latest build from
 | **Flatpak** | Sandboxed desktop install | `flatpak install --user emobie-*-x86_64.flatpak` |
 | **`.deb`** | Debian / Ubuntu / Mint | `sudo apt install ./emobie_*_amd64.deb` |
 | **`.rpm`** | Fedora / RHEL / openSUSE | `sudo dnf install ./emobie-*-1.x86_64.rpm` |
-| **AppImage** | Portable, no install | `chmod +x emobie_*.AppImage && ./emobie_*.AppImage` |
+| **AppImage** | Portable, no install | `chmod +x emobie_*.AppImage && ./emobie_*.AppImage` — for text expansion also run `bash packaging/install-inputd-user.sh` (AppImage does not ship the helper) |
 
 ```bash
 # Flatpak (after downloading the release bundle)
@@ -65,7 +65,7 @@ App ID: `io.github.asafelobotomy.emobie`
 | **Expand** | Optional as-you-type via host `emobie-inputd` (systemd --user auto-start; off by default; see [docs/MACROS.md](docs/MACROS.md)) |
 | **Summon** | Global hotkey (default `Ctrl+Shift+Space`; letters/numbers need a modifier) and system tray |
 | **Layout** | Resize freely — horizontal, square, or vertical; frameless by default (optional title bar in Settings) |
-| **Pin** | Always-on-top from the toolbar or tray |
+| **Pin** | Always-on-top from the toolbar or tray (X11 + Plasma Wayland; other Wayland compositors may ignore) |
 | **Look** | Light / dark / system theme, emoji size, and skin tone defaults |
 | **Sort** | Default order, name, type, first used, or number of uses |
 

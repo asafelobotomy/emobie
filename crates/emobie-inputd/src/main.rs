@@ -51,13 +51,7 @@ fn peer_uid_allowed(stream: &UnixStream) -> bool {
     }
 }
 
-fn handle_client(
-    stream: UnixStream,
-    enabled: &AtomicBool,
-    trie: &Mutex<TriggerTrie>,
-    can_inject: bool,
-    can_listen: bool,
-) {
+fn handle_client(stream: UnixStream, enabled: &AtomicBool, trie: &Mutex<TriggerTrie>) {
     let mut reader = BufReader::new(stream.try_clone().expect("clone"));
     let mut writer = stream;
     let mut line = String::new();
@@ -67,6 +61,8 @@ fn handle_client(
         if trimmed.is_empty() {
             continue;
         }
+        let can_inject = inject::can_inject();
+        let can_listen = listen::can_listen();
         let response = match serde_json::from_str::<Request>(&trimmed) {
             Ok(Request::Status) => Response::status(
                 can_inject,
@@ -75,7 +71,8 @@ fn handle_client(
                 if can_listen {
                     "emobie-inputd running"
                 } else {
-                    "running, but keyboard access missing — run setup-input-access.sh then log out/in"
+                    "running, but keyboard access missing — run setup-input-access.sh \
+(ACLs usually avoid logout; otherwise log out/in once)"
                 },
             ),
             Ok(Request::SetEnabled { enabled: value }) => {
@@ -136,8 +133,6 @@ fn main() {
     let enabled = Arc::new(AtomicBool::new(false));
     let trie = Arc::new(Mutex::new(TriggerTrie::default()));
     let stop = Arc::new(AtomicBool::new(false));
-    let can_inject = inject::can_inject();
-    let can_listen = listen::can_listen();
 
     listen::spawn_listener(enabled.clone(), trie.clone(), stop.clone());
 
@@ -170,7 +165,7 @@ fn main() {
                 let enabled = enabled.clone();
                 let trie = trie.clone();
                 std::thread::spawn(move || {
-                    handle_client(stream, &enabled, &trie, can_inject, can_listen);
+                    handle_client(stream, &enabled, &trie);
                 });
             }
             Err(err) => eprintln!("accept error: {err}"),

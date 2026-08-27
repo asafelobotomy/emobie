@@ -6,6 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GROUP="emobie-input"
+SYSTEM_SETUP="/usr/share/emobie/setup-input-access.sh"
 
 # Prefer staged/system assets; fall back to user install and repo layout.
 if [[ -f /usr/share/emobie/99-emobie-input.rules ]]; then
@@ -37,6 +38,10 @@ fi
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Re-running with pkexec…"
+  # Match Polkit annotate exec.path for the packaged script.
+  if [[ "$(readlink -f "$0" 2>/dev/null || echo "$0")" == "$(readlink -f "$SYSTEM_SETUP" 2>/dev/null || echo "$SYSTEM_SETUP")" ]]; then
+    exec pkexec "$SYSTEM_SETUP" "$@"
+  fi
   exec pkexec /usr/bin/bash "$0" "$@"
 fi
 
@@ -55,28 +60,46 @@ if ! getent group "$GROUP" >/dev/null; then
 fi
 
 install -m 644 "$RULES_SRC" "$RULES_DST"
-if [[ -n "$POLICY_SRC" && -d "$(dirname "$POLICY_DST")" ]]; then
+if [[ -n "$POLICY_SRC" ]]; then
+  if [[ ! -d "$(dirname "$POLICY_DST")" ]]; then
+    echo "Polkit actions directory missing; cannot install policy." >&2
+    exit 1
+  fi
   install -m 644 "$POLICY_SRC" "$POLICY_DST"
 fi
 
 usermod -aG "$GROUP" "$TARGET_USER"
 udevadm control --reload-rules
 udevadm trigger --subsystem-match=input || true
-# Session-local ACL so expand can work before the next login refreshes groups.
+
+ACL_OK=0
+ACL_TRIED=0
 if command -v setfacl >/dev/null; then
+  ACL_TRIED=1
   shopt -s nullglob
   events=(/dev/input/event*)
   if ((${#events[@]})); then
-    setfacl -m "u:${TARGET_USER}:r" "${events[@]}" || true
+    if setfacl -m "u:${TARGET_USER}:r" "${events[@]}"; then
+      ACL_OK=1
+    else
+      echo "Warning: setfacl failed for /dev/input/event* — logout may be required." >&2
+    fi
   fi
   if [[ -e /dev/uinput ]]; then
-    setfacl -m "u:${TARGET_USER}:rw" /dev/uinput || true
+    if ! setfacl -m "u:${TARGET_USER}:rw" /dev/uinput; then
+      echo "Warning: setfacl failed for /dev/uinput." >&2
+      ACL_OK=0
+    fi
   fi
   shopt -u nullglob
 fi
 
 echo "Added $TARGET_USER to $GROUP and installed udev rules."
-echo "Session ACLs were applied when setfacl is available — restart emobie-inputd"
-echo "(or toggle Expand as you type) to use keyboard access without logging out."
-echo "Log out/in only if ACLs are unavailable, so new sessions inherit $GROUP."
+if [[ "$ACL_TRIED" -eq 1 && "$ACL_OK" -eq 1 ]]; then
+  echo "Session ACLs applied — restart emobie-inputd (or toggle Expand) without logging out."
+elif [[ "$ACL_TRIED" -eq 1 ]]; then
+  echo "Session ACLs were not fully applied — log out/in so group $GROUP takes effect."
+else
+  echo "setfacl unavailable — log out/in so new sessions inherit $GROUP."
+fi
 echo "Membership in $GROUP is sensitive — it grants keyboard event access."

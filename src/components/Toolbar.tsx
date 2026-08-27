@@ -143,7 +143,11 @@ export function Toolbar({
           <button
             type="button"
             className="icon-btn pin"
-            title={pinned ? "Unpin" : "Pin above windows"}
+            title={
+              pinned
+                ? "Unpin"
+                : "Pin above windows (Plasma Wayland + X11; limited elsewhere)"
+            }
             aria-label={pinned ? "Unpin" : "Pin above windows"}
             aria-pressed={pinned}
             data-tauri-drag-region="false"
