@@ -87,6 +87,23 @@ bash packaging/install-inputd-user.sh
 pkexec bash ~/.local/share/emobie/setup-input-access.sh
 ```
 
+## Tray / taskbar icons
+
+On Wayland, the compositor matches the window **app id** to a `.desktop` file
+basename. emobie sets the GTK app id to `io.github.asafelobotomy.emobie` (same
+as the Flatpak id and `Icon=` / `StartupWMClass=` in the desktop entry). If you
+see a generic Wayland “W” icon after a local install, refresh icons and relaunch:
+
+```bash
+npm run icons:user
+# or after a release build:
+# bash scripts/install-user-icons.sh
+update-desktop-database ~/.local/share/applications
+gtk-update-icon-cache -f -t ~/.local/share/icons/hicolor
+```
+
+Quit and restart emobie after installing icons so Plasma picks up the new app id.
+
 ## Updates
 
 With **Check for updates on startup** enabled, Settings shows a banner when a
@@ -104,6 +121,11 @@ newer [GitHub Release](https://github.com/asafelobotomy/emobie/releases) exists.
 
 Quit and relaunch after a successful update. Download URLs are limited to this
 repo’s `releases/download/` assets.
+
+Favorites, recents, and custom macros are stored in the app preference file and
+mirrored to `~/.local/share/emobie/preferences.json` so they survive updates and
+install-channel switches (native ↔ Flatpak). On startup emobie merges those
+sources if one side is missing user data.
 
 ## Building AppImage locally
 

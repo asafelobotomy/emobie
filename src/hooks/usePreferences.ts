@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { load, type Store } from "@tauri-apps/plugin-store";
 import {
   DEFAULT_PREFERENCES,
   type Macro,
@@ -10,40 +9,7 @@ import {
   type SortBy,
 } from "../types/preferences";
 import { findEmojiByChar, type SkinTone } from "../data/loadEmojis";
-import { normalizePreferences } from "../lib/normalizePreferences";
-
-const STORE_PATH = "emobie-preferences.json";
-
-let storePromise: Promise<Store> | null = null;
-
-function getStore(): Promise<Store> {
-  if (!storePromise) {
-    storePromise = load(STORE_PATH, { autoSave: true });
-  }
-  return storePromise;
-}
-
-async function readPreferences(): Promise<Preferences> {
-  try {
-    const store = await getStore();
-    const saved = await store.get<Partial<Preferences>>("preferences");
-    return normalizePreferences(saved);
-  } catch {
-    return { ...DEFAULT_PREFERENCES };
-  }
-}
-
-async function writePreferences(prefs: Preferences): Promise<boolean> {
-  try {
-    const store = await getStore();
-    await store.set("preferences", prefs);
-    await store.save();
-    return true;
-  } catch (error) {
-    console.error("Failed to save preferences", error);
-    return false;
-  }
-}
+import { readPreferences, writePreferences } from "../lib/preferencesIo";
 
 export function usePreferences() {
   const [prefs, setPrefs] = useState<Preferences>(DEFAULT_PREFERENCES);

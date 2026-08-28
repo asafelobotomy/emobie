@@ -104,6 +104,9 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN: "1"
         run: npm run tauri build -- --bundles deb,rpm,appimage
 
+      - name: Fix Linux package icons for GTK app id
+        run: bash scripts/fix-linux-bundle-icons.sh
+
       - name: Stage package artifacts
         run: |
           set -euo pipefail

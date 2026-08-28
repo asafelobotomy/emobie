@@ -37,8 +37,8 @@ finish-args:
   - --talk-name=org.kde.KWin
   # Optional host emobie-inputd socket (as-you-type / auto-paste). No --device=input.
   - --filesystem=xdg-run/emobie
-  # Host-staged setup script + rules from install-inputd-user.sh (Grant via flatpak-spawn --host).
-  - --filesystem=xdg-data/emobie:ro
+  # Host-staged setup script + durable user prefs (~/.local/share/emobie).
+  - --filesystem=xdg-data/emobie:create
   # Launch-on-startup uses the Autostart portal path long-term; do not grant
   # xdg-config/autostart filesystem (Flathub linter rejects it). See docs/FLATHUB.md.
 
@@ -59,7 +59,7 @@ modules:
     sources:
       - type: git
         url: https://github.com/asafelobotomy/emobie.git
-        tag: v0.6.6
+        tag: v0.6.7
         commit: 7d9e52f90214bb2419abd0e12d2806b8fcdfdc18
         x-checker-data:
           type: git
@@ -79,8 +79,13 @@ modules:
       - install -Dm755 src-tauri/target/release/emobie /app/bin/emobie
       - install -Dm644 io.github.asafelobotomy.emobie.desktop /app/share/applications/io.github.asafelobotomy.emobie.desktop
       - install -Dm644 io.github.asafelobotomy.emobie.metainfo.xml /app/share/metainfo/io.github.asafelobotomy.emobie.metainfo.xml
+      - install -Dm644 src-tauri/icons/16x16.png /app/share/icons/hicolor/16x16/apps/io.github.asafelobotomy.emobie.png
+      - install -Dm644 src-tauri/icons/22x22.png /app/share/icons/hicolor/22x22/apps/io.github.asafelobotomy.emobie.png
+      - install -Dm644 src-tauri/icons/24x24.png /app/share/icons/hicolor/24x24/apps/io.github.asafelobotomy.emobie.png
       - install -Dm644 src-tauri/icons/32x32.png /app/share/icons/hicolor/32x32/apps/io.github.asafelobotomy.emobie.png
+      - install -Dm644 src-tauri/icons/48x48.png /app/share/icons/hicolor/48x48/apps/io.github.asafelobotomy.emobie.png
+      - install -Dm644 src-tauri/icons/64x64.png /app/share/icons/hicolor/64x64/apps/io.github.asafelobotomy.emobie.png
       - install -Dm644 src-tauri/icons/128x128.png /app/share/icons/hicolor/128x128/apps/io.github.asafelobotomy.emobie.png
-      - install -Dm644 src-tauri/icons/128x128@2x.png /app/share/icons/hicolor/256x256/apps/io.github.asafelobotomy.emobie.png
+      - install -Dm644 src-tauri/icons/256x256.png /app/share/icons/hicolor/256x256/apps/io.github.asafelobotomy.emobie.png
       - install -Dm644 src-tauri/icons/icon.png /app/share/icons/hicolor/512x512/apps/io.github.asafelobotomy.emobie.png
       - install -Dm644 LICENSE /app/share/licenses/io.github.asafelobotomy.emobie/LICENSE

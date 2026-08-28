@@ -44,6 +44,16 @@ description = "Allows quitting the application from the UI"
 commands.allow = ["quit_app"]
 
 [[permission]]
+identifier = "allow-load-preference-snapshots"
+description = "Allows reading preference snapshots from durable and alternate install paths"
+commands.allow = ["load_preference_snapshots"]
+
+[[permission]]
+identifier = "allow-save-durable-preferences"
+description = "Allows writing the durable preferences mirror under ~/.local/share/emobie"
+commands.allow = ["save_durable_preferences"]
+
+[[permission]]
 identifier = "allow-apply-window-pin"
 description = "Allows applying always-on-top / compositor keep-above for the pin button"
 commands.allow = ["apply_window_pin"]

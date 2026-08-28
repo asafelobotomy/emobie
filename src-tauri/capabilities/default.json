@@ -29,6 +29,8 @@
     "allow-apply-update",
     "allow-release-single-instance-lock",
     "allow-quit-app",
+    "allow-load-preference-snapshots",
+    "allow-save-durable-preferences",
     "allow-apply-window-pin",
     "allow-pin-capability",
     "allow-input-helper-status",

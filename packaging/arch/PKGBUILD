@@ -7,7 +7,7 @@
 # Prefer Flatpak/AppImage + packaging/install-inputd-user.sh for most users.
 
 pkgname=emobie
-pkgver=0.6.6
+pkgver=0.6.7
 pkgrel=1
 pkgdesc="Compact emoji palette with macros and optional text expansion"
 arch=('x86_64')
@@ -52,7 +52,20 @@ package() {
   install -Dm644 packaging/polkit/io.github.asafelobotomy.emobie.inputd.policy \
     "$pkgdir/usr/share/polkit-1/actions/io.github.asafelobotomy.emobie.inputd.policy"
   install -Dm644 flatpak/io.github.asafelobotomy.emobie.desktop \
+    "$pkgdir/usr/share/applications/io.github.asafelobotomy.emobie.desktop"
+  ln -s io.github.asafelobotomy.emobie.desktop \
     "$pkgdir/usr/share/applications/emobie.desktop"
+  for pair in \
+    "16:16x16.png" "22:22x22.png" "24:24x24.png" "32:32x32.png" \
+    "48:48x48.png" "64:64x64.png" "128:128x128.png" "256:256x256.png" \
+    "512:icon.png"; do
+    size="${pair%%:*}"
+    file="${pair##*:}"
+    install -Dm644 "src-tauri/icons/$file" \
+      "$pkgdir/usr/share/icons/hicolor/${size}x${size}/apps/io.github.asafelobotomy.emobie.png"
+  done
+  install -Dm644 flatpak/io.github.asafelobotomy.emobie.metainfo.xml \
+    "$pkgdir/usr/share/metainfo/io.github.asafelobotomy.emobie.metainfo.xml"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }
 

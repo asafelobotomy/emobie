@@ -169,8 +169,8 @@ Tags matching `vX.Y.Z` run GitHub Actions to publish **`.deb`**, **`.rpm`**, **A
 
 ```bash
 # Keep package.json, Cargo.toml, and tauri.conf.json versions in sync
-git tag v0.6.6
-git push origin v0.6.6
+git tag v0.6.7
+git push origin v0.6.7
 ```
 
 Or run the **Release** workflow from the Actions tab.
@@ -181,8 +181,11 @@ Or run the **Release** workflow from the Actions tab.
 
 - Global shortcuts and tray icons can differ on Wayland vs X11 depending on your compositor. On **GNOME**, install an AppIndicator / KStatusNotifierItem extension for the tray ([details](docs/LINUX.md)).
 - Optional **auto-paste** and **as-you-type expansion** inject keystrokes via host `emobie-inputd` (see [docs/MACROS.md](docs/MACROS.md)). Clipboard copy always works without the helper.
-- Flatpak preferences live under  
-  `~/.var/app/io.github.asafelobotomy.emobie/data/com.emobie.app/`.
+- Flatpak preferences live under
+  `~/.var/app/io.github.asafelobotomy.emobie/…`; native under
+  `~/.local/share/io.github.asafelobotomy.emobie/…` (older native builds used
+  `com.emobie.app`). A durable mirror at
+  `~/.local/share/emobie/preferences.json` keeps favorites/macros across both.
 - Pin is reliable on X11 and Plasma Wayland; other Wayland compositors may ignore it.
 
 ---

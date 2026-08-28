@@ -24,7 +24,7 @@ finish-args:
   - --talk-name=org.kde.KWin
   # Optional host emobie-inputd socket (as-you-type / auto-paste). No --device=input.
   - --filesystem=xdg-run/emobie
-  - --filesystem=xdg-data/emobie:ro
+  - --filesystem=xdg-data/emobie:create
   # GitHub Releases .deb wrap only: host autostart desktop entry.
   # Flathub-bound source manifest must not use this (Autostart portal instead).
   - --own-name=org.kde.StatusNotifierItem.*
@@ -59,19 +59,31 @@ modules:
         fi
       - install -Dm644 io.github.asafelobotomy.emobie.desktop /app/share/applications/io.github.asafelobotomy.emobie.desktop
       - |
-        for size in 32x32 128x128 256x256@2; do
-          src="deb-extract/usr/share/icons/hicolor/${size}/apps"
+        ICON_ID=io.github.asafelobotomy.emobie
+        for pair in \
+          "16x16:16x16" "22x22:22x22" "24x24:24x24" "32x32:32x32" \
+          "48x48:48x48" "64x64:64x64" "128x128:128x128" \
+          "256x256:256x256" "256x256@2:256x256" "512x512:512x512"; do
+          src_size="${pair%%:*}"
+          dest_size="${pair##*:}"
+          src="deb-extract/usr/share/icons/hicolor/${src_size}/apps"
           if [ -d "$src" ]; then
             icon="$(find "$src" -maxdepth 1 -type f \( -name '*.png' -o -name '*.svg' \) | head -n1 || true)"
             if [ -n "$icon" ]; then
-              install -Dm644 "$icon" "/app/share/icons/hicolor/${size}/apps/io.github.asafelobotomy.emobie.${icon##*.}"
+              install -Dm644 "$icon" \
+                "/app/share/icons/hicolor/${dest_size}/apps/${ICON_ID}.${icon##*.}"
             fi
           fi
         done
-      - |
-        if [ -f deb-extract/usr/share/icons/hicolor/128x128/apps/emobie.png ]; then
-          install -Dm644 deb-extract/usr/share/icons/hicolor/128x128/apps/emobie.png \
-            /app/share/icons/hicolor/128x128/apps/io.github.asafelobotomy.emobie.png
-        fi
+        # Prefer correctly named files when present.
+        for size in 16x16 22x22 24x24 32x32 48x48 64x64 128x128 256x256 512x512; do
+          for name in "$ICON_ID" emobie; do
+            f="deb-extract/usr/share/icons/hicolor/${size}/apps/${name}.png"
+            if [ -f "$f" ]; then
+              install -Dm644 "$f" "/app/share/icons/hicolor/${size}/apps/${ICON_ID}.png"
+              break
+            fi
+          done
+        done
       - install -Dm644 io.github.asafelobotomy.emobie.metainfo.xml \
           /app/share/metainfo/io.github.asafelobotomy.emobie.metainfo.xml

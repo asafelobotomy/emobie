@@ -117,6 +117,8 @@ pub fn run() {
             updates::check_for_updates,
             updates::open_release_page,
             updates::apply_update,
+            prefs::load_preference_snapshots,
+            prefs::save_durable_preferences,
         ])
         .run(tauri::generate_context!())
         .expect("error while running emobie");

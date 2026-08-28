@@ -7,10 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.7] - 2026-08-28
+
 ### Fixed
 
 - Native in-app updates install from the `.deb` into `~/.local/bin/emobie-bin` instead of an AppImage (avoids blank WebKit window on Wayland)
 - AppImage launcher sets `WEBKIT_DISABLE_DMABUF_RENDERER` / `WEBKIT_DISABLE_COMPOSITING_MODE` to reduce blank-window issues
+- Favorites, recents, and macros survive updates and Flatpak↔native switches via `~/.local/share/emobie/preferences.json` plus merge-on-load
+- Taskbar icon on Wayland: GTK app id matches the desktop file (`io.github.asafelobotomy.emobie`)
+- Linux packages install a full hicolor icon set under the app id (deb/rpm/AppImage/Flatpak/Arch/native)
 
 ## [0.6.6] - 2026-08-27
 
@@ -192,7 +197,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Horizontal mouse-wheel scrolling in wide layouts
 - Tray icon temp path for Flatpak-friendly sandboxing
 
-[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.6...HEAD
+[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.7...HEAD
+[0.6.7]: https://github.com/asafelobotomy/emobie/compare/v0.6.6...v0.6.7
 [0.6.6]: https://github.com/asafelobotomy/emobie/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/asafelobotomy/emobie/compare/v0.6.4...v0.6.5
 [0.6.4]: https://github.com/asafelobotomy/emobie/compare/v0.6.3...v0.6.4

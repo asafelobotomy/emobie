@@ -1,6 +1,7 @@
 //! GitHub Releases update check and simple package install.
 
 mod apply;
+mod native;
 
 use serde::{Deserialize, Serialize};
 

@@ -1,7 +1,7 @@
 {
   "name": "emobie",
   "private": true,
-  "version": "0.6.6",
+  "version": "0.6.7",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,8 +10,10 @@
     "test": "node --experimental-strip-types --test src/lib/*.test.ts",
     "test:inputd": "cargo test --manifest-path crates/emobie-inputd/Cargo.toml",
     "stage:inputd": "bash scripts/stage-inputd.sh",
+    "icons:user": "bash scripts/install-user-icons.sh",
+    "icons:fix-bundle": "bash scripts/fix-linux-bundle-icons.sh",
     "tauri": "tauri",
-    "tauri:build": "NO_STRIP=true APPIMAGE_EXTRACT_AND_RUN=1 tauri build"
+    "tauri:build": "NO_STRIP=true APPIMAGE_EXTRACT_AND_RUN=1 tauri build && bash scripts/fix-linux-bundle-icons.sh"
   },
   "dependencies": {
     "@fontsource/ubuntu": "^5.3.0",

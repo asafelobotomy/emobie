@@ -6,6 +6,8 @@ use std::io::{copy, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use super::native::install_native_from_deb;
+
 const USER_AGENT: &str = concat!("emobie/", env!("CARGO_PKG_VERSION"));
 const ALLOWED_PREFIX: &str =
     "https://github.com/asafelobotomy/emobie/releases/download/";
@@ -81,7 +83,7 @@ fn which(bin: &str) -> bool {
         .unwrap_or(false)
 }
 
-fn cache_dir() -> Result<PathBuf, String> {
+pub(crate) fn cache_dir() -> Result<PathBuf, String> {
     let base = std::env::var_os("XDG_CACHE_HOME")
         .map(PathBuf::from)
         .or_else(|| {
@@ -114,7 +116,7 @@ fn download_asset(url: &str, dest: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn run_checked(cmd: &mut Command) -> Result<(), String> {
+pub(crate) fn run_checked(cmd: &mut Command) -> Result<(), String> {
     let output = cmd.output().map_err(|e| e.to_string())?;
     if output.status.success() {
         return Ok(());
@@ -211,72 +213,6 @@ fn install_appimage(path: &Path) -> Result<(), String> {
         perms.set_mode(0o755);
         fs::set_permissions(&launcher, perms).map_err(|e| e.to_string())?;
     }
-    Ok(())
-}
-
-fn install_native_from_deb(deb: &Path) -> Result<(), String> {
-    let work = cache_dir()?.join("native-extract");
-    let _ = fs::remove_dir_all(&work);
-    fs::create_dir_all(&work).map_err(|e| e.to_string())?;
-    run_checked(
-        Command::new("ar")
-            .arg("x")
-            .arg(deb)
-            .current_dir(&work),
-    )?;
-    let data_tar = fs::read_dir(&work)
-        .map_err(|e| e.to_string())?
-        .filter_map(|e| e.ok())
-        .map(|e| e.path())
-        .find(|p| {
-            p.file_name()
-                .and_then(|n| n.to_str())
-                .is_some_and(|n| n.starts_with("data.tar"))
-        })
-        .ok_or_else(|| "deb missing data.tar.*".to_string())?;
-    run_checked(
-        Command::new("tar")
-            .arg("xf")
-            .arg(&data_tar)
-            .current_dir(&work),
-    )?;
-    let extracted = work.join("usr/bin/emobie");
-    if !extracted.is_file() {
-        let _ = fs::remove_dir_all(&work);
-        return Err("deb did not contain usr/bin/emobie".into());
-    }
-    let bin_dir = std::env::var_os("XDG_BIN_HOME")
-        .map(PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/bin"))
-        })
-        .ok_or_else(|| "HOME is not set".to_string())?;
-    fs::create_dir_all(&bin_dir).map_err(|e| e.to_string())?;
-    let dest_bin = bin_dir.join("emobie-bin");
-    fs::copy(&extracted, &dest_bin).map_err(|e| e.to_string())?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&dest_bin).map_err(|e| e.to_string())?.permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(&dest_bin, perms).map_err(|e| e.to_string())?;
-    }
-    let launcher = bin_dir.join("emobie");
-    let script = format!(
-        "#!/bin/sh\nset -e\nBIN=\"{}\"\nif [ -x \"$BIN\" ]; then\n  exec \"$BIN\" \"$@\"\nfi\nexec flatpak run --user io.github.asafelobotomy.emobie \"$@\"\n",
-        dest_bin.display()
-    );
-    fs::write(&launcher, script).map_err(|e| e.to_string())?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = fs::metadata(&launcher)
-            .map_err(|e| e.to_string())?
-            .permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(&launcher, perms).map_err(|e| e.to_string())?;
-    }
-    let _ = fs::remove_dir_all(&work);
     Ok(())
 }
 

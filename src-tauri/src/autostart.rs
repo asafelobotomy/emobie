@@ -38,19 +38,6 @@ fn marker_path() -> Option<PathBuf> {
     Some(data.join(FLATPAK_APP_ID).join(MARKER_NAME))
 }
 
-fn flatpak_desktop_contents() -> String {
-    format!(
-        "\
-[Desktop Entry]
-Type=Application
-Name={APP_NAME}
-X-XDP-Autostart={FLATPAK_APP_ID}
-Exec=flatpak run --command={APP_NAME} {FLATPAK_APP_ID}
-X-Flatpak={FLATPAK_APP_ID}
-"
-    )
-}
-
 fn native_desktop_contents() -> Result<String, String> {
     let exe = std::env::current_exe().map_err(|err| err.to_string())?;
     let exe = exe
@@ -67,10 +54,27 @@ Version=1.0
 Name={APP_NAME}
 Comment={APP_NAME} startup script
 Exec={exe}
+Icon={FLATPAK_APP_ID}
+StartupWMClass={FLATPAK_APP_ID}
 StartupNotify=false
 Terminal=false
 "
     ))
+}
+
+fn flatpak_desktop_contents() -> String {
+    format!(
+        "\
+[Desktop Entry]
+Type=Application
+Name={APP_NAME}
+Icon={FLATPAK_APP_ID}
+StartupWMClass={FLATPAK_APP_ID}
+X-XDP-Autostart={FLATPAK_APP_ID}
+Exec=flatpak run --command={APP_NAME} {FLATPAK_APP_ID}
+X-Flatpak={FLATPAK_APP_ID}
+"
+    )
 }
 
 fn remove_legacy_entries(dir: &PathBuf) {

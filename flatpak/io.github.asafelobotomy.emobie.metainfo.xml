@@ -4,6 +4,7 @@
   <launchable type="desktop-id">io.github.asafelobotomy.emobie.desktop</launchable>
   <name>emobie</name>
   <summary>Browse and copy emoji fast</summary>
+  <icon type="stock">io.github.asafelobotomy.emobie</icon>
   <developer id="io.github.asafelobotomy">
     <name>aSafeLobotomy</name>
   </developer>
@@ -58,6 +59,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.7" date="2026-08-28">
+      <description>
+        <p>Durable preferences across install channels, Wayland taskbar icon via matching GTK app id, and full hicolor icons in Linux packages.</p>
+      </description>
+    </release>
     <release version="0.6.6" date="2026-08-27">
       <description>
         <p>In-app updater, Ubuntu typeface, Linux distro/DE coverage (pin, Flatpak autostart, AppImage linuxdeploy fix), and text-expansion polish.</p>
