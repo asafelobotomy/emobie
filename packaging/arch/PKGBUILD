@@ -7,7 +7,7 @@
 # Prefer Flatpak/AppImage + packaging/install-inputd-user.sh for most users.
 
 pkgname=emobie
-pkgver=0.6.7
+pkgver=0.6.8
 pkgrel=1
 pkgdesc="Compact emoji palette with macros and optional text expansion"
 arch=('x86_64')
@@ -73,4 +73,5 @@ post_install() {
   echo "Enable the input helper: systemctl --user enable --now emobie-inputd.service"
   echo "Grant keyboard access once via emobie Expand, or:"
   echo "  pkexec /usr/share/emobie/setup-input-access.sh"
+  echo "Verify: bash scripts/verify-expand-setup.sh (from the emobie source tree)"
 }

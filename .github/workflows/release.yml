@@ -228,7 +228,8 @@ jobs:
             echo
             echo '```bash'
             echo "bash packaging/install-inputd-user.sh"
-            echo "pkexec bash ~/.local/share/emobie/setup-input-access.sh"
+            echo "bash scripts/verify-expand-setup.sh"
+            echo "# Enable Expand in emobie (Grant runs pkexec once for keyboard access)"
             echo '```'
           } > "$NOTES_FILE"
           cat "$NOTES_FILE"

@@ -86,6 +86,12 @@ pkexec env SUDO_USER="$USER" bash packaging/setup-input-access.sh
 Log out/in only if ACLs are unavailable, so new sessions inherit the group.
 Group membership is sensitive (keyboard event read access).
 
+**Verify setup** from a desktop terminal:
+
+```bash
+bash scripts/verify-expand-setup.sh
+```
+
 Under Flatpak, install the host helper first
 (`bash packaging/install-inputd-user.sh`), which stages
 `~/.local/share/emobie/setup-input-access.sh`. Expand/Grant then runs

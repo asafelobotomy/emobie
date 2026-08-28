@@ -1,0 +1,12 @@
+module emobie_inputd 1.0;
+
+require {
+    type unconfined_t;
+    type input_device_t;
+    type uinput_device_t;
+    class chr_file { open read write ioctl getattr };
+}
+
+# Allow the user's emobie-inputd (unconfined user domain) to read keyboards and uinput.
+allow unconfined_t input_device_t:chr_file { open read ioctl getattr };
+allow unconfined_t uinput_device_t:chr_file { open read write ioctl getattr };

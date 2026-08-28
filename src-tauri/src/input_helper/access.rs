@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 const SYSTEM_SETUP: &str = "/usr/share/emobie/setup-input-access.sh";
+const LOCAL_SETUP: &str = "/usr/local/share/emobie/setup-input-access.sh";
 
 fn in_flatpak() -> bool {
     std::env::var_os("FLATPAK_ID").is_some()
@@ -26,7 +27,10 @@ pkexec bash ~/.local/share/emobie/setup-input-access.sh \
 }
 
 fn sandbox_setup_scripts() -> Vec<PathBuf> {
-    let mut paths = vec![PathBuf::from(SYSTEM_SETUP)];
+    let mut paths = vec![
+        PathBuf::from(SYSTEM_SETUP),
+        PathBuf::from(LOCAL_SETUP),
+    ];
     if let Ok(home) = std::env::var("HOME") {
         paths.push(PathBuf::from(home).join(".local/share/emobie/setup-input-access.sh"));
     }
@@ -40,7 +44,7 @@ fn sandbox_setup_scripts() -> Vec<PathBuf> {
 }
 
 fn host_setup_candidates() -> Vec<String> {
-    let mut paths = vec![SYSTEM_SETUP.to_string()];
+    let mut paths = vec![SYSTEM_SETUP.to_string(), LOCAL_SETUP.to_string()];
     if let Ok(home) = std::env::var("HOME") {
         paths.push(format!("{home}/.local/share/emobie/setup-input-access.sh"));
     }
@@ -72,9 +76,9 @@ fn with_session_env(cmd: &mut Command) {
     }
 }
 
-/// Prefer direct pkexec of the annotated system script; bash-wrap user copies.
+/// Prefer direct pkexec of Polkit-annotated scripts; bash-wrap user copies.
 fn pkexec_args(script: &str) -> Vec<String> {
-    if script == SYSTEM_SETUP {
+    if script == SYSTEM_SETUP || script == LOCAL_SETUP {
         vec![script.to_string()]
     } else {
         vec!["/usr/bin/bash".into(), script.to_string()]
@@ -161,9 +165,17 @@ pub fn run_access_setup() -> Result<InputHelperStatus, String> {
     let (script, flatpak) = resolve_setup_script()?;
     run_pkexec(&script, flatpak)?;
     let mut status = with_flatpak_flag(unix::restart_helper());
-    if status.can_listen {
+    if status.can_listen && status.can_inject {
         status.detail =
-            "Keyboard access ready — Expand as you type can watch keys now.".into();
+            "Keyboard access ready — Expand as you type can watch keys and inject text.".into();
+    } else if status.can_listen {
+        status.detail = "Keyboard access ready, but text injection needs a desktop session. \
+Restart emobie-inputd from your graphical session (or log out/in)."
+            .into();
+    } else if status.daemon && !status.can_inject {
+        status.detail = "Helper running but text injection is unavailable (no compositor env). \
+Log out/in or restart emobie-inputd from a graphical session."
+            .into();
     } else if status.daemon {
         status.detail = "Helper restarted but keyboard devices are still closed. \
 If session ACLs failed, log out/in once so the emobie-input group applies."

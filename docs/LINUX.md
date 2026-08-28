@@ -55,6 +55,37 @@ on the compositor; some Wayland sessions restrict global shortcuts.
 
 ## Permissions (expand / auto-paste)
 
+Text expansion needs three layers on every distro:
+
+| Layer | What | How |
+|-------|------|-----|
+| **Helper daemon** | `emobie-inputd` on the **host** (same user as the desktop session) | Bundled in `.deb`/`.rpm`; AppImage/Flatpak/Arch use `packaging/install-inputd-user.sh` |
+| **Keyboard read** | Open `/dev/input/event*` | udev group `emobie-input` + one-time **Grant** (Polkit); `setfacl` when `acl` package installed |
+| **Text inject** | Type expansions into the focused app | Compositor env (`WAYLAND_DISPLAY` / `DISPLAY`); daemon auto-detects `$XDG_RUNTIME_DIR/wayland-0` |
+
+**Verify your setup** (from a desktop terminal):
+
+```bash
+bash scripts/verify-expand-setup.sh
+```
+
+### Distro packages
+
+| Distro | `acl` (setfacl) | Notes |
+|--------|-----------------|-------|
+| Ubuntu / Debian / Mint | `sudo apt-get install acl` | Usually preinstalled |
+| Fedora / RHEL | `sudo dnf install acl` | See SELinux below |
+| openSUSE | `sudo zypper install acl` | |
+| Arch / CachyOS | `sudo pacman -S acl` | Use `install-inputd-user.sh` for helper |
+
+### Grant (Polkit) paths
+
+| Install | pkexec target |
+|---------|---------------|
+| `.deb` / `.rpm` | `/usr/share/emobie/setup-input-access.sh` |
+| AppImage / user helper | `/usr/local/share/emobie/setup-input-access.sh` (created on first Grant) |
+| Fallback | `pkexec bash ~/.local/share/emobie/setup-input-access.sh` |
+
 1. **systemd --user** runs `emobie-inputd` (same user as the session — never root)
 2. **udev** + group `emobie-input` (and optional **setfacl**) grant `/dev/input` read
 3. **Polkit** prompts once for `setup-input-access.sh`

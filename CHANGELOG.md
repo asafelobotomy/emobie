@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.8] - 2026-08-28
+
+### Added
+
+- `scripts/verify-expand-setup.sh` — diagnose helper, socket, keyboard access, compositor env, and SELinux hints across distros
+- Optional SELinux module stub (`packaging/selinux/`) for Fedora/RHEL AVC denials
+- Polkit action for `/usr/local/share/emobie/setup-input-access.sh` (AppImage / user helper installs)
+
+### Fixed
+
+- Text expansion inject on Plasma Wayland when `emobie-inputd` starts without `WAYLAND_DISPLAY` (auto-detect `$XDG_RUNTIME_DIR/wayland-0`)
+- Do not force `DISPLAY=:0` on Wayland sessions (avoids duplicate keystrokes via XWayland + enigo)
+- Grant/setup script: `modprobe uinput`, distro `acl` hints, access verification, helper restart, and `/usr/local` Polkit path for user installs
+- `can_inject` checks compositor env and writable uinput instead of only path existence
+- systemd user unit: `After=graphical-session.target`, compositor `PassEnvironment` (group access via udev/setfacl after Grant)
+- Expand Grant status distinguishes listen vs inject readiness; Grant retry requires both before enabling
+
 ## [0.6.7] - 2026-08-28
 
 ### Fixed
@@ -197,7 +214,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Horizontal mouse-wheel scrolling in wide layouts
 - Tray icon temp path for Flatpak-friendly sandboxing
 
-[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.7...HEAD
+[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.8...HEAD
+[0.6.8]: https://github.com/asafelobotomy/emobie/compare/v0.6.7...v0.6.8
 [0.6.7]: https://github.com/asafelobotomy/emobie/compare/v0.6.6...v0.6.7
 [0.6.6]: https://github.com/asafelobotomy/emobie/compare/v0.6.5...v0.6.6
 [0.6.5]: https://github.com/asafelobotomy/emobie/compare/v0.6.4...v0.6.5

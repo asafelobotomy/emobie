@@ -2,6 +2,7 @@ mod inject;
 mod listen;
 mod matcher;
 mod protocol;
+mod session_env;
 
 use matcher::TriggerTrie;
 use nix::sys::socket::{getsockopt, sockopt::PeerCredentials};
@@ -121,6 +122,7 @@ fn handle_client(stream: UnixStream, enabled: &AtomicBool, trie: &Mutex<TriggerT
 }
 
 fn main() {
+    session_env::ensure_session_env();
     let path = socket_path();
     if let Some(parent) = path.parent() {
         if let Err(err) = ensure_runtime_dir(parent) {

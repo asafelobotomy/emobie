@@ -3,18 +3,31 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::thread;
 use std::time::Duration;
 
+use crate::session_env;
+
 const KEY_GAP: Duration = Duration::from_micros(1000);
 
-pub fn can_open_uinput() -> bool {
-    std::path::Path::new("/dev/uinput").exists()
-        || std::path::Path::new("/dev/input/uinput").exists()
+fn compositor_available() -> bool {
+    session_env::compositor_likely_available()
+}
+
+fn can_write_uinput() -> bool {
+    for path in ["/dev/uinput", "/dev/input/uinput"] {
+        if std::path::Path::new(path).exists()
+            && std::fs::OpenOptions::new()
+                .write(true)
+                .open(path)
+                .is_ok()
+        {
+            return true;
+        }
+    }
+    false
 }
 
 /// True when paste/inject is plausible in this session (compositor and/or uinput).
 pub fn can_inject() -> bool {
-    can_open_uinput()
-        || std::env::var_os("WAYLAND_DISPLAY").is_some()
-        || std::env::var_os("DISPLAY").is_some()
+    compositor_available() || can_write_uinput()
 }
 
 fn with_enigo<F, T>(f: F) -> Result<T, String>

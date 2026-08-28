@@ -14,4 +14,15 @@
     <annotate key="org.freedesktop.policykit.exec.path">/usr/share/emobie/setup-input-access.sh</annotate>
     <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
   </action>
+  <action id="io.github.asafelobotomy.emobie.inputd.setup-local">
+    <description>Allow configuring emobie input helper device access (local install)</description>
+    <message>Authentication is required to set up emobie text expansion keyboard access</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/local/share/emobie/setup-input-access.sh</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
 </policyconfig>

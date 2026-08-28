@@ -16,8 +16,11 @@ type TextExpansionSettingsProps = {
 
 function helperStatusLabel(status: InputHelperStatus | null): string {
   if (!status) return "Checking input helper…";
-  if (status.daemon && status.canListen) {
-    return `Helper running (listen + paste). ${status.detail}`;
+  if (status.daemon && status.canListen && status.canInject) {
+    return `Helper running (listen + inject). ${status.detail}`;
+  }
+  if (status.daemon && status.canListen && !status.canInject) {
+    return `Helper can listen but text injection is unavailable. Restart emobie-inputd from your desktop session. ${status.detail}`;
   }
   if (status.daemon && !status.canListen) {
     return `Helper running, but keyboard access is missing. ${status.detail}`;
@@ -73,6 +76,12 @@ export function TextExpansionSettings({
         setMessage(status.detail);
         return;
       }
+      if (!status.canInject) {
+        setMessage(
+          "Keyboard access OK, but text injection needs a desktop session. Restart emobie-inputd or log out/in.",
+        );
+        return;
+      }
 
       onExpandAsYouType(true);
       setMessage("Text expansion enabled.");
@@ -96,7 +105,7 @@ export function TextExpansionSettings({
       const status = await grantAccess();
       onInputStatus(status);
       setMessage(status.detail);
-      if (status.canListen && !expandAsYouType) {
+      if (status.canListen && status.canInject && !expandAsYouType) {
         onExpandAsYouType(true);
       }
     } catch (error) {

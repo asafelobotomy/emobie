@@ -10,6 +10,23 @@ BIN_NAME="emobie-inputd"
 
 mkdir -p "$BIN_DIR" "$UNIT_DIR" "${XDG_DATA_HOME:-$HOME/.local/share}/emobie"
 
+if ! command -v cargo >/dev/null; then
+  echo "cargo is required to build emobie-inputd. Install Rust from https://rustup.rs" >&2
+  exit 1
+fi
+if ! command -v setfacl >/dev/null; then
+  echo "Note: install the acl package so Grant can apply session ACLs without logout." >&2
+  if command -v pacman >/dev/null; then
+    echo "  sudo pacman -S acl" >&2
+  elif command -v apt-get >/dev/null; then
+    echo "  sudo apt-get install acl" >&2
+  elif command -v dnf >/dev/null; then
+    echo "  sudo dnf install acl" >&2
+  elif command -v zypper >/dev/null; then
+    echo "  sudo zypper install acl" >&2
+  fi
+fi
+
 echo "Building $BIN_NAME (release)…"
 cargo build --release --manifest-path "$ROOT/crates/emobie-inputd/Cargo.toml"
 install -m 755 "$ROOT/crates/emobie-inputd/target/release/$BIN_NAME" "$BIN_DIR/$BIN_NAME"
@@ -25,6 +42,7 @@ cat >"$UNIT_DIR/$UNIT_NAME" <<EOF
 [Unit]
 Description=emobie input helper (text expansion / paste)
 Documentation=https://github.com/asafelobotomy/emobie/blob/main/docs/MACROS.md
+After=graphical-session.target
 PartOf=graphical-session.target
 
 [Service]
@@ -33,9 +51,12 @@ ExecStart=$BIN_DIR/$BIN_NAME
 Restart=on-failure
 RestartSec=2
 NoNewPrivileges=true
+# Inherit compositor env when the user manager has it; daemon also auto-detects
+# $XDG_RUNTIME_DIR/wayland-0 when these are missing (common on Plasma Wayland).
+PassEnvironment=WAYLAND_DISPLAY DISPLAY XAUTHORITY
 
 [Install]
-WantedBy=default.target
+WantedBy=graphical-session.target
 EOF
 
 systemctl --user daemon-reload
@@ -47,3 +68,4 @@ systemctl --user --no-pager --full status "$UNIT_NAME" || true
 echo
 echo "Socket: \${XDG_RUNTIME_DIR}/emobie/emobie-inputd.sock (mode 0600)."
 echo "As-you-type: enable Expand in Settings (one Polkit prompt for keyboard access)."
+echo "Verify setup: bash scripts/verify-expand-setup.sh"

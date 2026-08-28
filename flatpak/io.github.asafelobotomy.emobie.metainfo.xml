@@ -59,6 +59,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.8" date="2026-08-28">
+      <description>
+        <p>Cross-distro text expansion permissions, Wayland inject fix, and verify-expand-setup diagnostic script.</p>
+      </description>
+    </release>
     <release version="0.6.7" date="2026-08-28">
       <description>
         <p>Durable preferences across install channels, Wayland taskbar icon via matching GTK app id, and full hicolor icons in Linux packages.</p>
