@@ -145,6 +145,7 @@ pub fn ensure_started() -> InputHelperStatus {
     if let Ok(resp) = request(serde_json::json!({ "cmd": "status" })) {
         return status_from_resp(resp);
     }
+    let _ = super::bootstrap::try_bootstrap_host_helper();
     if try_systemctl_start() {
         if let Some(status) = wait_until_running(20) {
             return InputHelperStatus {
@@ -162,7 +163,7 @@ pub fn ensure_started() -> InputHelperStatus {
         }
     }
     offline_status(
-        "emobie-inputd not running — install with packaging/install-inputd-user.sh",
+        "emobie-inputd not running — enable Expand to install the host helper automatically",
     )
 }
 

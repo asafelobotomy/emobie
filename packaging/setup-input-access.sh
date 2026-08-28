@@ -177,6 +177,40 @@ else
 fi
 
 RUNTIME="/run/user/${TARGET_UID}"
+try_load_selinux_module() {
+  command -v getenforce >/dev/null 2>&1 || return 0
+  [[ "$(getenforce 2>/dev/null)" == "Enforcing" ]] || return 0
+  local te=""
+  for candidate in \
+    "$SCRIPT_DIR/selinux/emobie-inputd.te" \
+    "$SCRIPT_DIR/../packaging/selinux/emobie-inputd.te" \
+    "/usr/share/emobie/selinux/emobie-inputd.te" \
+    "$LOCAL_DIR/selinux/emobie-inputd.te"; do
+    if [[ -f "$candidate" ]]; then
+      te="$candidate"
+      break
+    fi
+  done
+  if [[ -z "$te" ]]; then
+    echo "SELinux enforcing — optional module at packaging/selinux/emobie-inputd.te"
+    return 0
+  fi
+  if command -v checkmodule >/dev/null && command -v semodule_package >/dev/null; then
+    local mod="/tmp/emobie-inputd.mod" pp="/tmp/emobie-inputd.pp"
+    if checkmodule -M -m -o "$mod" "$te" && semodule_package -o "$pp" -m "$mod"; then
+      if semodule -i "$pp"; then
+        echo "Loaded SELinux module for emobie-inputd."
+        return 0
+      fi
+    fi
+    echo "Warning: could not compile/load SELinux module — see packaging/selinux/README.md" >&2
+  else
+    echo "SELinux enforcing — install checkpolicy/policycoreutils-python-utils for auto module load." >&2
+  fi
+}
+
+try_load_selinux_module
+
 if [[ -d "$RUNTIME" ]] && command -v systemctl >/dev/null; then
   if sudo -u "$TARGET_USER" env XDG_RUNTIME_DIR="$RUNTIME" \
     systemctl --user restart emobie-inputd.service 2>/dev/null; then

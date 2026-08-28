@@ -98,8 +98,9 @@ Under Flatpak, install the host helper first
 `flatpak-spawn --host pkexec …` against that host script. If Grant still fails,
 run the host `pkexec` command above and retry.
 
-**Layout note:** as-you-type matching maps keys assuming a US QWERTY physical
-layout. Triggers that need other layouts may not fire until mapping improves.
+**Layout note:** trigger matching follows your active XKB layout
+(`XKB_DEFAULT_*` / session keyboard settings). Switch layouts at runtime like
+any other app; remapped keys follow the layout in effect when you type.
 
 **Pin:** always-on-top uses GTK keep-above (works on X11) and, on Plasma
 Wayland, KWin `keepAbove`. Other Wayland compositors may ignore pin.

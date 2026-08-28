@@ -38,10 +38,10 @@ Grab the latest build from
 
 | Format | Best for | How |
 |--------|----------|-----|
-| **Flatpak** | Sandboxed desktop install | `flatpak install --user emobie-*-x86_64.flatpak` — for text expansion also run `bash packaging/install-inputd-user.sh` on the host |
+| **Flatpak** | Sandboxed desktop install | `flatpak install --user emobie-*-x86_64.flatpak` — Expand auto-installs the host helper |
 | **`.deb`** | Debian / Ubuntu / Mint / Pop | `sudo apt install ./emobie_*_amd64.deb` |
 | **`.rpm`** | Fedora / RHEL / openSUSE | `sudo dnf install ./emobie-*-1.x86_64.rpm` (openSUSE: `zypper install …`) |
-| **AppImage** | Portable / Arch / CachyOS | `chmod +x emobie_*.AppImage && ./emobie_*.AppImage` — for text expansion also run `bash packaging/install-inputd-user.sh` |
+| **AppImage** | Portable / Arch / CachyOS | `chmod +x emobie_*.AppImage && ./emobie_*.AppImage` — Expand auto-installs the host helper |
 
 Arch / CachyOS / Manjaro: see [`docs/LINUX.md`](docs/LINUX.md) and optional [`packaging/arch/PKGBUILD`](packaging/arch/PKGBUILD).
 
@@ -169,8 +169,8 @@ Tags matching `vX.Y.Z` run GitHub Actions to publish **`.deb`**, **`.rpm`**, **A
 
 ```bash
 # Keep package.json, Cargo.toml, and tauri.conf.json versions in sync
-git tag v0.6.8
-git push origin v0.6.8
+git tag v0.6.9
+git push origin v0.6.9
 ```
 
 Or run the **Release** workflow from the Actions tab.

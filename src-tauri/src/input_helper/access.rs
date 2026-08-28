@@ -14,10 +14,8 @@ fn in_flatpak() -> bool {
 
 pub fn host_setup_hint() -> String {
     if in_flatpak() {
-        "Flatpak cannot grant keyboard access inside the sandbox. On the host \
-run: bash packaging/install-inputd-user.sh && \
-pkexec bash ~/.local/share/emobie/setup-input-access.sh \
-— then retry Expand."
+        "Flatpak installs the host input helper when you enable Expand. \
+If Grant fails, run on the host: pkexec bash ~/.local/share/emobie/setup-input-access.sh"
             .into()
     } else {
         "Run: pkexec bash ~/.local/share/emobie/setup-input-access.sh \
@@ -153,7 +151,7 @@ pub fn with_flatpak_flag(mut status: InputHelperStatus) -> InputHelperStatus {
         && !status.detail.contains("Flatpak needs a host helper")
     {
         status.detail = format!(
-            "{} Flatpak needs a host helper — run packaging/install-inputd-user.sh on the host.",
+            "{} Enable Expand to install the host helper automatically.",
             status.detail
         );
     }

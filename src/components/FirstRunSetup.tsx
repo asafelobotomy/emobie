@@ -84,9 +84,8 @@ export function FirstRunSetup({
 
           {isFlatpak ? (
             <p className="first-run-copy">
-              Flatpak build: install the host helper first (
-              <code>bash packaging/install-inputd-user.sh</code>
-              ), then continue — Grant uses a host admin prompt.
+              Flatpak installs the host input helper automatically when you
+              continue — one admin Grant prompt for keyboard access.
             </p>
           ) : null}
 

@@ -35,6 +35,7 @@ jobs:
             patchelf \
             libssl-dev \
             libxdo-dev \
+            libxkbcommon-dev \
             build-essential \
             file
 

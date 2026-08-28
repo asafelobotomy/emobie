@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 mod access;
 #[cfg(unix)]
+mod bootstrap;
+#[cfg(unix)]
 mod unix;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

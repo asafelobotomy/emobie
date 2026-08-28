@@ -59,7 +59,7 @@ Text expansion needs three layers on every distro:
 
 | Layer | What | How |
 |-------|------|-----|
-| **Helper daemon** | `emobie-inputd` on the **host** (same user as the desktop session) | Bundled in `.deb`/`.rpm`; AppImage/Flatpak/Arch use `packaging/install-inputd-user.sh` |
+| **Helper daemon** | `emobie-inputd` on the **host** (same user as the desktop session) | Bundled in `.deb`/`.rpm`; AppImage/Flatpak auto-install on first Expand |
 | **Keyboard read** | Open `/dev/input/event*` | udev group `emobie-input` + one-time **Grant** (Polkit); `setfacl` when `acl` package installed |
 | **Text inject** | Type expansions into the focused app | Compositor env (`WAYLAND_DISPLAY` / `DISPLAY`); daemon auto-detects `$XDG_RUNTIME_DIR/wayland-0` |
 
@@ -109,13 +109,15 @@ logout even when group membership is delayed.
 
 ### Flatpak
 
-The sandbox never gets `--device=input`. Install the host helper first, then use
-Expand/Grant (runs `flatpak-spawn --host pkexec …`).
+The sandbox never gets `--device=input`. On first **Expand**, emobie installs
+`emobie-inputd` on the host from the bundled archive, then runs Grant
+(`flatpak-spawn --host pkexec …`).
+
+Manual fallback:
 
 ```bash
 bash packaging/install-inputd-user.sh
-# then Enable Expand in emobie, or:
-pkexec bash ~/.local/share/emobie/setup-input-access.sh
+bash scripts/verify-expand-setup.sh
 ```
 
 ## Tray / taskbar icons

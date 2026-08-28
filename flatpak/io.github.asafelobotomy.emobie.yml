@@ -76,7 +76,10 @@ modules:
       - npm ci --offline --legacy-peer-deps
       - cargo --offline fetch --manifest-path src-tauri/Cargo.toml --verbose
       - npm run --offline tauri build -- --no-bundle
+      - cargo build --release --manifest-path crates/emobie-inputd/Cargo.toml
+      - bash scripts/stage-inputd.sh
       - install -Dm755 src-tauri/target/release/emobie /app/bin/emobie
+      - install -Dm644 src-tauri/inputd-bundle/inputd-host-bundle.tgz /app/share/emobie/inputd-host-bundle.tgz
       - install -Dm644 io.github.asafelobotomy.emobie.desktop /app/share/applications/io.github.asafelobotomy.emobie.desktop
       - install -Dm644 io.github.asafelobotomy.emobie.metainfo.xml /app/share/metainfo/io.github.asafelobotomy.emobie.metainfo.xml
       - install -Dm644 src-tauri/icons/16x16.png /app/share/icons/hicolor/16x16/apps/io.github.asafelobotomy.emobie.png

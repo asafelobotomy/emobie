@@ -59,6 +59,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.9" date="2026-08-28">
+      <description>
+        <p>Layout-aware text expansion, seamless AppImage/Flatpak helper install, and SELinux auto-setup during Grant.</p>
+      </description>
+    </release>
     <release version="0.6.8" date="2026-08-28">
       <description>
         <p>Cross-distro text expansion permissions, Wayland inject fix, and verify-expand-setup diagnostic script.</p>

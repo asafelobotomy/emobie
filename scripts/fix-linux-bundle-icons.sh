@@ -75,6 +75,17 @@ fix_appdir() {
     ln -sfn "usr/share/applications/${ICON_ID}.desktop" "$appdir/${ICON_ID}.desktop"
     ln -sfn "${ICON_ID}.desktop" "$appdir/emobie.desktop"
   fi
+  stage_inputd_in_appdir "$appdir"
+}
+
+stage_inputd_in_appdir() {
+  local appdir="$1"
+  local stage="$ROOT/src-tauri/inputd-bundle"
+  [[ -d "$stage" ]] || return 0
+  local dest="$appdir/usr/share/emobie"
+  mkdir -p "$dest"
+  echo "Bundling input helper in AppImage: $dest"
+  cp -a "$stage"/. "$dest"/
 }
 
 repack_deb() {

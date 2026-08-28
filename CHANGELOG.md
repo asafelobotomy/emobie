@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.9] - 2026-08-28
+
+### Added
+
+- Layout-aware trigger matching via libxkbcommon (follows session XKB layout)
+- AppImage and Flatpak auto-install host `emobie-inputd` on first Expand (`inputd-host-bundle.tgz`)
+- SELinux module auto-load during Grant when `checkmodule`/`semodule` are available
+
+### Changed
+
+- Expand flow for AppImage/Flatpak: enable Expand → helper installs automatically → one Grant prompt
+- AppImage bundles input helper under `usr/share/emobie/`
+
 ## [0.6.8] - 2026-08-28
 
 ### Added
@@ -214,7 +227,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Horizontal mouse-wheel scrolling in wide layouts
 - Tray icon temp path for Flatpak-friendly sandboxing
 
-[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.8...HEAD
+[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.9...HEAD
+[0.6.9]: https://github.com/asafelobotomy/emobie/compare/v0.6.8...v0.6.9
 [0.6.8]: https://github.com/asafelobotomy/emobie/compare/v0.6.7...v0.6.8
 [0.6.7]: https://github.com/asafelobotomy/emobie/compare/v0.6.6...v0.6.7
 [0.6.6]: https://github.com/asafelobotomy/emobie/compare/v0.6.5...v0.6.6

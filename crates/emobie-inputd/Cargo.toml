@@ -1,6 +1,6 @@
 [package]
 name = "emobie-inputd"
-version = "0.6.8"
+version = "0.6.9"
 edition = "2021"
 description = "Privileged input helper for emobie text expansion"
 license = "MIT"
@@ -17,5 +17,6 @@ arboard = "3"
 # and panics/hangs on X11 (and some Wayland) sessions, killing the listen thread.
 enigo = { version = "0.3", default-features = false, features = ["x11rb", "wayland"] }
 evdev = "0.12"
+xkbcommon = "0.8"
 nix = { version = "0.29", features = ["fs", "uio", "socket", "user"] }
 ctrlc = "3"

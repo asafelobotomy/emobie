@@ -139,7 +139,7 @@ export function TextExpansionSettings({
       </div>
       <p className="settings-hint settings-hint-block">
         {isFlatpak
-          ? "Flatpak uses a host emobie-inputd. Install the helper on the host first (packaging/install-inputd-user.sh), then Grant runs pkexec on the host."
+          ? "Expand installs the host input helper automatically when needed, then runs one admin Grant for keyboard access."
           : "Starts emobie-inputd and turns on listening. If keyboard access is missing, you get one admin prompt — no logout when session ACLs apply."}
       </p>
 
@@ -157,8 +157,8 @@ export function TextExpansionSettings({
       ) : null}
       {!daemonReady && isFlatpak ? (
         <p className="settings-hint settings-hint-block">
-          Host install:{" "}
-          <code>bash packaging/install-inputd-user.sh</code> then retry Expand.
+          Enable Expand — emobie installs the host helper automatically, then prompts
+          once for keyboard access.
         </p>
       ) : null}
 
