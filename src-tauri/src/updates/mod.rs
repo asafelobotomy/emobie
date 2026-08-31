@@ -86,7 +86,7 @@ fn pick_asset<'a>(
         prefer
             .iter()
             .any(|suffix| asset.name.ends_with(suffix))
-            && asset.browser_download_url.starts_with("https://github.com/")
+            && asset.browser_download_url.starts_with(apply::ALLOWED_PREFIX)
     })
 }
 

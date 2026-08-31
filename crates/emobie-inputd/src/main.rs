@@ -4,33 +4,27 @@ mod listen;
 mod matcher;
 mod protocol;
 mod session_env;
+mod socket_path;
+mod state;
 
 use matcher::TriggerTrie;
 use nix::sys::socket::{getsockopt, sockopt::PeerCredentials};
+use nix::sys::stat::{umask, Mode};
 use nix::unistd::getuid;
-use protocol::{Request, Response};
+use protocol::{MatchRule, Request, Response};
+use socket_path::{acquire_instance_lock, resolve_socket_path};
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::path::Path;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 
-fn runtime_dir() -> PathBuf {
-    if let Ok(dir) = std::env::var("XDG_RUNTIME_DIR") {
-        return PathBuf::from(dir).join("emobie");
-    }
-    // Tests / broken sessions only — production binds under XDG_RUNTIME_DIR.
-    PathBuf::from(format!("/tmp/emobie-{}", getuid()))
-}
-
-fn socket_path() -> PathBuf {
-    if let Ok(path) = std::env::var("EMOBIE_INPUTD_SOCKET") {
-        return PathBuf::from(path);
-    }
-    runtime_dir().join("emobie-inputd.sock")
-}
+const MAX_REQUEST_BYTES: u64 = 512 * 1024;
+const MAX_CLIENT_THREADS: usize = 32;
 
 fn ensure_runtime_dir(dir: &Path) -> std::io::Result<()> {
     fs::create_dir_all(dir)?;
@@ -53,11 +47,74 @@ fn peer_uid_allowed(stream: &UnixStream) -> bool {
     }
 }
 
-fn handle_client(stream: UnixStream, enabled: &AtomicBool, trie: &Mutex<TriggerTrie>) {
+fn read_request_line(
+    reader: &mut BufReader<UnixStream>,
+    line: &mut String,
+) -> std::io::Result<bool> {
+    line.clear();
+    // Bound the read so a huge unterminated payload cannot OOM the daemon.
+    let mut buf = Vec::new();
+    let n = {
+        let mut limited = reader.by_ref().take(MAX_REQUEST_BYTES + 1);
+        limited.read_until(b'\n', &mut buf)?
+    };
+    if n == 0 {
+        return Ok(false);
+    }
+    if buf.len() > MAX_REQUEST_BYTES as usize || !buf.ends_with(b"\n") {
+        return Err(std::io::Error::new(
+            ErrorKind::InvalidData,
+            "request too large or missing newline",
+        ));
+    }
+    *line = String::from_utf8_lossy(&buf).into_owned();
+    Ok(true)
+}
+
+fn persist(enabled: &AtomicBool, stored: &Mutex<Vec<MatchRule>>) {
+    let matches = stored
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .clone();
+    state::save(enabled.load(Ordering::Relaxed), &matches);
+}
+
+fn write_response(writer: &mut UnixStream, response: &Response) {
+    if let Ok(payload) = serde_json::to_string(response) {
+        let _ = writeln!(writer, "{payload}");
+    }
+}
+
+fn handle_client(
+    stream: UnixStream,
+    enabled: &AtomicBool,
+    trie: &Mutex<TriggerTrie>,
+    stored: &Mutex<Vec<MatchRule>>,
+    clients: &AtomicUsize,
+) {
     let mut reader = BufReader::new(stream.try_clone().expect("clone"));
     let mut writer = stream;
     let mut line = String::new();
-    while reader.read_line(&mut line).unwrap_or(0) > 0 {
+    loop {
+        match read_request_line(&mut reader, &mut line) {
+            Ok(true) => {}
+            Ok(false) => break,
+            Err(err) if err.kind() == ErrorKind::InvalidData => {
+                let can_inject = inject::can_inject();
+                let can_listen = listen::can_listen();
+                write_response(
+                    &mut writer,
+                    &Response::err(
+                        can_inject,
+                        can_listen,
+                        enabled.load(Ordering::Relaxed),
+                        "request too large",
+                    ),
+                );
+                break;
+            }
+            Err(_) => break,
+        }
         let trimmed = line.trim().to_string();
         line.clear();
         if trimmed.is_empty() {
@@ -65,11 +122,12 @@ fn handle_client(stream: UnixStream, enabled: &AtomicBool, trie: &Mutex<TriggerT
         }
         let can_inject = inject::can_inject();
         let can_listen = listen::can_listen();
+        let enabled_now = enabled.load(Ordering::Relaxed);
         let response = match serde_json::from_str::<Request>(&trimmed) {
             Ok(Request::Status) => Response::status(
                 can_inject,
                 can_listen,
-                enabled.load(Ordering::Relaxed),
+                enabled_now,
                 if can_listen {
                     "emobie-inputd running"
                 } else {
@@ -79,6 +137,10 @@ fn handle_client(stream: UnixStream, enabled: &AtomicBool, trie: &Mutex<TriggerT
             ),
             Ok(Request::SetEnabled { enabled: value }) => {
                 enabled.store(value, Ordering::Relaxed);
+                if !value {
+                    listen::clear_pending();
+                }
+                persist(enabled, stored);
                 Response::status(
                     can_inject,
                     can_listen,
@@ -90,21 +152,37 @@ fn handle_client(stream: UnixStream, enabled: &AtomicBool, trie: &Mutex<TriggerT
                     },
                 )
             }
-            Ok(Request::SyncMatches { matches }) => {
-                let pairs: Vec<(String, String, protocol::TriggerMode)> = matches
-                    .into_iter()
-                    .map(|m| (m.trigger, m.expansion, m.mode))
-                    .collect();
-                if let Ok(mut guard) = trie.lock() {
-                    guard.load(&pairs);
+            Ok(Request::SyncMatches { matches }) => match state::validate_matches(&matches) {
+                Ok(()) => {
+                    let pairs = state::pairs_from_matches(&matches);
+                    let count = pairs.len();
+                    // Update stored + trie under one critical section so they cannot diverge.
+                    let sync_result = (|| -> Result<(), String> {
+                        let mut stored_guard = stored
+                            .lock()
+                            .map_err(|_| "internal lock poisoned — try again".to_string())?;
+                        let mut trie_guard = trie
+                            .lock()
+                            .map_err(|_| "internal lock poisoned — try again".to_string())?;
+                        trie_guard.load(&pairs);
+                        *stored_guard = matches;
+                        Ok(())
+                    })();
+                    match sync_result {
+                        Ok(()) => {
+                            persist(enabled, stored);
+                            Response::status(
+                                can_inject,
+                                can_listen,
+                                enabled.load(Ordering::Relaxed),
+                                &format!("synced {count} matches"),
+                            )
+                        }
+                        Err(err) => Response::err(can_inject, can_listen, enabled_now, &err),
+                    }
                 }
-                Response::status(
-                    can_inject,
-                    can_listen,
-                    enabled.load(Ordering::Relaxed),
-                    &format!("synced {} matches", pairs.len()),
-                )
-            }
+                Err(err) => Response::err(can_inject, can_listen, enabled_now, &err),
+            },
             Ok(Request::InjectPaste) => match inject::inject_ctrl_v() {
                 Ok(()) => Response::status(
                     can_inject,
@@ -112,41 +190,83 @@ fn handle_client(stream: UnixStream, enabled: &AtomicBool, trie: &Mutex<TriggerT
                     enabled.load(Ordering::Relaxed),
                     "paste injected",
                 ),
-                Err(err) => Response::err(&err),
+                Err(err) => Response::err(can_inject, can_listen, enabled_now, &err),
             },
-            Err(err) => Response::err(&format!("bad request: {err}")),
+            Err(err) => Response::err(
+                can_inject,
+                can_listen,
+                enabled_now,
+                &format!("bad request: {err}"),
+            ),
         };
-        if let Ok(payload) = serde_json::to_string(&response) {
-            let _ = writeln!(writer, "{payload}");
-        }
+        write_response(&mut writer, &response);
     }
+    clients.fetch_sub(1, Ordering::AcqRel);
 }
 
 fn main() {
-    session_env::ensure_session_env();
-    let path = socket_path();
-    if let Some(parent) = path.parent() {
-        if let Err(err) = ensure_runtime_dir(parent) {
-            eprintln!("failed to create {}: {err}", parent.display());
+    let path = resolve_socket_path();
+    // Lock beside the resolved socket so /run/emobie and XDG paths cannot dual-listen.
+    let lock_dir = path
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_else(socket_path::default_runtime_dir);
+    if let Err(err) = ensure_runtime_dir(&lock_dir) {
+        eprintln!("failed to create {}: {err}", lock_dir.display());
+        std::process::exit(1);
+    }
+
+    let _instance_lock = match acquire_instance_lock(&lock_dir) {
+        Ok(lock) => lock,
+        Err(err) => {
+            eprintln!("{err}");
             std::process::exit(1);
         }
-    }
+    };
     let _ = fs::remove_file(&path);
 
-    let enabled = Arc::new(AtomicBool::new(false));
+    let persisted = state::load();
+    let enabled = Arc::new(AtomicBool::new(persisted.enabled));
     let trie = Arc::new(Mutex::new(TriggerTrie::default()));
+    let stored = Arc::new(Mutex::new(persisted.matches.clone()));
+    if let Ok(mut guard) = trie.lock() {
+        guard.load(&state::pairs_from_matches(&persisted.matches));
+    }
     let stop = Arc::new(AtomicBool::new(false));
+    let clients = Arc::new(AtomicUsize::new(0));
+
+    // Set WAYLAND_DISPLAY once before any worker threads (set_var is not thread-safe).
+    session_env::ensure_session_env();
 
     listen::spawn_listener(enabled.clone(), trie.clone(), stop.clone());
 
+    // Restrict socket mode at creation time (avoid a brief wider window).
+    let prev_umask = umask(Mode::from_bits_truncate(0o177));
     let listener = UnixListener::bind(&path).unwrap_or_else(|err| {
+        let _ = umask(prev_umask);
         eprintln!("failed to bind {}: {err}", path.display());
         std::process::exit(1);
     });
+    let _ = umask(prev_umask);
     if let Err(err) = chmod_path(&path, 0o600) {
         eprintln!("warning: could not chmod socket: {err}");
     }
-    println!("emobie-inputd listening on {}", path.display());
+    if let Err(err) = listener.set_nonblocking(true) {
+        eprintln!("warning: could not set nonblocking accept: {err}");
+    }
+    println!(
+        "emobie-inputd listening on {} (enabled={}, matches={})",
+        path.display(),
+        persisted.enabled,
+        persisted.matches.len()
+    );
+
+    // Boot-time user units often start before KWin/GNOME creates wayland-0.
+    // Wait in the background so Status works immediately after bind.
+    // Enigo uses wayland_display_for_enigo() (read-only detect), not process env.
+    thread::spawn(|| {
+        session_env::wait_for_compositor(Duration::from_secs(45));
+    });
 
     let stop_flag = stop.clone();
     let sock_cleanup = path.clone();
@@ -155,25 +275,71 @@ fn main() {
         let _ = fs::remove_file(&sock_cleanup);
     });
 
-    for stream in listener.incoming() {
-        if stop.load(Ordering::Relaxed) {
-            break;
-        }
-        match stream {
-            Ok(stream) => {
+    while !stop.load(Ordering::Relaxed) {
+        match listener.accept() {
+            Ok((stream, _)) => {
                 if !peer_uid_allowed(&stream) {
                     eprintln!("rejected non-owner peer on socket");
                     continue;
                 }
+                let active = clients.fetch_add(1, Ordering::AcqRel);
+                if active >= MAX_CLIENT_THREADS {
+                    clients.fetch_sub(1, Ordering::AcqRel);
+                    eprintln!("rejecting client — too many connections");
+                    continue;
+                }
                 let enabled = enabled.clone();
                 let trie = trie.clone();
-                std::thread::spawn(move || {
-                    handle_client(stream, &enabled, &trie);
+                let stored = stored.clone();
+                let clients = clients.clone();
+                thread::spawn(move || {
+                    handle_client(stream, &enabled, &trie, &stored, &clients);
                 });
             }
-            Err(err) => eprintln!("accept error: {err}"),
+            Err(err) if err.kind() == ErrorKind::WouldBlock => {
+                thread::sleep(Duration::from_millis(50));
+            }
+            Err(err) => {
+                if stop.load(Ordering::Relaxed) {
+                    break;
+                }
+                eprintln!("accept error: {err}");
+                thread::sleep(Duration::from_millis(50));
+            }
         }
     }
 
     let _ = fs::remove_file(&path);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MAX_REQUEST_BYTES;
+    use std::io::{BufRead, BufReader, Cursor, Read};
+
+    fn read_bounded(data: &[u8]) -> (usize, Vec<u8>) {
+        let mut reader = BufReader::new(Cursor::new(data));
+        let mut buf = Vec::new();
+        let n = {
+            let mut limited = reader.by_ref().take(MAX_REQUEST_BYTES + 1);
+            limited.read_until(b'\n', &mut buf).unwrap()
+        };
+        (n, buf)
+    }
+
+    #[test]
+    fn bounded_read_rejects_oversize_line() {
+        let huge = "x".repeat(MAX_REQUEST_BYTES as usize + 2) + "\n";
+        let (n, buf) = read_bounded(huge.as_bytes());
+        assert!(n > 0);
+        assert!(buf.len() > MAX_REQUEST_BYTES as usize || !buf.ends_with(b"\n"));
+    }
+
+    #[test]
+    fn bounded_read_accepts_normal_line() {
+        let (n, buf) = read_bounded(b"{\"cmd\":\"status\"}\n");
+        assert!(n > 0);
+        assert!(buf.ends_with(b"\n"));
+        assert!(buf.len() <= MAX_REQUEST_BYTES as usize);
+    }
 }

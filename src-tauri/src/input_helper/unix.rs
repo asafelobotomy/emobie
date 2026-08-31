@@ -4,8 +4,12 @@ use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
+
+/// Heal a live daemon with `can_inject == false` at most once per process.
+static INJECT_HEAL_ATTEMPTED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Deserialize)]
 pub struct DaemonResponse {
@@ -18,16 +22,59 @@ pub struct DaemonResponse {
     pub error: Option<String>,
 }
 
+fn current_uid() -> u32 {
+    std::fs::read_to_string("/proc/self/status")
+        .ok()
+        .and_then(|s| {
+            s.lines()
+                .find(|l| l.starts_with("Uid:"))
+                .and_then(|l| l.split_whitespace().nth(1))
+                .and_then(|u| u.parse().ok())
+        })
+        .unwrap_or(0)
+}
+
+fn tmp_emobie_socket() -> PathBuf {
+    PathBuf::from(format!("/tmp/emobie-{}/emobie-inputd.sock", current_uid()))
+}
+
 fn candidate_sockets() -> Vec<PathBuf> {
     let mut paths = Vec::new();
     if let Ok(custom) = std::env::var("EMOBIE_INPUTD_SOCKET") {
-        paths.push(PathBuf::from(custom));
+        let path = PathBuf::from(&custom);
+        if trusted_socket_path(&path) {
+            paths.push(path);
+        }
     }
     if let Ok(runtime) = std::env::var("XDG_RUNTIME_DIR") {
         paths.push(PathBuf::from(runtime).join("emobie/emobie-inputd.sock"));
     }
     paths.push(PathBuf::from("/run/emobie/emobie-inputd.sock"));
+    paths.push(tmp_emobie_socket());
     paths
+}
+
+fn trusted_socket_path(path: &std::path::Path) -> bool {
+    // Keep in sync with crates/emobie-inputd/src/socket_path.rs::is_trusted.
+    if path.file_name().and_then(|n| n.to_str()) != Some("emobie-inputd.sock") {
+        return false;
+    }
+    let Some(parent) = path.parent() else {
+        return false;
+    };
+    if parent == std::path::Path::new("/run/emobie") {
+        return true;
+    }
+    if let Ok(runtime) = std::env::var("XDG_RUNTIME_DIR") {
+        if parent == std::path::Path::new(&runtime).join("emobie") {
+            return true;
+        }
+    }
+    let tmp_fallback = PathBuf::from(format!("/tmp/emobie-{}", current_uid()));
+    if parent == tmp_fallback.as_path() {
+        return true;
+    }
+    false
 }
 
 fn connect() -> Option<UnixStream> {
@@ -80,6 +127,7 @@ pub fn status() -> InputHelperStatus {
     }
 }
 
+/// Poll until the daemon socket accepts Status (does not require can_inject).
 fn wait_until_running(attempts: u32) -> Option<InputHelperStatus> {
     for _ in 0..attempts {
         thread::sleep(Duration::from_millis(150));
@@ -105,6 +153,13 @@ fn systemctl_user(args: &[&str]) -> bool {
 fn try_systemctl_start() -> bool {
     systemctl_user(&["enable", "--now", "emobie-inputd.service"])
         || systemctl_user(&["start", "emobie-inputd.service"])
+}
+
+/// Best-effort restart after package/helper refresh (also used by updates).
+pub fn try_restart_inputd_unit() -> bool {
+    systemctl_user(&["daemon-reload"]);
+    systemctl_user(&["try-restart", "emobie-inputd.service"])
+        || systemctl_user(&["restart", "emobie-inputd.service"])
 }
 
 fn trusted_inputd_paths() -> Vec<PathBuf> {
@@ -141,13 +196,41 @@ fn try_spawn_detached() -> bool {
     false
 }
 
+fn stop_all_helpers() {
+    let _ = systemctl_user(&["stop", "emobie-inputd.service"]);
+    // Detached fallbacks from older ensure_started paths can outlive the unit.
+    let _ = Command::new("pkill")
+        .args(["-x", "emobie-inputd"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+    thread::sleep(Duration::from_millis(150));
+    for path in candidate_sockets() {
+        let _ = std::fs::remove_file(&path);
+    }
+}
+
 pub fn ensure_started() -> InputHelperStatus {
     if let Ok(resp) = request(serde_json::json!({ "cmd": "status" })) {
-        return status_from_resp(resp);
+        let status = status_from_resp(resp);
+        if status.can_inject {
+            return status;
+        }
+        // Early-boot units can bind before Wayland exists. Heal at most once —
+        // thrashing every sync/status call leaves Expand offline.
+        if !INJECT_HEAL_ATTEMPTED.swap(true, Ordering::SeqCst) {
+            let healed = restart_helper();
+            if healed.daemon {
+                return healed;
+            }
+        }
+        return status;
     }
     let _ = super::bootstrap::try_bootstrap_host_helper();
+    // Socket binds before compositor wait — ~5s is enough for "running".
     if try_systemctl_start() {
-        if let Some(status) = wait_until_running(20) {
+        if let Some(status) = wait_until_running(34) {
             return InputHelperStatus {
                 detail: format!("started via systemd — {}", status.detail),
                 ..status
@@ -155,7 +238,7 @@ pub fn ensure_started() -> InputHelperStatus {
         }
     }
     if try_spawn_detached() {
-        if let Some(status) = wait_until_running(20) {
+        if let Some(status) = wait_until_running(34) {
             return InputHelperStatus {
                 detail: format!("started helper — {}", status.detail),
                 ..status
@@ -169,20 +252,18 @@ pub fn ensure_started() -> InputHelperStatus {
 
 /// Restart so can_listen re-opens devices after ACL/udev changes.
 pub fn restart_helper() -> InputHelperStatus {
-    let _ = systemctl_user(&["restart", "emobie-inputd.service"]);
-    if wait_until_running(20).is_some() {
-        return status();
-    }
-    for path in candidate_sockets() {
-        let _ = std::fs::remove_file(&path);
-    }
-    thread::sleep(Duration::from_millis(200));
-    if try_spawn_detached() {
-        if let Some(status) = wait_until_running(20) {
+    stop_all_helpers();
+    if try_systemctl_start() {
+        if let Some(status) = wait_until_running(34) {
             return status;
         }
     }
-    ensure_started()
+    if try_spawn_detached() {
+        if let Some(status) = wait_until_running(34) {
+            return status;
+        }
+    }
+    offline_status("could not restart emobie-inputd")
 }
 
 #[cfg(target_os = "linux")]
@@ -217,7 +298,14 @@ pub fn set_enabled(enabled: bool) -> Result<InputHelperStatus, String> {
         let _ = ensure_started();
     }
     match request(serde_json::json!({ "cmd": "set_enabled", "enabled": enabled })) {
-        Ok(resp) => Ok(status_from_resp(resp)),
+        Ok(resp) if resp.ok => Ok(status_from_resp(resp)),
+        Ok(resp) => {
+            if enabled {
+                Err(resp.error.unwrap_or(resp.detail))
+            } else {
+                Ok(status_from_resp(resp))
+            }
+        }
         Err(err) => {
             if enabled {
                 Err(err)
@@ -234,8 +322,9 @@ pub fn sync_matches(matches: Vec<InputMatch>) -> Result<InputHelperStatus, Strin
         "cmd": "sync_matches",
         "matches": matches,
     })) {
-        Ok(resp) => Ok(status_from_resp(resp)),
-        Err(err) => Ok(offline_status(&err)),
+        Ok(resp) if resp.ok => Ok(status_from_resp(resp)),
+        Ok(resp) => Err(resp.error.unwrap_or(resp.detail)),
+        Err(err) => Err(err),
     }
 }
 
@@ -253,5 +342,25 @@ pub fn inject_paste() -> Result<(), String> {
                 Err(_) => Err("Paste injection panicked".into()),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::trusted_socket_path;
+    use std::path::Path;
+
+    #[test]
+    fn trusts_tmp_emobie_fallback() {
+        let uid = super::current_uid();
+        let path = format!("/tmp/emobie-{uid}/emobie-inputd.sock");
+        assert!(trusted_socket_path(Path::new(&path)));
+    }
+
+    #[test]
+    fn rejects_untrusted_socket() {
+        assert!(!trusted_socket_path(Path::new(
+            "/tmp/evil/emobie-inputd.sock"
+        )));
     }
 }

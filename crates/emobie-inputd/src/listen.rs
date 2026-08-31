@@ -1,19 +1,43 @@
 //! Trigger matching from one or more keyboard event devices.
 //!
 //! Key → char mapping uses libxkbcommon (session layout via XKB_DEFAULT_*).
+//! Expansion runs on key *release* of the completing key so the focused app
+//! has committed the trigger before we erase it.
 
 use evdev::{Device, InputEventKind, Key};
 use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::inject;
 use crate::keymap::KeymapState;
 use crate::matcher::TriggerTrie;
+
+struct PendingExpand {
+    erase: usize,
+    expansion: String,
+    trigger: String,
+    key_code: u16,
+}
+
+static PENDING_HOLDER: OnceLock<Arc<Mutex<Option<PendingExpand>>>> = OnceLock::new();
+
+/// Drop any pending expand (e.g. when expansion is disabled).
+pub fn clear_pending() {
+    if let Some(pending) = PENDING_HOLDER.get() {
+        if let Ok(mut guard) = pending.lock() {
+            *guard = None;
+        }
+    }
+}
+
+/// Cached keyboard-path scan so Status spam does not open every event device.
+static LISTEN_CACHE: Mutex<Option<(Instant, bool)>> = Mutex::new(None);
+const LISTEN_CACHE_TTL: Duration = Duration::from_secs(2);
 
 fn is_keyboard(device: &Device) -> bool {
     device.supported_keys().is_some_and(|keys| {
@@ -43,7 +67,33 @@ fn list_keyboard_paths() -> Vec<PathBuf> {
 }
 
 pub fn can_listen() -> bool {
-    !list_keyboard_paths().is_empty()
+    if let Ok(cache) = LISTEN_CACHE.lock() {
+        if let Some((at, ok)) = *cache {
+            if at.elapsed() < LISTEN_CACHE_TTL {
+                return ok;
+            }
+        }
+    }
+    let ok = !list_keyboard_paths().is_empty();
+    if let Ok(mut cache) = LISTEN_CACHE.lock() {
+        *cache = Some((Instant::now(), ok));
+    }
+    ok
+}
+
+fn fire_expand(pending: PendingExpand, trigger_committed: bool, enabled: &AtomicBool) {
+    if !enabled.load(Ordering::Relaxed) {
+        return;
+    }
+    // Queue onto the inject worker — never call enigo on the listen thread.
+    if let Err(err) = inject::expand_trigger(
+        pending.erase,
+        &pending.expansion,
+        &pending.trigger,
+        trigger_committed,
+    ) {
+        eprintln!("expand failed: {err}");
+    }
 }
 
 fn handle_key(
@@ -53,13 +103,55 @@ fn handle_key(
     enabled: &AtomicBool,
     buffer: &Mutex<String>,
     trie: &Mutex<TriggerTrie>,
+    pending: &Mutex<Option<PendingExpand>>,
 ) {
     let pressed = value != 0;
     keymap.update_key(key.code(), pressed);
 
+    // Synthetic keys from our own inject — keep keymap in sync, ignore buffer.
+    if inject::should_suppress_keys() {
+        return;
+    }
+
+    // Key release: fire expansion for the key that completed the trigger.
+    if value == 0 {
+        let to_fire = {
+            let Ok(mut guard) = pending.lock() else {
+                return;
+            };
+            if guard.as_ref().is_some_and(|p| p.key_code == key.code()) {
+                guard.take()
+            } else {
+                None
+            }
+        };
+        if let Some(p) = to_fire {
+            // Key already released — trigger text is committed; skip pre-delay.
+            fire_expand(p, true, enabled);
+        }
+        return;
+    }
+
+    // Only initial presses update the match buffer (ignore autorepeat).
     if value != 1 {
         return;
     }
+
+    // A new key while an expand is pending: flush the pending expand first so
+    // the next character cannot race ahead of the replacement.
+    {
+        let to_fire = {
+            let Ok(mut guard) = pending.lock() else {
+                return;
+            };
+            guard.take()
+        };
+        if let Some(p) = to_fire {
+            // Completing key still down — allow a short settle before erase.
+            fire_expand(p, false, enabled);
+        }
+    }
+
     if !enabled.load(Ordering::Relaxed) {
         if let Ok(mut guard) = buffer.lock() {
             guard.clear();
@@ -94,8 +186,15 @@ fn handle_key(
             return;
         };
         guard.push(ch);
-        if guard.len() > 128 {
-            let trim: String = guard.chars().skip(guard.len() - 96).collect();
+        if guard.chars().count() > 128 {
+            let trim: String = guard
+                .chars()
+                .rev()
+                .take(96)
+                .collect::<String>()
+                .chars()
+                .rev()
+                .collect();
             *guard = trim;
         }
         let matched = {
@@ -105,22 +204,27 @@ fn handle_key(
             trie_guard.match_suffix(&guard)
         };
         if let Some((len, expansion)) = matched {
+            let chars: Vec<char> = guard.chars().collect();
+            let start = chars.len().saturating_sub(len);
+            let trigger: String = chars[start..].iter().collect();
             for _ in 0..len {
                 guard.pop();
             }
-            Some((len, expansion))
+            Some((len, expansion, trigger))
         } else {
             None
         }
     };
 
-    if let Some((len, expansion)) = hit {
-        // Never expand on the listen thread: enigo/backends can panic or hang.
-        thread::spawn(move || {
-            if let Err(err) = inject::expand_trigger(len, &expansion) {
-                eprintln!("expand failed: {err}");
-            }
-        });
+    if let Some((len, expansion, trigger)) = hit {
+        if let Ok(mut guard) = pending.lock() {
+            *guard = Some(PendingExpand {
+                erase: len,
+                expansion,
+                trigger,
+                key_code: key.code(),
+            });
+        }
     }
 }
 
@@ -129,6 +233,7 @@ fn spawn_device_thread(
     enabled: Arc<AtomicBool>,
     trie: Arc<Mutex<TriggerTrie>>,
     buffer: Arc<Mutex<String>>,
+    pending: Arc<Mutex<Option<PendingExpand>>>,
     stop: Arc<AtomicBool>,
     alive: Arc<Mutex<HashSet<PathBuf>>>,
 ) {
@@ -156,6 +261,7 @@ fn spawn_device_thread(
                             &enabled,
                             &buffer,
                             &trie,
+                            &pending,
                         );
                     }
                 }
@@ -175,6 +281,8 @@ pub fn spawn_listener(
 ) {
     thread::spawn(move || {
         let buffer = Arc::new(Mutex::new(String::new()));
+        let pending = Arc::new(Mutex::new(None));
+        let _ = PENDING_HOLDER.set(pending.clone());
         let alive = Arc::new(Mutex::new(HashSet::<PathBuf>::new()));
         loop {
             if stop.load(Ordering::Relaxed) {
@@ -201,6 +309,7 @@ pub fn spawn_listener(
                     enabled.clone(),
                     trie.clone(),
                     buffer.clone(),
+                    pending.clone(),
                     stop.clone(),
                     alive.clone(),
                 );

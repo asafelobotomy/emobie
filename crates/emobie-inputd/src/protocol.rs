@@ -50,13 +50,19 @@ impl Response {
         }
     }
 
-    pub fn err(detail: &str) -> Self {
+    /// Error that preserves live capability flags so clients do not look "offline".
+    pub fn err(
+        can_inject: bool,
+        can_listen: bool,
+        enabled: bool,
+        detail: &str,
+    ) -> Self {
         Self {
             ok: false,
             daemon: true,
-            can_inject: false,
-            can_listen: false,
-            enabled: false,
+            can_inject,
+            can_listen,
+            enabled,
             detail: detail.to_string(),
             error: Some(detail.to_string()),
         }

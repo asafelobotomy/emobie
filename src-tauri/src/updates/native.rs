@@ -55,6 +55,24 @@ pub fn install_native_from_deb(deb: &Path) -> Result<(), String> {
         perms.set_mode(0o755);
         fs::set_permissions(&dest_bin, perms).map_err(|e| e.to_string())?;
     }
+
+    // Also install emobie-inputd + host bootstrap assets when present in the deb.
+    let inputd_src = work.join("usr/bin/emobie-inputd");
+    if inputd_src.is_file() {
+        let dest_inputd = bin_dir.join("emobie-inputd");
+        fs::copy(&inputd_src, &dest_inputd).map_err(|e| e.to_string())?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&dest_inputd)
+                .map_err(|e| e.to_string())?
+                .permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&dest_inputd, perms).map_err(|e| e.to_string())?;
+        }
+        install_native_inputd_assets(&work, &dest_inputd)?;
+    }
+
     let launcher = bin_dir.join("emobie");
     let script = format!(
         "#!/bin/sh\nset -e\nBIN=\"{}\"\nif [ -x \"$BIN\" ]; then\n  exec \"$BIN\" \"$@\"\nfi\nexec flatpak run --user {ICON_ID} \"$@\"\n",
@@ -72,6 +90,71 @@ pub fn install_native_from_deb(deb: &Path) -> Result<(), String> {
     }
     install_native_desktop_assets(&work, &launcher)?;
     let _ = fs::remove_dir_all(&work);
+    Ok(())
+}
+
+fn install_native_inputd_assets(extracted_root: &Path, inputd_bin: &Path) -> Result<(), String> {
+    let data = std::env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local").join("share"))
+        })
+        .ok_or_else(|| "HOME is not set".to_string())?
+        .join("emobie");
+    fs::create_dir_all(&data).map_err(|e| e.to_string())?;
+
+    let share = extracted_root.join("usr/share/emobie");
+    for name in [
+        "setup-input-access.sh",
+        "99-emobie-input.rules",
+        "io.github.asafelobotomy.emobie.inputd.policy",
+        "bootstrap-inputd-host.sh",
+    ] {
+        let src = share.join(name);
+        if src.is_file() {
+            let dest = data.join(name);
+            fs::copy(&src, &dest).map_err(|e| e.to_string())?;
+            #[cfg(unix)]
+            if name.ends_with(".sh") {
+                use std::os::unix::fs::PermissionsExt;
+                let mut perms = fs::metadata(&dest).map_err(|e| e.to_string())?.permissions();
+                perms.set_mode(0o755);
+                fs::set_permissions(&dest, perms).map_err(|e| e.to_string())?;
+            }
+        }
+    }
+
+    let bootstrap = data.join("bootstrap-inputd-host.sh");
+    if bootstrap.is_file() {
+        let _ = Command::new("bash")
+            .arg(&bootstrap)
+            .arg(inputd_bin)
+            .status();
+    } else {
+        // Minimal user unit when bootstrap script is missing from the package.
+        let unit_dir = std::env::var_os("XDG_CONFIG_HOME")
+            .map(PathBuf::from)
+            .or_else(|| {
+                std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config"))
+            })
+            .ok_or_else(|| "HOME is not set".to_string())?
+            .join("systemd/user");
+        fs::create_dir_all(&unit_dir).map_err(|e| e.to_string())?;
+        let unit = format!(
+            "[Unit]\nDescription=emobie input helper (text expansion / paste)\nAfter=graphical-session.target\nPartOf=graphical-session.target\n\n[Service]\nType=simple\nExecStart={}\nRestart=on-failure\nRestartSec=2\nNoNewPrivileges=true\nPassEnvironment=WAYLAND_DISPLAY DISPLAY XAUTHORITY XDG_RUNTIME_DIR\n\n[Install]\nWantedBy=graphical-session.target\n",
+            inputd_bin.display()
+        );
+        fs::write(unit_dir.join("emobie-inputd.service"), unit).map_err(|e| e.to_string())?;
+        let _ = Command::new("systemctl")
+            .args(["--user", "daemon-reload"])
+            .status();
+        let _ = Command::new("systemctl")
+            .args(["--user", "enable", "emobie-inputd.service"])
+            .status();
+        let _ = Command::new("systemctl")
+            .args(["--user", "restart", "emobie-inputd.service"])
+            .status();
+    }
     Ok(())
 }
 

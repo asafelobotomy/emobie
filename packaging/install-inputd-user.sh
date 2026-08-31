@@ -17,13 +17,13 @@ fi
 if ! command -v setfacl >/dev/null; then
   echo "Note: install the acl package so Grant can apply session ACLs without logout." >&2
   if command -v pacman >/dev/null; then
-    echo "  sudo pacman -S acl" >&2
+    echo "  pkexec pacman -S acl" >&2
   elif command -v apt-get >/dev/null; then
-    echo "  sudo apt-get install acl" >&2
+    echo "  pkexec apt-get install acl" >&2
   elif command -v dnf >/dev/null; then
-    echo "  sudo dnf install acl" >&2
+    echo "  pkexec dnf install acl" >&2
   elif command -v zypper >/dev/null; then
-    echo "  sudo zypper install acl" >&2
+    echo "  pkexec zypper install acl" >&2
   fi
 fi
 
@@ -37,7 +37,9 @@ install -m 644 "$ROOT/packaging/udev/99-emobie-input.rules" \
 install -m 644 "$ROOT/packaging/polkit/io.github.asafelobotomy.emobie.inputd.policy" \
   "${XDG_DATA_HOME:-$HOME/.local/share}/emobie/io.github.asafelobotomy.emobie.inputd.policy"
 
-# User unit pointing at ~/.local/bin (not /usr/bin).
+# User unit pointing at ~/.local/bin (dev / from-source install).
+# Distro packages use /usr/lib/systemd/user + /usr/bin; bootstrap prefers the
+# packaged binary when it is present and not older than the host helper.
 cat >"$UNIT_DIR/$UNIT_NAME" <<EOF
 [Unit]
 Description=emobie input helper (text expansion / paste)
@@ -53,14 +55,18 @@ RestartSec=2
 NoNewPrivileges=true
 # Inherit compositor env when the user manager has it; daemon also auto-detects
 # $XDG_RUNTIME_DIR/wayland-0 when these are missing (common on Plasma Wayland).
-PassEnvironment=WAYLAND_DISPLAY DISPLAY XAUTHORITY
+PassEnvironment=WAYLAND_DISPLAY DISPLAY XAUTHORITY XDG_RUNTIME_DIR
 
 [Install]
 WantedBy=graphical-session.target
 EOF
 
 systemctl --user daemon-reload
-systemctl --user enable --now "$UNIT_NAME"
+# Older installs also linked default.target (starts before Wayland).
+systemctl --user disable "$UNIT_NAME" >/dev/null 2>&1 || true
+systemctl --user enable "$UNIT_NAME"
+# enable --now does not restart an already-active unit after binary replace.
+systemctl --user restart "$UNIT_NAME"
 
 echo "Installed $BIN_DIR/$BIN_NAME"
 echo "Enabled systemd --user unit: $UNIT_NAME"

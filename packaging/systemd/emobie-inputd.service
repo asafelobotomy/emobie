@@ -1,6 +1,7 @@
 [Unit]
 Description=emobie input helper (text expansion / paste)
 Documentation=https://github.com/asafelobotomy/emobie/blob/main/docs/MACROS.md
+# Start with the desktop session — not default.target (too early for Wayland).
 After=graphical-session.target
 PartOf=graphical-session.target
 
@@ -11,8 +12,9 @@ Restart=on-failure
 RestartSec=2
 # Runs as the graphical user session so Wayland/X11 inject works.
 # Device access for as-you-type is via udev + emobie-input group.
+# The daemon waits for $XDG_RUNTIME_DIR/wayland-* if started slightly early.
 NoNewPrivileges=true
-PassEnvironment=WAYLAND_DISPLAY DISPLAY XAUTHORITY
+PassEnvironment=WAYLAND_DISPLAY DISPLAY XAUTHORITY XDG_RUNTIME_DIR
 
 [Install]
 WantedBy=graphical-session.target

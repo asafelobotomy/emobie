@@ -125,11 +125,7 @@ fn resolve_setup_script() -> Result<(String, bool), String> {
                 return Ok((path, true));
             }
         }
-        for path in sandbox_setup_scripts() {
-            if path.is_file() {
-                return Ok((path.to_string_lossy().into_owned(), true));
-            }
-        }
+        // Never pass sandbox (/app) paths to --host pkexec — the host cannot read them.
         return Err(host_setup_hint());
     }
 

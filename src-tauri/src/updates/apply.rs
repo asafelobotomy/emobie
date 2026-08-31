@@ -9,8 +9,38 @@ use std::process::Command;
 use super::native::install_native_from_deb;
 
 const USER_AGENT: &str = concat!("emobie/", env!("CARGO_PKG_VERSION"));
-const ALLOWED_PREFIX: &str =
+pub const ALLOWED_PREFIX: &str =
     "https://github.com/asafelobotomy/emobie/releases/download/";
+
+/// Best-effort: refresh host inputd after an app/package update.
+fn refresh_inputd_after_update(kind: InstallKind) {
+    #[cfg(target_os = "linux")]
+    {
+        match kind {
+            InstallKind::AppImage | InstallKind::Flatpak => {
+                let _ = crate::input_helper::bootstrap::refresh_host_helper();
+                let _ = crate::input_helper::unix::try_restart_inputd_unit();
+            }
+            InstallKind::Native => {
+                let _ = crate::input_helper::unix::try_restart_inputd_unit();
+            }
+            InstallKind::Deb | InstallKind::Rpm => {
+                if let Ok(home) = std::env::var("HOME") {
+                    let user_unit = PathBuf::from(&home)
+                        .join(".config/systemd/user/emobie-inputd.service");
+                    if Path::new("/usr/bin/emobie-inputd").is_file() && user_unit.is_file() {
+                        let _ = fs::remove_file(&user_unit);
+                    }
+                }
+                let _ = crate::input_helper::unix::try_restart_inputd_unit();
+            }
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = kind;
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -96,6 +126,9 @@ pub(crate) fn cache_dir() -> Result<PathBuf, String> {
 }
 
 fn validate_download_url(url: &str) -> Result<(), String> {
+    if url.chars().any(|c| c.is_whitespace()) {
+        return Err("Invalid download URL.".into());
+    }
     if !url.starts_with(ALLOWED_PREFIX) {
         return Err("Refusing download from unexpected host/path.".into());
     }
@@ -309,6 +342,10 @@ pub fn apply_update(download_url: String, asset_name: String) -> Result<ApplyUpd
             restart_required: true,
         }),
     };
+
+    if result.is_ok() {
+        refresh_inputd_after_update(kind);
+    }
 
     let _ = fs::remove_file(&dest);
     result

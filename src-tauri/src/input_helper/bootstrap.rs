@@ -3,6 +3,17 @@
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::time::SystemTime;
+
+/// Members allowed in the host bootstrap tarball (must match scripts/stage-inputd.sh).
+const TAR_MEMBERS: &[&str] = &[
+    "emobie-inputd",
+    "bootstrap-inputd-host.sh",
+    "setup-input-access.sh",
+    "99-emobie-input.rules",
+    "io.github.asafelobotomy.emobie.inputd.policy",
+    "selinux/emobie-inputd.te",
+];
 
 fn bundled_tarball_paths() -> Vec<PathBuf> {
     let mut paths = Vec::new();
@@ -28,7 +39,10 @@ fn bundled_loose_paths() -> Vec<PathBuf> {
     if let Ok(appdir) = std::env::var("APPDIR") {
         dirs.push(PathBuf::from(appdir).join("usr/share/emobie"));
     }
-    dirs.push(PathBuf::from("/app/share/emobie"));
+    // /app is only visible inside Flatpak — host bash cannot read it.
+    if std::env::var_os("FLATPAK_ID").is_none() {
+        dirs.push(PathBuf::from("/app/share/emobie"));
+    }
     dirs
 }
 
@@ -52,40 +66,135 @@ fn host_home() -> Option<PathBuf> {
     }
 }
 
-fn host_helper_installed() -> bool {
-    let Some(home) = host_home() else {
-        return false;
-    };
-    home.join(".local/bin/emobie-inputd").is_file()
+fn host_data_dir() -> Option<PathBuf> {
+    host_home().map(|home| home.join(".local/share/emobie"))
 }
 
-fn run_host_script(script: &str) -> bool {
+fn host_helper_path() -> Option<PathBuf> {
+    host_home().map(|home| home.join(".local/bin/emobie-inputd"))
+}
+
+fn path_safe_for_shell(path: &Path) -> bool {
+    let s = path.to_string_lossy();
+    !s.is_empty()
+        && !s.contains('\0')
+        && !s.contains('\'')
+        && !s.contains('"')
+        && !s.contains('$')
+        && !s.contains('`')
+        && !s.contains(';')
+        && !s.contains('|')
+        && !s.contains('&')
+}
+
+fn host_file_executable(path: &Path) -> bool {
     if std::env::var_os("FLATPAK_ID").is_some() {
-        Command::new("flatpak-spawn")
-            .args(["--host", "bash", "-s"])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .and_then(|mut child| {
-                if let Some(mut stdin) = child.stdin.take() {
-                    stdin.write_all(script.as_bytes())?;
-                }
-                child.wait()
-            })
-            .map(|status| status.success())
-            .unwrap_or(false)
-    } else {
-        Command::new("bash")
-            .arg("-c")
-            .arg(script)
+        let path_str = path.to_string_lossy();
+        return Command::new("flatpak-spawn")
+            .args(["--host", "test", "-x", path_str.as_ref()])
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status()
             .map(|s| s.success())
-            .unwrap_or(false)
+            .unwrap_or(false);
     }
+    path.is_file()
+}
+
+fn host_helper_installed() -> bool {
+    host_helper_path()
+        .map(|p| host_file_executable(&p))
+        .unwrap_or(false)
+}
+
+fn mtime(path: &Path) -> Option<SystemTime> {
+    std::fs::metadata(path).ok()?.modified().ok()
+}
+
+fn host_mtime(path: &Path) -> Option<SystemTime> {
+    if std::env::var_os("FLATPAK_ID").is_none() {
+        return mtime(path);
+    }
+    let path_str = path.to_string_lossy();
+    let output = Command::new("flatpak-spawn")
+        .args([
+            "--host",
+            "stat",
+            "-c",
+            "%Y",
+            path_str.as_ref(),
+        ])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let secs: u64 = String::from_utf8_lossy(&output.stdout).trim().parse().ok()?;
+    Some(SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(secs))
+}
+
+/// True when the bundled tarball is newer than the installed helper (or helper missing).
+fn bundled_helper_newer_than_installed(tarball: &Path) -> bool {
+    let Some(installed) = host_helper_path() else {
+        return true;
+    };
+    if !host_file_executable(&installed) {
+        return true;
+    }
+    let Some(bundle_mtime) = mtime(tarball) else {
+        return false;
+    };
+    match host_mtime(&installed) {
+        Some(installed_mtime) => bundle_mtime > installed_mtime,
+        None => true,
+    }
+}
+
+fn run_host_bootstrap(bootstrap: &Path, binary: &Path) -> bool {
+    let mut cmd = if std::env::var_os("FLATPAK_ID").is_some() {
+        let mut c = Command::new("flatpak-spawn");
+        c.args(["--host", "bash"]);
+        c.arg(bootstrap).arg(binary);
+        c
+    } else {
+        let mut c = Command::new("bash");
+        c.arg(bootstrap).arg(binary);
+        c
+    };
+    cmd.stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+fn extract_tarball_to(data: &Path, bytes: &[u8]) -> bool {
+    if fs_create_dir_all(data).is_err() {
+        return false;
+    }
+    let mut cmd = Command::new("tar");
+    cmd.args(["xzf", "-", "-C"])
+        .arg(data)
+        .args(["--no-absolute-names", "--no-overwrite-dir"])
+        .args(TAR_MEMBERS)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    cmd.spawn()
+        .and_then(|mut child| {
+            if let Some(mut stdin) = child.stdin.take() {
+                stdin.write_all(bytes)?;
+            }
+            child.wait()
+        })
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+fn fs_create_dir_all(path: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(path)
 }
 
 fn install_from_tarball(tarball: &Path) -> bool {
@@ -98,40 +207,29 @@ fn install_from_tarball(tarball: &Path) -> bool {
         return false;
     }
 
+    let Some(data) = host_data_dir() else {
+        return false;
+    };
+    if !path_safe_for_shell(&data) {
+        return false;
+    }
+
     if std::env::var_os("FLATPAK_ID").is_some() {
-        Command::new("flatpak-spawn")
-            .args([
-                "--host",
-                "sh",
-                "-c",
-                "mkdir -p \"$HOME/.local/share/emobie\" && \
-                 tar xzf - -C \"$HOME/.local/share/emobie\" && \
-                 bash \"$HOME/.local/share/emobie/bootstrap-inputd-host.sh\" \
-                   \"$HOME/.local/share/emobie/emobie-inputd\"",
-            ])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .and_then(|mut child| {
-                if let Some(mut stdin) = child.stdin.take() {
-                    stdin.write_all(&bytes)?;
-                }
-                child.wait()
-            })
-            .map(|status| status.success())
-            .unwrap_or(false)
-    } else {
-        let home = std::env::var("HOME").unwrap_or_default();
-        let data = format!("{home}/.local/share/emobie");
+        // Host-side extract via flatpak-spawn; paths come from host HOME, not the sandbox.
+        let data_str = data.to_string_lossy();
+        let members = TAR_MEMBERS
+            .iter()
+            .map(|m| format!("'{m}'"))
+            .collect::<Vec<_>>()
+            .join(" ");
         let script = format!(
             "set -euo pipefail; \
-             mkdir -p '{data}'; \
-             tar xzf - -C '{data}'; \
-             bash '{data}/bootstrap-inputd-host.sh' '{data}/emobie-inputd'"
+             mkdir -p '{data_str}'; \
+             tar xzf - -C '{data_str}' --no-absolute-names --no-overwrite-dir {members}; \
+             exec bash '{data_str}/bootstrap-inputd-host.sh' '{data_str}/emobie-inputd'"
         );
-        Command::new("bash")
-            .arg("-c")
+        Command::new("flatpak-spawn")
+            .args(["--host", "bash", "-c"])
             .arg(&script)
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
@@ -145,28 +243,57 @@ fn install_from_tarball(tarball: &Path) -> bool {
             })
             .map(|status| status.success())
             .unwrap_or(false)
+    } else if !extract_tarball_to(&data, &bytes) {
+        false
+    } else {
+        run_host_bootstrap(
+            &data.join("bootstrap-inputd-host.sh"),
+            &data.join("emobie-inputd"),
+        )
     }
 }
 
 fn install_from_loose_dir(dir: &Path) -> bool {
+    // Flatpak host cannot read /app paths — only use host-extracted tarball flow.
+    if std::env::var_os("FLATPAK_ID").is_some() {
+        return false;
+    }
     let binary = dir.join("emobie-inputd");
     let bootstrap = dir.join("bootstrap-inputd-host.sh");
     if !binary.is_file() || !bootstrap.is_file() {
         return false;
     }
-    let script = format!(
-        "exec bash '{}' '{}'",
-        bootstrap.display(),
-        binary.display()
-    );
-    run_host_script(&script)
+    run_host_bootstrap(&bootstrap, &binary)
 }
 
-/// Install host helper from AppImage/Flatpak bundle when missing.
+/// Install or refresh host helper from AppImage/Flatpak bundle when missing or stale.
 pub fn try_bootstrap_host_helper() -> bool {
+    // Refresh when a bundled tarball is newer than the installed helper.
+    for path in bundled_tarball_paths() {
+        if path.is_file() && bundled_helper_newer_than_installed(&path) {
+            if install_from_tarball(&path) {
+                return host_helper_installed();
+            }
+        }
+    }
     if host_helper_installed() {
         return true;
     }
+    for path in bundled_tarball_paths() {
+        if path.is_file() && install_from_tarball(&path) {
+            return host_helper_installed();
+        }
+    }
+    for dir in bundled_loose_paths() {
+        if dir.is_dir() && install_from_loose_dir(&dir) {
+            return host_helper_installed();
+        }
+    }
+    false
+}
+
+/// Force re-bootstrap from the newest bundled tarball (used after app updates).
+pub fn refresh_host_helper() -> bool {
     for path in bundled_tarball_paths() {
         if path.is_file() && install_from_tarball(&path) {
             return host_helper_installed();

@@ -1,14 +1,18 @@
 //! Ensure compositor env vars are set when started from systemd --user.
 
 use std::path::PathBuf;
+use std::thread;
+use std::time::{Duration, Instant};
 
 /// systemd user units often start before the session exports WAYLAND_DISPLAY.
 /// Detect the Wayland socket under XDG_RUNTIME_DIR so enigo can inject.
 /// Does not set DISPLAY — forcing :0 on Wayland sessions can duplicate keystrokes via XWayland.
+///
+/// Call only from `main` before spawning worker threads — `set_var` is not thread-safe.
 pub fn ensure_session_env() {
     if std::env::var_os("WAYLAND_DISPLAY").is_none() {
         if let Some(name) = detect_wayland_display() {
-            // SAFETY: called once at process start, before any threads.
+            // SAFETY: only called from main before listen/inject/accept threads start.
             unsafe {
                 std::env::set_var("WAYLAND_DISPLAY", name);
             }
@@ -16,9 +20,45 @@ pub fn ensure_session_env() {
     }
 }
 
+/// Block until a compositor socket appears (or timeout).
+/// Read-only — safe to call from a background thread after workers have started.
+/// Prefer running after the Unix socket is bound so clients can Status while we wait.
+pub fn wait_for_compositor(timeout: Duration) {
+    let start = Instant::now();
+    loop {
+        if compositor_likely_available() {
+            return;
+        }
+        if start.elapsed() >= timeout {
+            return;
+        }
+        thread::sleep(Duration::from_millis(250));
+    }
+}
+
+/// Display name for Enigo (`Settings.wayland_display`), re-detected each call.
+pub fn wayland_display_for_enigo() -> Option<String> {
+    if let Ok(name) = std::env::var("WAYLAND_DISPLAY") {
+        if !name.is_empty() {
+            let runtime = std::env::var("XDG_RUNTIME_DIR").ok()?;
+            if PathBuf::from(&runtime).join(&name).exists() {
+                return Some(name);
+            }
+        }
+    }
+    detect_wayland_display().map(str::to_string)
+}
+
 /// Read-only probe (safe on worker threads).
 pub fn compositor_likely_available() -> bool {
-    if std::env::var_os("WAYLAND_DISPLAY").is_some() || std::env::var_os("DISPLAY").is_some() {
+    if let Ok(name) = std::env::var("WAYLAND_DISPLAY") {
+        if let Ok(runtime) = std::env::var("XDG_RUNTIME_DIR") {
+            if PathBuf::from(runtime).join(&name).exists() {
+                return true;
+            }
+        }
+    }
+    if std::env::var_os("DISPLAY").is_some() {
         return true;
     }
     detect_wayland_display().is_some()
