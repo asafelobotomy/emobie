@@ -25,12 +25,12 @@ pub struct InputHelperStatus {
 pub struct InputMatch {
     pub trigger: String,
     pub expansion: String,
-    #[serde(default = "immediate_mode")]
-    pub mode: String,
+  #[serde(default = "default_mode")]
+  pub mode: String,
 }
 
-fn immediate_mode() -> String {
-    "immediate".into()
+fn default_mode() -> String {
+    "space".into()
 }
 
 #[cfg(not(unix))]

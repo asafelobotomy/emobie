@@ -41,8 +41,8 @@ build() {
 
 package() {
   cd "$pkgname-$pkgver"
-  install -Dm755 "src-tauri/target/release/emobie" "$pkgdir/usr/bin/emobie"
-  install -Dm755 "crates/emobie-inputd/target/release/emobie-inputd" \
+  install -Dm755 "$srcdir/target/release/emobie" "$pkgdir/usr/bin/emobie"
+  install -Dm755 "$srcdir/target/release/emobie-inputd" \
     "$pkgdir/usr/bin/emobie-inputd"
   install -Dm644 packaging/systemd/emobie-inputd.service \
     "$pkgdir/usr/lib/systemd/user/emobie-inputd.service"
@@ -52,6 +52,8 @@ package() {
     "$pkgdir/usr/share/emobie/99-emobie-input.rules"
   install -Dm644 packaging/polkit/io.github.asafelobotomy.emobie.inputd.policy \
     "$pkgdir/usr/share/polkit-1/actions/io.github.asafelobotomy.emobie.inputd.policy"
+  install -Dm644 packaging/selinux/emobie-inputd.te \
+    "$pkgdir/usr/share/emobie/selinux/emobie-inputd.te"
   install -Dm644 flatpak/io.github.asafelobotomy.emobie.desktop \
     "$pkgdir/usr/share/applications/io.github.asafelobotomy.emobie.desktop"
   ln -s io.github.asafelobotomy.emobie.desktop \

@@ -2,8 +2,9 @@
 
 use super::unix;
 use super::InputHelperStatus;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::time::SystemTime;
 
 const SYSTEM_SETUP: &str = "/usr/share/emobie/setup-input-access.sh";
 const LOCAL_SETUP: &str = "/usr/local/share/emobie/setup-input-access.sh";
@@ -24,13 +25,33 @@ If Grant fails, run on the host: pkexec bash ~/.local/share/emobie/setup-input-a
     }
 }
 
+fn user_setup_script() -> Option<PathBuf> {
+    std::env::var_os("HOME").map(|h| {
+        PathBuf::from(h).join(".local/share/emobie/setup-input-access.sh")
+    })
+}
+
 fn sandbox_setup_scripts() -> Vec<PathBuf> {
-    let mut paths = vec![
-        PathBuf::from(SYSTEM_SETUP),
-        PathBuf::from(LOCAL_SETUP),
-    ];
-    if let Ok(home) = std::env::var("HOME") {
-        paths.push(PathBuf::from(home).join(".local/share/emobie/setup-input-access.sh"));
+    let mut paths = Vec::new();
+    let home = std::env::var_os("HOME").map(PathBuf::from);
+    let local_helper = home
+        .as_ref()
+        .map(|h| h.join(".local/bin/emobie-inputd"))
+        .filter(|p| p.is_file());
+    // Prefer user/local copies when the host helper is under ~/.local/bin
+    // (AppImage/Flatpak bootstrap) so Grant does not run a stale system script.
+    if local_helper.is_some() {
+        if let Some(user) = user_setup_script() {
+            paths.push(user);
+        }
+        paths.push(PathBuf::from(LOCAL_SETUP));
+        paths.push(PathBuf::from(SYSTEM_SETUP));
+    } else {
+        paths.push(PathBuf::from(SYSTEM_SETUP));
+        paths.push(PathBuf::from(LOCAL_SETUP));
+        if let Some(user) = user_setup_script() {
+            paths.push(user);
+        }
     }
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
@@ -42,9 +63,22 @@ fn sandbox_setup_scripts() -> Vec<PathBuf> {
 }
 
 fn host_setup_candidates() -> Vec<String> {
-    let mut paths = vec![SYSTEM_SETUP.to_string(), LOCAL_SETUP.to_string()];
+    let mut paths = Vec::new();
     if let Ok(home) = std::env::var("HOME") {
-        paths.push(format!("{home}/.local/share/emobie/setup-input-access.sh"));
+        let local_bin = format!("{home}/.local/bin/emobie-inputd");
+        let user_setup = format!("{home}/.local/share/emobie/setup-input-access.sh");
+        if host_file_exists(&local_bin) {
+            paths.push(user_setup);
+            paths.push(LOCAL_SETUP.to_string());
+            paths.push(SYSTEM_SETUP.to_string());
+            return paths;
+        }
+        paths.push(SYSTEM_SETUP.to_string());
+        paths.push(LOCAL_SETUP.to_string());
+        paths.push(user_setup);
+    } else {
+        paths.push(SYSTEM_SETUP.to_string());
+        paths.push(LOCAL_SETUP.to_string());
     }
     paths
 }
@@ -58,6 +92,28 @@ fn host_file_exists(path: &str) -> bool {
         .status()
         .map(|s| s.success())
         .unwrap_or(false)
+}
+
+fn mtime(path: &Path) -> Option<SystemTime> {
+    std::fs::metadata(path).ok()?.modified().ok()
+}
+
+/// Pick the newest existing script among candidates (avoids stale packaged Grant).
+fn newest_existing(paths: &[PathBuf]) -> Option<PathBuf> {
+    let mut best: Option<(SystemTime, PathBuf)> = None;
+    for path in paths {
+        if !path.is_file() {
+            continue;
+        }
+        let Some(modified) = mtime(path) else {
+            continue;
+        };
+        match &best {
+            Some((t, _)) if *t >= modified => {}
+            _ => best = Some((modified, path.clone())),
+        }
+    }
+    best.map(|(_, p)| p)
 }
 
 fn with_session_env(cmd: &mut Command) {
@@ -129,14 +185,12 @@ fn resolve_setup_script() -> Result<(String, bool), String> {
         return Err(host_setup_hint());
     }
 
-    let script = sandbox_setup_scripts()
-        .into_iter()
-        .find(|path| path.is_file())
-        .ok_or_else(|| {
-            "setup-input-access.sh not found — install the emobie package or run \
+    let candidates = sandbox_setup_scripts();
+    let script = newest_existing(&candidates).ok_or_else(|| {
+        "setup-input-access.sh not found — install the emobie package or run \
 packaging/setup-input-access.sh"
-                .to_string()
-        })?;
+            .to_string()
+    })?;
     Ok((script.to_string_lossy().into_owned(), false))
 }
 

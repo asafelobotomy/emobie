@@ -52,8 +52,25 @@ export function TextExpansionSettings({
   /** Start helper, grant access if needed (one Polkit prompt), then enable. */
   const setExpandEnabled = async (enabled: boolean) => {
     if (!enabled) {
-      onExpandAsYouType(false);
+      setBusy(true);
       setMessage(null);
+      try {
+        const status = await invoke<InputHelperStatus>("input_helper_set_enabled", {
+          enabled: false,
+        });
+        onInputStatus(status);
+        onExpandAsYouType(false);
+      } catch (error) {
+        setMessage(
+          typeof error === "string" && error.trim()
+            ? error
+            : error instanceof Error
+              ? error.message
+              : "Could not disable expansion on the helper.",
+        );
+      } finally {
+        setBusy(false);
+      }
       return;
     }
     setBusy(true);
@@ -83,6 +100,10 @@ export function TextExpansionSettings({
         return;
       }
 
+      status = await invoke<InputHelperStatus>("input_helper_set_enabled", {
+        enabled: true,
+      });
+      onInputStatus(status);
       onExpandAsYouType(true);
       setMessage("Text expansion enabled.");
     } catch (error) {

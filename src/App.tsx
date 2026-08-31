@@ -214,8 +214,21 @@ function App() {
     expandAsYouType: prefs.expandAsYouType,
     expandTriggerMode: prefs.expandTriggerMode,
     expandKeepTriggerSpace: prefs.expandKeepTriggerSpace,
-    macros: mergedMacros,
+    // Custom macros only — shortcode catalog exceeds the daemon match cap.
+    macros: prefs.macros,
     onStatus: setInputStatus,
+    onSyncError: (message) => {
+      setInputStatus((prev) =>
+        prev
+          ? { ...prev, detail: message }
+          : {
+              daemon: false,
+              canInject: false,
+              canListen: false,
+              detail: message,
+            },
+      );
+    },
   });
 
   const togglePin = useCallback(() => {

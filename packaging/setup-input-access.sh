@@ -13,13 +13,13 @@ LOCAL_DIR="/usr/local/share/emobie"
 
 acl_package_hint() {
   if command -v apt-get >/dev/null 2>&1; then
-    echo "Install setfacl: sudo apt-get install acl"
+    echo "Install setfacl: pkexec apt-get install acl"
   elif command -v dnf >/dev/null 2>&1; then
-    echo "Install setfacl: sudo dnf install acl"
+    echo "Install setfacl: pkexec dnf install acl"
   elif command -v zypper >/dev/null 2>&1; then
-    echo "Install setfacl: sudo zypper install acl"
+    echo "Install setfacl: pkexec zypper install acl"
   elif command -v pacman >/dev/null 2>&1; then
-    echo "Install setfacl: sudo pacman -S acl"
+    echo "Install setfacl: pkexec pacman -S acl"
   else
     echo "Install the acl package so setfacl can grant immediate keyboard access."
   fi
@@ -65,8 +65,8 @@ if [[ "$(id -u)" -ne 0 ]]; then
   if [[ "$SELF" == "$(readlink -f "$LOCAL_SETUP" 2>/dev/null || echo "$LOCAL_SETUP")" ]]; then
     exec pkexec "$LOCAL_SETUP" "$@"
   fi
-  exec pkexec env SUDO_USER="${SUDO_USER:-$USER}" PKEXEC_UID="${PKEXEC_UID:-$UID}" \
-    /usr/bin/bash "$0" "$@"
+  exec pkexec --keep-cwd env SUDO_USER="${SUDO_USER:-$USER}" PKEXEC_UID="${PKEXEC_UID:-$UID}" \
+    /usr/bin/bash "$(script_path)" "$@"
 fi
 
 TARGET_USER="${SUDO_USER:-}"
@@ -78,6 +78,17 @@ if [[ -z "$TARGET_USER" || "$TARGET_USER" == "root" ]]; then
   exit 1
 fi
 TARGET_UID="$(id -u "$TARGET_USER")"
+
+# Run a command as TARGET_USER without depending on sudo (we are already root).
+run_as_user() {
+  if command -v runuser >/dev/null 2>&1; then
+    runuser -u "$TARGET_USER" -- "$@"
+  elif command -v setpriv >/dev/null 2>&1; then
+    setpriv --reuid="$TARGET_UID" --regid="$(id -g "$TARGET_USER")" --clear-groups -- "$@"
+  else
+    su -s /bin/sh "$TARGET_USER" -c '"$@"' -- "$@"
+  fi
+}
 
 for cmd in groupadd usermod udevadm install; do
   if ! command -v "$cmd" >/dev/null; then
@@ -167,7 +178,7 @@ for node in /dev/input/event*; do
 done
 shopt -u nullglob
 if [[ -n "$EVENT" ]]; then
-  if sudo -u "$TARGET_USER" test -r "$EVENT"; then
+  if run_as_user test -r "$EVENT"; then
     echo "Verified: $TARGET_USER can read keyboard devices."
   else
     echo "Warning: $TARGET_USER still cannot read $EVENT — log out/in and retry Expand."
@@ -212,7 +223,7 @@ try_load_selinux_module() {
 try_load_selinux_module
 
 if [[ -d "$RUNTIME" ]] && command -v systemctl >/dev/null; then
-  if sudo -u "$TARGET_USER" env XDG_RUNTIME_DIR="$RUNTIME" \
+  if run_as_user env XDG_RUNTIME_DIR="$RUNTIME" \
     systemctl --user restart emobie-inputd.service 2>/dev/null; then
     echo "Restarted emobie-inputd for $TARGET_USER."
   fi

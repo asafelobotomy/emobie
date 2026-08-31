@@ -87,3 +87,70 @@ modules:
         done
       - install -Dm644 io.github.asafelobotomy.emobie.metainfo.xml \
           /app/share/metainfo/io.github.asafelobotomy.emobie.metainfo.xml
+      # Host Expand bootstrap (same assets as Flathub source Flatpak).
+      - |
+        set -euo pipefail
+        SHARE=/app/share/emobie
+        HOST="$SHARE/host-bundle"
+        mkdir -p "$HOST/selinux"
+        if [ -x deb-extract/usr/bin/emobie-inputd ]; then
+          install -Dm755 deb-extract/usr/bin/emobie-inputd "$HOST/emobie-inputd"
+        else
+          echo "emobie.deb missing usr/bin/emobie-inputd" >&2
+          exit 1
+        fi
+        for asset in setup-input-access.sh 99-emobie-input.rules \
+          io.github.asafelobotomy.emobie.inputd.policy bootstrap-inputd-host.sh; do
+          if [ -f "deb-extract/usr/share/emobie/$asset" ]; then
+            install -Dm755 "deb-extract/usr/share/emobie/$asset" "$HOST/$asset" 2>/dev/null \
+              || install -Dm644 "deb-extract/usr/share/emobie/$asset" "$HOST/$asset"
+          fi
+        done
+        # Rules/policy are data; bootstrap/setup are scripts.
+        [ -f "$HOST/setup-input-access.sh" ] && chmod 755 "$HOST/setup-input-access.sh" || true
+        [ -f "$HOST/bootstrap-inputd-host.sh" ] && chmod 755 "$HOST/bootstrap-inputd-host.sh" || true
+        if [ ! -f "$HOST/bootstrap-inputd-host.sh" ]; then
+          # Minimal bootstrap when the deb did not ship the host script.
+          cat >"$HOST/bootstrap-inputd-host.sh" <<'BOOT'
+#!/usr/bin/env bash
+set -euo pipefail
+SOURCE="${1:?}"
+BIN_DIR="${XDG_BIN_HOME:-$HOME/.local/bin}"
+UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+DATA="${XDG_DATA_HOME:-$HOME/.local/share}/emobie"
+ASSET_DIR="$(dirname "$(readlink -f "$SOURCE")")"
+mkdir -p "$BIN_DIR" "$UNIT_DIR" "$DATA"
+install -m755 "$SOURCE" "$BIN_DIR/emobie-inputd"
+for asset in setup-input-access.sh 99-emobie-input.rules io.github.asafelobotomy.emobie.inputd.policy; do
+  [[ -f "$ASSET_DIR/$asset" ]] || continue
+  if [[ "$asset" == *.sh ]]; then install -Dm755 "$ASSET_DIR/$asset" "$DATA/$asset"
+  else install -Dm644 "$ASSET_DIR/$asset" "$DATA/$asset"; fi
+done
+cat >"$UNIT_DIR/emobie-inputd.service" <<EOF
+[Unit]
+Description=emobie input helper
+After=graphical-session.target
+PartOf=graphical-session.target
+[Service]
+Type=simple
+ExecStart=$BIN_DIR/emobie-inputd
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PassEnvironment=WAYLAND_DISPLAY DISPLAY XAUTHORITY XDG_RUNTIME_DIR
+[Install]
+WantedBy=graphical-session.target
+EOF
+systemctl --user daemon-reload
+systemctl --user disable emobie-inputd.service >/dev/null 2>&1 || true
+systemctl --user enable emobie-inputd.service
+systemctl --user restart emobie-inputd.service
+BOOT
+          chmod 755 "$HOST/bootstrap-inputd-host.sh"
+        fi
+        if [ -f deb-extract/usr/share/emobie/selinux/emobie-inputd.te ]; then
+          install -Dm644 deb-extract/usr/share/emobie/selinux/emobie-inputd.te \
+            "$HOST/selinux/emobie-inputd.te"
+        fi
+        tar czf "$SHARE/inputd-host-bundle.tgz" -C "$HOST" .
+        rm -rf "$HOST"

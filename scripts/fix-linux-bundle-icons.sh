@@ -145,17 +145,21 @@ repack_rpm() {
 
 repack_appimage() {
   local appimage="$1"
-  command -v appimagetool >/dev/null 2>&1 || {
-    echo "appimagetool not found; fixing AppDir only (re-run linuxdeploy/appimagetool to refresh .AppImage)" >&2
-    return 0
-  }
+  if ! command -v appimagetool >/dev/null 2>&1; then
+    echo "appimagetool is required to seal inputd-host-bundle into the AppImage" >&2
+    exit 1
+  fi
   local appdir
   appdir="$(find "$BUNDLE/appimage" -maxdepth 1 -type d -name '*.AppDir' | head -n1 || true)"
   if [[ -z "$appdir" ]]; then
     echo "No AppDir found under $BUNDLE/appimage" >&2
-    return 0
+    exit 1
   fi
   fix_appdir "$appdir"
+  if [[ ! -f "$appdir/usr/share/emobie/inputd-host-bundle.tgz" ]]; then
+    echo "AppDir missing usr/share/emobie/inputd-host-bundle.tgz after staging" >&2
+    exit 1
+  fi
   ARCH=x86_64 appimagetool "$appdir" "$appimage"
   chmod +x "$appimage"
   echo "Repacked AppImage icons: $appimage"
