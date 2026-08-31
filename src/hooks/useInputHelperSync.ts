@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { expansionMatches } from "../lib/macros";
+import { customExpansionMatches } from "../lib/macros";
 import type { InputHelperStatus } from "../lib/inputHelper";
 import type { Macro, MacroTriggerMode } from "../types/preferences";
 
@@ -74,7 +74,7 @@ export function useInputHelperSync({
       }
       if (cancelled || !expandAsYouType) return;
 
-      const matches = expansionMatches(
+      const matches = customExpansionMatches(
         macros.map((macro) => ({ ...macro, source: "custom" as const })),
         expandTriggerMode,
         expandKeepTriggerSpace,

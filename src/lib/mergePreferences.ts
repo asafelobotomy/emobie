@@ -98,10 +98,18 @@ export function userDataFingerprint(prefs: {
   macros?: Macro[];
   favorites?: string[];
   recents?: string[];
+  expandAsYouType?: boolean;
+  expandTriggerMode?: string;
+  expandKeepTriggerSpace?: boolean;
+  inputHelperSetupSeen?: boolean;
 }): string {
   return JSON.stringify({
     macros: prefs.macros ?? [],
     favorites: prefs.favorites ?? [],
     recents: prefs.recents ?? [],
+    expandAsYouType: Boolean(prefs.expandAsYouType),
+    expandTriggerMode: prefs.expandTriggerMode ?? "space",
+    expandKeepTriggerSpace: Boolean(prefs.expandKeepTriggerSpace),
+    inputHelperSetupSeen: Boolean(prefs.inputHelperSetupSeen),
   });
 }

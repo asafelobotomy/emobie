@@ -41,10 +41,11 @@ fn sandbox_setup_scripts() -> Vec<PathBuf> {
     // Prefer user/local copies when the host helper is under ~/.local/bin
     // (AppImage/Flatpak bootstrap) so Grant does not run a stale system script.
     if local_helper.is_some() {
+        // Prefer Polkit-annotated /usr/local copy when present (Grant stages it).
+        paths.push(PathBuf::from(LOCAL_SETUP));
         if let Some(user) = user_setup_script() {
             paths.push(user);
         }
-        paths.push(PathBuf::from(LOCAL_SETUP));
         paths.push(PathBuf::from(SYSTEM_SETUP));
     } else {
         paths.push(PathBuf::from(SYSTEM_SETUP));
@@ -68,8 +69,8 @@ fn host_setup_candidates() -> Vec<String> {
         let local_bin = format!("{home}/.local/bin/emobie-inputd");
         let user_setup = format!("{home}/.local/share/emobie/setup-input-access.sh");
         if host_file_exists(&local_bin) {
-            paths.push(user_setup);
             paths.push(LOCAL_SETUP.to_string());
+            paths.push(user_setup);
             paths.push(SYSTEM_SETUP.to_string());
             return paths;
         }

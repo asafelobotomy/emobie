@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { normalizeMacros, normalizePreferences } from "./normalizePreferences.ts";
 import {
+  customExpansionMatches,
   expansionMatches,
   findHotkeyConflict,
   findTriggerConflict,
@@ -110,6 +111,30 @@ describe("macros helpers", () => {
       expansionMatches(list, "immediate", true)[0].expansion,
       "hiya",
     );
+  });
+
+  it("customExpansionMatches drops shortcode catalog entries", () => {
+    const list: MacroEntry[] = [
+      {
+        id: "1",
+        trigger: ".hi",
+        expansion: "hiya",
+        hotkey: null,
+        enabled: true,
+        source: "custom",
+      },
+      {
+        id: "2",
+        trigger: ":smile:",
+        expansion: "🙂",
+        hotkey: null,
+        enabled: true,
+        source: "shortcode",
+      },
+    ];
+    const synced = customExpansionMatches(list, "space");
+    assert.equal(synced.length, 1);
+    assert.equal(synced[0].trigger, ".hi");
   });
 });
 

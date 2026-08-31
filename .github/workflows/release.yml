@@ -93,6 +93,18 @@ jobs:
             rpm \
             libfuse2
 
+      - name: Install appimagetool
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/appimagetool \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x /tmp/appimagetool
+          # Wrapper so APPIMAGE_EXTRACT_AND_RUN works without FUSE.
+          printf '%s\n' '#!/bin/sh' 'exec env APPIMAGE_EXTRACT_AND_RUN=1 /tmp/appimagetool "$@"' \
+            | sudo tee /usr/local/bin/appimagetool >/dev/null
+          sudo chmod +x /usr/local/bin/appimagetool
+          appimagetool --version || true
+
       - name: Install npm dependencies
         run: npm ci
 
@@ -105,7 +117,22 @@ jobs:
         run: npm run tauri build -- --bundles deb,rpm,appimage
 
       - name: Fix Linux package icons for GTK app id
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
         run: bash scripts/fix-linux-bundle-icons.sh
+
+      - name: Verify AppImage ships Expand host bundle
+        run: |
+          set -euo pipefail
+          APPIMAGE="$(find src-tauri/target/release/bundle/appimage -name '*.AppImage' | head -n1)"
+          test -n "$APPIMAGE"
+          chmod +x "$APPIMAGE"
+          TMP="$(mktemp -d)"
+          # Extract without FUSE.
+          cd "$TMP"
+          APPIMAGE_EXTRACT_AND_RUN=1 "$APPIMAGE" --appimage-extract >/dev/null
+          test -f squashfs-root/usr/share/emobie/inputd-host-bundle.tgz
+          echo "AppImage contains inputd-host-bundle.tgz"
 
       - name: Stage package artifacts
         run: |

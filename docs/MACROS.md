@@ -32,18 +32,20 @@ On first launch emobie opens a short setup dialog to start the input helper
 and optionally grant keyboard access (Skip is fine). The helper runs as a
 **systemd --user** service (same user as your desktop session — never root).
 
-### User-local install
+### User-local install (fallback)
+
+AppImage and Flatpak install the host helper automatically when you enable
+**Expand** (or finish first-run setup). Use the script only for from-source
+builds or when auto-bootstrap fails:
 
 ```bash
 bash packaging/install-inputd-user.sh
 ```
 
-This builds `emobie-inputd` into `~/.local/bin`, installs a user unit, and
-emobie also calls `input_helper_ensure_started` on every launch (systemd
-`enable --now` or a trusted local binary) so the helper is up for paste and
-ready when you turn on expansion. Enabling **Expand as you type** starts the
-helper if needed, grants keyboard access with one Polkit prompt when missing,
-restarts the helper, and turns on keystroke listening immediately.
+This builds `emobie-inputd` into `~/.local/bin` and installs a user unit.
+emobie also calls `input_helper_ensure_started` on every launch so the helper
+is up for paste. Enabling **Expand as you type** grants keyboard access with
+one Polkit prompt when missing, restarts the helper, and turns on listening.
 
 ### Distro / .deb package
 
@@ -92,11 +94,16 @@ Group membership is sensitive (keyboard event read access).
 bash scripts/verify-expand-setup.sh
 ```
 
-Under Flatpak, install the host helper first
-(`bash packaging/install-inputd-user.sh`), which stages
-`~/.local/share/emobie/setup-input-access.sh`. Expand/Grant then runs
-`flatpak-spawn --host pkexec …` against that host script. If Grant still fails,
-run the host `pkexec` command above and retry.
+Under Flatpak or AppImage, enabling Expand stages the host helper
+(`~/.local/bin/emobie-inputd`) and Grant runs host Polkit against
+`setup-input-access.sh`. If Grant still fails, run on the host:
+
+```bash
+pkexec bash ~/.local/share/emobie/setup-input-access.sh
+```
+
+Only use `bash packaging/install-inputd-user.sh` as a fallback when auto-bootstrap
+cannot find the bundled host tarball.
 
 **Layout note:** trigger matching follows your active XKB layout
 (`XKB_DEFAULT_*` / session keyboard settings). Switch layouts at runtime like

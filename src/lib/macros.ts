@@ -14,6 +14,7 @@ export {
   shortcodeTrigger,
   searchMacros,
   expansionMatches,
+  customExpansionMatches,
   findHotkeyConflict,
   findTriggerConflict,
 } from "./macroHelpers";

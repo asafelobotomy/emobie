@@ -48,6 +48,8 @@ package() {
     "$pkgdir/usr/lib/systemd/user/emobie-inputd.service"
   install -Dm755 packaging/setup-input-access.sh \
     "$pkgdir/usr/share/emobie/setup-input-access.sh"
+  install -Dm755 packaging/bootstrap-inputd-host.sh \
+    "$pkgdir/usr/share/emobie/bootstrap-inputd-host.sh"
   install -Dm644 packaging/udev/99-emobie-input.rules \
     "$pkgdir/usr/share/emobie/99-emobie-input.rules"
   install -Dm644 packaging/polkit/io.github.asafelobotomy.emobie.inputd.policy \

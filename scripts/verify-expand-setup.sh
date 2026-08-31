@@ -40,12 +40,16 @@ fi
 # --- socket ---
 RUNTIME="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 SOCK="$RUNTIME/emobie/emobie-inputd.sock"
+TMP_SOCK="/tmp/emobie-$(id -u)/emobie-inputd.sock"
 if [[ -S "$SOCK" ]]; then
   if systemctl --user is-active emobie-inputd.service >/dev/null 2>&1; then
     pass "Socket $SOCK"
   else
     warn "Socket exists but emobie-inputd.service is not active — stale socket? systemctl --user restart emobie-inputd"
   fi
+elif [[ -S "$TMP_SOCK" ]]; then
+  warn "Socket at $TMP_SOCK (XDG fallback) — prefer $RUNTIME/emobie for Flatpak"
+  SOCK="$TMP_SOCK"
 else
   warn "Socket missing at $SOCK — start emobie-inputd or open emobie once"
 fi
@@ -90,19 +94,30 @@ else
   fail "Missing /etc/udev/rules.d/99-emobie-input.rules — run setup-input-access.sh"
 fi
 
-# --- device nodes ---
-EVENT=""
+# --- keyboard device nodes (ignore mice/joysticks after keyboard-only udev) ---
+READABLE_KB=0
+ANY_KB=0
 shopt -s nullglob
-for node in /dev/input/event*; do EVENT="$node"; break; done
-shopt -u nullglob
-if [[ -n "$EVENT" ]]; then
-  if [[ -r "$EVENT" ]]; then
-    pass "Can read $EVENT"
-  else
-    fail "Cannot read $EVENT — run Grant (Polkit + setfacl) or log out/in"
+for node in /dev/input/event*; do
+  if command -v udevadm >/dev/null 2>&1; then
+    if ! udevadm info -q property -n "$node" 2>/dev/null | grep -qx 'ID_INPUT_KEYBOARD=1'; then
+      continue
+    fi
   fi
-else
-  warn "No /dev/input/event* nodes visible"
+  ANY_KB=1
+  if [[ -r "$node" ]]; then
+    READABLE_KB=1
+    pass "Can read keyboard $node"
+    break
+  fi
+done
+shopt -u nullglob
+if [[ "$READABLE_KB" -eq 0 ]]; then
+  if [[ "$ANY_KB" -eq 1 ]]; then
+    fail "Cannot read keyboard event nodes — run Grant (Polkit + setfacl) or log out/in"
+  else
+    warn "No keyboard event nodes identified — plug in a keyboard or check udev"
+  fi
 fi
 
 if [[ -e /dev/uinput ]]; then

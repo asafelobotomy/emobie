@@ -13,6 +13,7 @@ const need = [
   "/usr/bin/emobie-inputd",
   "/usr/lib/systemd/user/emobie-inputd.service",
   "/usr/share/emobie/setup-input-access.sh",
+  "/usr/share/emobie/bootstrap-inputd-host.sh",
   "/usr/share/emobie/99-emobie-input.rules",
   "/usr/share/emobie/selinux/emobie-inputd.te",
   "/usr/share/polkit-1/actions/io.github.asafelobotomy.emobie.inputd.policy",

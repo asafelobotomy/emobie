@@ -45,6 +45,19 @@ export function expansionMatches(
     });
 }
 
+/** Matches for emobie-inputd — never include shortcode catalog (daemon max 2000). */
+export function customExpansionMatches(
+  macros: MacroEntry[],
+  mode: MacroTriggerMode,
+  keepTriggerSpace = false,
+): { trigger: string; expansion: string; mode: MacroTriggerMode }[] {
+  return expansionMatches(
+    macros.filter((macro) => macro.source !== "shortcode"),
+    mode,
+    keepTriggerSpace,
+  );
+}
+
 export function findHotkeyConflict(
   macros: Macro[],
   summonHotkey: string,

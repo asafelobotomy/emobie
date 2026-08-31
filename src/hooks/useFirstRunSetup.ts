@@ -9,6 +9,10 @@ type Options = {
   onMarkSeen: () => void;
 };
 
+function expandReady(status: InputHelperStatus): boolean {
+  return Boolean(status.daemon && status.canListen && status.canInject);
+}
+
 /** Ensures the input helper on every launch and opens first-run setup when needed. */
 export function useFirstRunSetup({
   ready,
@@ -28,7 +32,8 @@ export function useFirstRunSetup({
         if (cancelled) return;
         onStatus(status);
         if (setupSeen) return;
-        if (status.daemon && status.canListen) {
+        // Match Settings: listen + inject required before treating Expand as ready.
+        if (expandReady(status)) {
           onMarkSeen();
           return;
         }
@@ -45,7 +50,8 @@ export function useFirstRunSetup({
         })
         .catch(() => undefined);
     };
-    const timer = window.setInterval(refresh, 5000);
+    // Slow poll — Expand sync owns start/status on the settings path.
+    const timer = window.setInterval(refresh, 15000);
     return () => {
       cancelled = true;
       window.clearInterval(timer);

@@ -10,7 +10,7 @@ environments. Companion to [`MACROS.md`](MACROS.md) (input helper) and
 |---------------|--------|----------------|
 | Ubuntu / Debian / Pop!_OS / Mint | `.deb` from [Releases](https://github.com/asafelobotomy/emobie/releases) | Bundled `emobie-inputd`; Expand → Polkit |
 | Fedora / RHEL / openSUSE | `.rpm` | Same as `.deb` (helper + udev + polkit in package) |
-| Arch / Manjaro / **CachyOS** | Flatpak or AppImage, or build from source | Host helper: `bash packaging/install-inputd-user.sh` |
+| Arch / Manjaro / **CachyOS** | Flatpak or AppImage, or build from source | Auto host helper on Expand; fallback `install-inputd-user.sh` |
 | Immutable (Silverblue, etc.) | Flatpak + host/user helper | Helper must run outside the app sandbox |
 
 There is no official AUR package yet. A starting point lives in
@@ -73,10 +73,10 @@ bash scripts/verify-expand-setup.sh
 
 | Distro | `acl` (setfacl) | Notes |
 |--------|-----------------|-------|
-| Ubuntu / Debian / Mint | `sudo apt-get install acl` | Usually preinstalled |
-| Fedora / RHEL | `sudo dnf install acl` | See SELinux below |
-| openSUSE | `sudo zypper install acl` | |
-| Arch / CachyOS | `sudo pacman -S acl` | Use `install-inputd-user.sh` for helper |
+| Ubuntu / Debian / Mint | `pkexec apt-get install acl` | Usually preinstalled |
+| Fedora / RHEL | `pkexec dnf install acl` | See SELinux below |
+| openSUSE | `pkexec zypper install acl` | |
+| Arch / CachyOS | `pkexec pacman -S acl` | Expand auto-installs host helper |
 
 ### Grant (Polkit) paths
 
@@ -100,12 +100,12 @@ permission errors after a successful Polkit prompt:
 systemctl --user status emobie-inputd.service
 ls -la /dev/input/event* | head
 # Optional: temporary permissive check while debugging (revert afterward)
-# sudo setenforce 0
+# pkexec --keep-cwd setenforce 0
 ```
 
 Report AVC denials with `ausearch -m avc -ts recent | grep emobie` and open an
 issue if SELinux blocks the helper. Session `setfacl` usually avoids needing a
-logout even when group membership is delayed.
+logout even when group membership is delayed. See `packaging/selinux/README.md`.
 
 ### Flatpak
 
@@ -113,7 +113,7 @@ The sandbox never gets `--device=input`. On first **Expand**, emobie installs
 `emobie-inputd` on the host from the bundled archive, then runs Grant
 (`flatpak-spawn --host pkexec …`).
 
-Manual fallback:
+Manual fallback (only if Expand auto-bootstrap fails):
 
 ```bash
 bash packaging/install-inputd-user.sh
@@ -175,7 +175,8 @@ NO_STRIP=true APPIMAGE_EXTRACT_AND_RUN=1 npm run tauri build -- --bundles appima
 CachyOS is Arch-based. Typical setup:
 
 1. Install Flatpak or AppImage (or build with `npm run tauri build`)
-2. `bash packaging/install-inputd-user.sh` for expand/auto-paste
+2. Enable **Expand** in Settings (auto-installs the host helper + Grant); fallback:
+   `bash packaging/install-inputd-user.sh`
 3. On **Plasma** (common default): pin + tray + Grant are on the supported path
 
 ## Related docs

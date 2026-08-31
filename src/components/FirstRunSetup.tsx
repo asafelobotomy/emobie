@@ -52,8 +52,12 @@ export function FirstRunSetup({
         onStatus(next);
       }
 
-      if (next.daemon && next.canListen) {
+      if (next.daemon && next.canListen && next.canInject) {
         setMessage("Text expansion is ready — enable it anytime in Settings.");
+      } else if (next.daemon && next.canListen && !next.canInject) {
+        setMessage(
+          "Keyboard access OK, but text injection needs a desktop session. Restart emobie-inputd or log out/in, then enable Expand in Settings.",
+        );
       } else {
         setMessage(next.detail || "Could not finish setup.");
       }
@@ -64,7 +68,9 @@ export function FirstRunSetup({
     }
   };
 
-  const ready = Boolean(status?.daemon && status.canListen);
+  const ready = Boolean(
+    status?.daemon && status.canListen && status.canInject,
+  );
   const isFlatpak = Boolean(status?.flatpak);
 
   return (
