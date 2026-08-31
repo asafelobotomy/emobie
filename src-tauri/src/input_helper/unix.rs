@@ -4,12 +4,8 @@ use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
-
-/// Heal a live daemon with `can_inject == false` at most once per process.
-static INJECT_HEAL_ATTEMPTED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Deserialize)]
 pub struct DaemonResponse {
@@ -17,8 +13,6 @@ pub struct DaemonResponse {
     pub can_inject: bool,
     pub can_listen: bool,
     pub detail: String,
-    #[allow(dead_code)]
-    pub enabled: Option<bool>,
     pub error: Option<String>,
 }
 
@@ -77,11 +71,11 @@ fn trusted_socket_path(path: &std::path::Path) -> bool {
     false
 }
 
-fn connect() -> Option<UnixStream> {
+fn connect_with_timeout(timeout: Duration) -> Option<UnixStream> {
     for path in candidate_sockets() {
         if let Ok(stream) = UnixStream::connect(&path) {
-            let _ = stream.set_read_timeout(Some(Duration::from_millis(800)));
-            let _ = stream.set_write_timeout(Some(Duration::from_millis(800)));
+            let _ = stream.set_read_timeout(Some(timeout));
+            let _ = stream.set_write_timeout(Some(timeout));
             return Some(stream);
         }
     }
@@ -89,7 +83,15 @@ fn connect() -> Option<UnixStream> {
 }
 
 pub fn request(cmd: serde_json::Value) -> Result<DaemonResponse, String> {
-    let mut stream = connect().ok_or_else(|| "emobie-inputd not running".to_string())?;
+    request_with_timeout(cmd, Duration::from_millis(800))
+}
+
+fn request_with_timeout(
+    cmd: serde_json::Value,
+    timeout: Duration,
+) -> Result<DaemonResponse, String> {
+    let mut stream =
+        connect_with_timeout(timeout).ok_or_else(|| "emobie-inputd not running".to_string())?;
     let payload = serde_json::to_string(&cmd).map_err(|e| e.to_string())?;
     writeln!(stream, "{payload}").map_err(|e| e.to_string())?;
     let mut reader = BufReader::new(stream);
@@ -198,34 +200,28 @@ fn try_spawn_detached() -> bool {
 
 fn stop_all_helpers() {
     let _ = systemctl_user(&["stop", "emobie-inputd.service"]);
-    // Detached fallbacks from older ensure_started paths can outlive the unit.
+    // Wait for the unit to go inactive before touching sockets.
+    for _ in 0..20 {
+        if !systemctl_user(&["is-active", "--quiet", "emobie-inputd.service"]) {
+            break;
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
+    // Only clear detached leftovers; prefer systemd for managed instances.
     let _ = Command::new("pkill")
         .args(["-x", "emobie-inputd"])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status();
-    thread::sleep(Duration::from_millis(150));
-    for path in candidate_sockets() {
-        let _ = std::fs::remove_file(&path);
-    }
+    thread::sleep(Duration::from_millis(100));
 }
 
 pub fn ensure_started() -> InputHelperStatus {
     if let Ok(resp) = request(serde_json::json!({ "cmd": "status" })) {
-        let status = status_from_resp(resp);
-        if status.can_inject {
-            return status;
-        }
-        // Early-boot units can bind before Wayland exists. Heal at most once —
-        // thrashing every sync/status call leaves Expand offline.
-        if !INJECT_HEAL_ATTEMPTED.swap(true, Ordering::SeqCst) {
-            let healed = restart_helper();
-            if healed.daemon {
-                return healed;
-            }
-        }
-        return status;
+        // Enigo re-detects Wayland each inject — do not restart solely because
+        // can_inject is false (burns heal and thrash on headless/early boot).
+        return status_from_resp(resp);
     }
     let _ = super::bootstrap::try_bootstrap_host_helper();
     // Socket binds before compositor wait — ~5s is enough for "running".
@@ -318,10 +314,13 @@ pub fn set_enabled(enabled: bool) -> Result<InputHelperStatus, String> {
 
 pub fn sync_matches(matches: Vec<InputMatch>) -> Result<InputHelperStatus, String> {
     let _ = ensure_started();
-    match request(serde_json::json!({
-        "cmd": "sync_matches",
-        "matches": matches,
-    })) {
+    match request_with_timeout(
+        serde_json::json!({
+            "cmd": "sync_matches",
+            "matches": matches,
+        }),
+        Duration::from_secs(8),
+    ) {
         Ok(resp) if resp.ok => Ok(status_from_resp(resp)),
         Ok(resp) => Err(resp.error.unwrap_or(resp.detail)),
         Err(err) => Err(err),
@@ -330,17 +329,17 @@ pub fn sync_matches(matches: Vec<InputMatch>) -> Result<InputHelperStatus, Strin
 
 pub fn inject_paste() -> Result<(), String> {
     let _ = ensure_started();
-    match request(serde_json::json!({ "cmd": "inject_paste" })) {
+    match request_with_timeout(
+        serde_json::json!({ "cmd": "inject_paste" }),
+        Duration::from_secs(3),
+    ) {
         Ok(resp) if resp.ok => Ok(()),
         Ok(resp) => Err(resp.error.unwrap_or(resp.detail)),
         Err(_) => {
             if std::env::var_os("FLATPAK_ID").is_some() {
                 return Err("emobie-inputd required inside Flatpak".into());
             }
-            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(native_inject_paste)) {
-                Ok(result) => result,
-                Err(_) => Err("Paste injection panicked".into()),
-            }
+            native_inject_paste()
         }
     }
 }

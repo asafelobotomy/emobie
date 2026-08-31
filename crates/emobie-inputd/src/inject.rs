@@ -111,15 +111,19 @@ fn ctrl_v(enigo: &mut Enigo) -> Result<(), String> {
     enigo
         .key(Key::Control, Direction::Press)
         .map_err(|e| e.to_string())?;
-    thread::sleep(KEY_GAP);
-    enigo
-        .key(Key::Unicode('v'), Direction::Click)
-        .map_err(|e| e.to_string())?;
-    thread::sleep(KEY_GAP);
-    enigo
+    let typed = (|| -> Result<(), String> {
+        thread::sleep(KEY_GAP);
+        enigo
+            .key(Key::Unicode('v'), Direction::Click)
+            .map_err(|e| e.to_string())?;
+        thread::sleep(KEY_GAP);
+        Ok(())
+    })();
+    // Always release Control — a stuck modifier poisons the session.
+    let released = enigo
         .key(Key::Control, Direction::Release)
-        .map_err(|e| e.to_string())?;
-    Ok(())
+        .map_err(|e| e.to_string());
+    typed.and(released)
 }
 
 fn erase_chars(enigo: &mut Enigo, count: usize) -> Result<(), String> {
@@ -357,15 +361,28 @@ pub fn expand_trigger(
 }
 
 /// Queue Ctrl+V on the inject worker and wait for completion (serialized with expands).
-/// Does not hold listen suppress — paste is short and IPC timeouts must not mute typing.
 pub fn inject_ctrl_v() -> Result<(), String> {
     let (reply_tx, reply_rx) = mpsc::sync_channel(1);
-    inject_sender()
-        .send(InjectJob::Paste { reply: reply_tx })
-        .map_err(|_| "inject worker stopped".to_string())?;
-    reply_rx
-        .recv_timeout(Duration::from_secs(2))
-        .map_err(|_| "inject paste timed out".to_string())?
+    // Suppress listen briefly so synthetic Ctrl+V does not pollute the match buffer.
+    LISTEN_SUPPRESS_JOBS.fetch_add(1, Ordering::AcqRel);
+    match inject_sender().try_send(InjectJob::Paste { reply: reply_tx }) {
+        Ok(()) => {}
+        Err(_) => {
+            finish_listen_suppress();
+            return Err("inject queue full".to_string());
+        }
+    }
+    match reply_rx.recv_timeout(Duration::from_secs(2)) {
+        Ok(result) => {
+            finish_listen_suppress();
+            result
+        }
+        Err(_) => {
+            // Worker may still complete later; drop suppress so typing is not muted.
+            finish_listen_suppress();
+            Err("inject paste timed out".to_string())
+        }
+    }
 }
 
 #[cfg(test)]

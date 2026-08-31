@@ -50,6 +50,12 @@ pub fn default_socket_path() -> PathBuf {
     default_runtime_dir().join(SOCKET_NAME)
 }
 
+/// Per-uid lock directory — always the default runtime dir, even when the socket
+/// lives under `/run/emobie`, so XDG and `/run` cannot dual-listen.
+pub fn instance_lock_dir() -> PathBuf {
+    default_runtime_dir()
+}
+
 /// Resolve bind/connect path; ignores untrusted `EMOBIE_INPUTD_SOCKET` overrides.
 pub fn resolve_socket_path() -> PathBuf {
     if let Ok(custom) = std::env::var("EMOBIE_INPUTD_SOCKET") {
@@ -66,9 +72,10 @@ pub fn resolve_socket_path() -> PathBuf {
     default_socket_path()
 }
 
-/// Exclusive lock so a detached helper and systemd unit cannot both listen.
+/// Exclusive per-uid lock so a detached helper and systemd unit cannot both listen.
 /// Keep the returned lock alive for the process lifetime.
-pub fn acquire_instance_lock(runtime_dir: &Path) -> Result<Flock<File>, String> {
+pub fn acquire_instance_lock() -> Result<Flock<File>, String> {
+    let runtime_dir = instance_lock_dir();
     let path = runtime_dir.join(LOCK_NAME);
     let file = File::options()
         .create(true)

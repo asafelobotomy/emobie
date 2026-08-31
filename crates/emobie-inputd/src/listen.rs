@@ -39,7 +39,18 @@ pub fn clear_pending() {
 static LISTEN_CACHE: Mutex<Option<(Instant, bool)>> = Mutex::new(None);
 const LISTEN_CACHE_TTL: Duration = Duration::from_secs(2);
 
+fn is_virtual_uinput(device: &Device) -> bool {
+    let name = device.name().unwrap_or("").to_ascii_lowercase();
+    name.contains("uinput")
+        || name.contains("enigo")
+        || name.contains("virtual")
+        || name.contains("emobie")
+}
+
 fn is_keyboard(device: &Device) -> bool {
+    if is_virtual_uinput(device) {
+        return false;
+    }
     device.supported_keys().is_some_and(|keys| {
         keys.contains(Key::KEY_A) && keys.contains(Key::KEY_Z) && keys.contains(Key::KEY_ENTER)
     })
@@ -81,7 +92,12 @@ pub fn can_listen() -> bool {
     ok
 }
 
-fn fire_expand(pending: PendingExpand, trigger_committed: bool, enabled: &AtomicBool) {
+fn fire_expand(
+    pending: PendingExpand,
+    trigger_committed: bool,
+    enabled: &AtomicBool,
+    buffer: &Mutex<String>,
+) {
     if !enabled.load(Ordering::Relaxed) {
         return;
     }
@@ -93,6 +109,11 @@ fn fire_expand(pending: PendingExpand, trigger_committed: bool, enabled: &Atomic
         trigger_committed,
     ) {
         eprintln!("expand failed: {err}");
+        // Queue full / worker down — put the trigger back so buffer stays aligned
+        // with what the focused app still shows on screen.
+        if let Ok(mut guard) = buffer.lock() {
+            guard.push_str(&pending.trigger);
+        }
     }
 }
 
@@ -127,7 +148,7 @@ fn handle_key(
         };
         if let Some(p) = to_fire {
             // Key already released — trigger text is committed; skip pre-delay.
-            fire_expand(p, true, enabled);
+            fire_expand(p, true, enabled, buffer);
         }
         return;
     }
@@ -148,7 +169,7 @@ fn handle_key(
         };
         if let Some(p) = to_fire {
             // Completing key still down — allow a short settle before erase.
-            fire_expand(p, false, enabled);
+            fire_expand(p, false, enabled, buffer);
         }
     }
 

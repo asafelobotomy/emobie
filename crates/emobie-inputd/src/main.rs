@@ -12,7 +12,7 @@ use nix::sys::socket::{getsockopt, sockopt::PeerCredentials};
 use nix::sys::stat::{umask, Mode};
 use nix::unistd::getuid;
 use protocol::{MatchRule, Request, Response};
-use socket_path::{acquire_instance_lock, resolve_socket_path};
+use socket_path::{acquire_instance_lock, instance_lock_dir, resolve_socket_path};
 use std::fs;
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::os::unix::fs::PermissionsExt;
@@ -79,6 +79,18 @@ fn persist(enabled: &AtomicBool, stored: &Mutex<Vec<MatchRule>>) {
     state::save(enabled.load(Ordering::Relaxed), &matches);
 }
 
+fn persist_locked(enabled: &AtomicBool, matches: &[MatchRule]) {
+    state::save(enabled.load(Ordering::Relaxed), matches);
+}
+
+struct ClientSlot<'a>(&'a AtomicUsize);
+
+impl Drop for ClientSlot<'_> {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
 fn write_response(writer: &mut UnixStream, response: &Response) {
     if let Ok(payload) = serde_json::to_string(response) {
         let _ = writeln!(writer, "{payload}");
@@ -90,10 +102,14 @@ fn handle_client(
     enabled: &AtomicBool,
     trie: &Mutex<TriggerTrie>,
     stored: &Mutex<Vec<MatchRule>>,
-    clients: &AtomicUsize,
+    _clients: ClientSlot<'_>,
 ) {
-    let mut reader = BufReader::new(stream.try_clone().expect("clone"));
-    let mut writer = stream;
+    let writer_stream = match stream.try_clone() {
+        Ok(s) => s,
+        Err(_) => return,
+    };
+    let mut reader = BufReader::new(stream);
+    let mut writer = writer_stream;
     let mut line = String::new();
     loop {
         match read_request_line(&mut reader, &mut line) {
@@ -156,7 +172,7 @@ fn handle_client(
                 Ok(()) => {
                     let pairs = state::pairs_from_matches(&matches);
                     let count = pairs.len();
-                    // Update stored + trie under one critical section so they cannot diverge.
+                    // Update stored + trie + disk under one critical section.
                     let sync_result = (|| -> Result<(), String> {
                         let mut stored_guard = stored
                             .lock()
@@ -166,18 +182,16 @@ fn handle_client(
                             .map_err(|_| "internal lock poisoned — try again".to_string())?;
                         trie_guard.load(&pairs);
                         *stored_guard = matches;
+                        persist_locked(enabled, &stored_guard);
                         Ok(())
                     })();
                     match sync_result {
-                        Ok(()) => {
-                            persist(enabled, stored);
-                            Response::status(
-                                can_inject,
-                                can_listen,
-                                enabled.load(Ordering::Relaxed),
-                                &format!("synced {count} matches"),
-                            )
-                        }
+                        Ok(()) => Response::status(
+                            can_inject,
+                            can_listen,
+                            enabled.load(Ordering::Relaxed),
+                            &format!("synced {count} matches"),
+                        ),
                         Err(err) => Response::err(can_inject, can_listen, enabled_now, &err),
                     }
                 }
@@ -201,22 +215,27 @@ fn handle_client(
         };
         write_response(&mut writer, &response);
     }
-    clients.fetch_sub(1, Ordering::AcqRel);
 }
 
 fn main() {
     let path = resolve_socket_path();
-    // Lock beside the resolved socket so /run/emobie and XDG paths cannot dual-listen.
-    let lock_dir = path
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(socket_path::default_runtime_dir);
+    let lock_dir = instance_lock_dir();
+    // Always create the per-uid lock dir (and socket parent if different).
     if let Err(err) = ensure_runtime_dir(&lock_dir) {
         eprintln!("failed to create {}: {err}", lock_dir.display());
         std::process::exit(1);
     }
+    if let Some(parent) = path.parent() {
+        if parent != lock_dir.as_path() {
+            if let Err(err) = ensure_runtime_dir(parent) {
+                eprintln!("failed to create {}: {err}", parent.display());
+                std::process::exit(1);
+            }
+        }
+    }
 
-    let _instance_lock = match acquire_instance_lock(&lock_dir) {
+    // Global per-uid lock — covers XDG, /run/emobie, and /tmp fallback sockets.
+    let _instance_lock = match acquire_instance_lock() {
         Ok(lock) => lock,
         Err(err) => {
             eprintln!("{err}");
@@ -293,7 +312,8 @@ fn main() {
                 let stored = stored.clone();
                 let clients = clients.clone();
                 thread::spawn(move || {
-                    handle_client(stream, &enabled, &trie, &stored, &clients);
+                    let slot = ClientSlot(&clients);
+                    handle_client(stream, &enabled, &trie, &stored, slot);
                 });
             }
             Err(err) if err.kind() == ErrorKind::WouldBlock => {
