@@ -130,11 +130,10 @@ jobs:
       - name: Verify AppImage ships Expand host bundle
         run: |
           set -euo pipefail
-          APPIMAGE="$(find src-tauri/target/release/bundle/appimage -name '*.AppImage' | head -n1)"
+          APPIMAGE="$(find "$GITHUB_WORKSPACE/src-tauri/target/release/bundle/appimage" -name '*.AppImage' | head -n1)"
           test -n "$APPIMAGE"
           chmod +x "$APPIMAGE"
           TMP="$(mktemp -d)"
-          # Extract without FUSE.
           cd "$TMP"
           APPIMAGE_EXTRACT_AND_RUN=1 "$APPIMAGE" --appimage-extract >/dev/null
           test -f squashfs-root/usr/share/emobie/inputd-host-bundle.tgz
