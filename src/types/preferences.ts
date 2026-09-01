@@ -7,6 +7,9 @@ export type SortBy = "default" | "name" | "type" | "dateAdded" | "uses";
 /** When expand-as-you-type is on: fire immediately, or only after Space. */
 export type MacroTriggerMode = "immediate" | "space";
 
+/** ASCII emoticon nose style for macros and triggers. */
+export type EmoticonStyle = "minimal" | "classic";
+
 export type Macro = {
   id: string;
   trigger: string;
@@ -35,7 +38,10 @@ export type Preferences = {
   recents: string[];
   favorites: string[];
   macros: Macro[];
-  showShortcodeMacros: boolean;
+  /** When on, shortcodes/emoticons for favorited emojis appear under Macros. */
+  favoriteEmojiMacros: boolean;
+  /** Prefer :) / :D or :-) / :-D style emoticon triggers. */
+  emoticonStyle: EmoticonStyle;
   autoPasteOnCopy: boolean;
   expandAsYouType: boolean;
   /** How expand-as-you-type matches triggers (global). */
@@ -65,7 +71,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   recents: [],
   favorites: [],
   macros: [],
-  showShortcodeMacros: true,
+  favoriteEmojiMacros: false,
+  emoticonStyle: "minimal",
   autoPasteOnCopy: false,
   expandAsYouType: false,
   expandTriggerMode: "space",
@@ -74,6 +81,14 @@ export const DEFAULT_PREFERENCES: Preferences = {
   dismissedUpdateVersion: null,
   inputHelperSetupSeen: false,
 };
+
+export const EMOTICON_STYLE_OPTIONS: {
+  value: EmoticonStyle;
+  label: string;
+}[] = [
+  { value: "minimal", label: ":) style" },
+  { value: "classic", label: ":-) style" },
+];
 
 export const SORT_OPTIONS: { value: SortBy; label: string }[] = [
   { value: "default", label: "Default order" },

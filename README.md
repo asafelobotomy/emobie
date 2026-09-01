@@ -63,7 +63,7 @@ Linux tray, pin, startup, and SELinux notes: [`docs/LINUX.md`](docs/LINUX.md).
 |---|---|
 | **Catalog** | Full Unicode emoji set via emojibase, with categories and search (name, tags, shortcodes) |
 | **Favorites & recents** | Right-click to favorite; recent history with configurable size |
-| **Macros** | Custom trigger → expansion cards (+ to add), shortcodes + emoticons (`:)`, `;')`, …), per-macro hotkeys, YAML import/export |
+| **Macros** | Custom trigger → expansion cards (+ to add), optional favorited-emoji shortcodes/emoticons, per-macro hotkeys, YAML import/export |
 | **Updates** | Optional startup check; Settings can download and install the matching release asset (deb/rpm/AppImage/Flatpak) |
 | **Copy** | One-click clipboard copy; optional auto-paste when the host input helper is available |
 | **Expand** | Optional as-you-type via host `emobie-inputd` (systemd --user auto-start; off by default; see [docs/MACROS.md](docs/MACROS.md)) |
@@ -169,8 +169,8 @@ Tags matching `vX.Y.Z` run GitHub Actions to publish **`.deb`**, **`.rpm`**, **A
 
 ```bash
 # Keep package.json, Cargo.toml, and tauri.conf.json versions in sync
-git tag v0.6.9
-git push origin v0.6.9
+git tag v0.6.10
+git push origin v0.6.10
 ```
 
 Or run the **Release** workflow from the Actions tab.

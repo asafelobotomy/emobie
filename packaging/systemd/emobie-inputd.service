@@ -14,7 +14,7 @@ RestartSec=2
 # Device access for as-you-type is via udev + emobie-input group.
 # The daemon waits for $XDG_RUNTIME_DIR/wayland-* if started slightly early.
 NoNewPrivileges=true
-PassEnvironment=WAYLAND_DISPLAY DISPLAY XAUTHORITY XDG_RUNTIME_DIR
+PassEnvironment=WAYLAND_DISPLAY DISPLAY XAUTHORITY XDG_RUNTIME_DIR XKB_DEFAULT_LAYOUT XKB_DEFAULT_MODEL XKB_DEFAULT_VARIANT XKB_DEFAULT_OPTIONS
 
 [Install]
 WantedBy=graphical-session.target

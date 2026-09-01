@@ -59,6 +59,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.10" date="2026-09-01">
+      <description>
+        <p>Favorite emoji macros, emoticon style setting, inputd preferences bootstrap, and AppImage WebKit bundling fix.</p>
+      </description>
+    </release>
     <release version="0.6.9" date="2026-08-28">
       <description>
         <p>Layout-aware text expansion, seamless AppImage/Flatpak helper install, and SELinux auto-setup during Grant.</p>

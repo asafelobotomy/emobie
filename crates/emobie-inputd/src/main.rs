@@ -5,6 +5,7 @@ mod matcher;
 mod protocol;
 mod session_env;
 mod socket_path;
+mod prefs_bootstrap;
 mod state;
 
 use matcher::TriggerTrie;
@@ -244,7 +245,10 @@ fn main() {
     };
     let _ = fs::remove_file(&path);
 
-    let persisted = state::load();
+    let mut persisted = state::load();
+    if prefs_bootstrap::apply_if_empty(&mut persisted) {
+        state::save(persisted.enabled, &persisted.matches);
+    }
     let enabled = Arc::new(AtomicBool::new(persisted.enabled));
     let trie = Arc::new(Mutex::new(TriggerTrie::default()));
     let stored = Arc::new(Mutex::new(persisted.matches.clone()));

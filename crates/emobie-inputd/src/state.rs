@@ -6,6 +6,10 @@ use std::fs;
 use std::io::Write;
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::PathBuf;
+use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+static SAVE_MUTEX: Mutex<()> = Mutex::new(());
 
 pub const MAX_MATCHES: usize = 2_000;
 pub const MAX_TRIGGER_LEN: usize = 256;
@@ -89,6 +93,9 @@ pub fn load() -> PersistedState {
 }
 
 pub fn save(enabled: bool, matches: &[MatchRule]) {
+    let Ok(_guard) = SAVE_MUTEX.lock() else {
+        return;
+    };
     let Some(path) = state_path() else {
         return;
     };
@@ -110,7 +117,11 @@ pub fn save(enabled: bool, matches: &[MatchRule]) {
     let Ok(body) = serde_json::to_string_pretty(&state) else {
         return;
     };
-    let tmp = path.with_extension("json.tmp");
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let tmp = path.with_extension(format!("json.{nonce}.tmp"));
     let write_result = (|| -> std::io::Result<()> {
         let mut file = fs::OpenOptions::new()
             .create(true)

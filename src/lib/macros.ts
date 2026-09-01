@@ -3,7 +3,8 @@ import {
   EMOJIS,
   type SkinTone,
 } from "../data/loadEmojis";
-import type { Macro } from "../types/preferences";
+import type { EmoticonStyle, Macro } from "../types/preferences";
+import { filterEmoticonsByStyle } from "./emoticonStyle";
 import {
   shortcodeTrigger,
   type MacroEntry,
@@ -29,32 +30,44 @@ function pushUnique(
   entries.push(entry);
 }
 
-export function buildShortcodeMacros(skinTone: SkinTone): MacroEntry[] {
+const EMOJI_BY_HEX = new Map(EMOJIS.map((emoji) => [emoji.hexcode, emoji]));
+
+/** Shortcodes and emoticons for favorited emojis only (not the full library). */
+export function buildFavoriteEmojiMacros(
+  favorites: string[],
+  skinTone: SkinTone,
+  emoticonStyle: EmoticonStyle,
+): MacroEntry[] {
   const entries: MacroEntry[] = [];
   const seen = new Set<string>();
 
-  for (const emoji of EMOJIS) {
+  for (const hexcode of favorites) {
+    const emoji = EMOJI_BY_HEX.get(hexcode);
+    if (!emoji) continue;
     const expansion = applySkinTone(emoji, skinTone);
     for (const code of emoji.shortcodes) {
       pushUnique(entries, seen, {
-        id: `shortcode:${shortcodeTrigger(code)}`,
+        id: `favorite:${hexcode}:${shortcodeTrigger(code)}`,
         trigger: shortcodeTrigger(code),
         expansion,
         hotkey: null,
         enabled: true,
-        source: "shortcode",
+        source: "favorite",
         label: emoji.label,
         group: emoji.group,
       });
     }
-    for (const emoticon of emoji.emoticons) {
+    for (const emoticon of filterEmoticonsByStyle(
+      emoji.emoticons,
+      emoticonStyle,
+    )) {
       pushUnique(entries, seen, {
-        id: `emoticon:${emoticon}`,
+        id: `favorite:${hexcode}:emoticon:${emoticon}`,
         trigger: emoticon,
         expansion,
         hotkey: null,
         enabled: true,
-        source: "shortcode",
+        source: "favorite",
         label: emoji.label,
         group: emoji.group,
       });
@@ -66,17 +79,26 @@ export function buildShortcodeMacros(skinTone: SkinTone): MacroEntry[] {
 
 export function mergeMacros(
   custom: Macro[],
-  options: { showShortcodes: boolean; skinTone: SkinTone },
+  options: {
+    favoriteEmojiMacros: boolean;
+    favorites: string[];
+    skinTone: SkinTone;
+    emoticonStyle: EmoticonStyle;
+  },
 ): MacroEntry[] {
   const customEntries: MacroEntry[] = custom.map((macro) => ({
     ...macro,
     source: "custom",
   }));
-  if (!options.showShortcodes) return customEntries;
+  if (!options.favoriteEmojiMacros || options.favorites.length === 0) {
+    return customEntries;
+  }
 
   const customTriggers = new Set(custom.map((macro) => macro.trigger));
-  const shortcodes = buildShortcodeMacros(options.skinTone).filter(
-    (entry) => !customTriggers.has(entry.trigger),
-  );
-  return [...customEntries, ...shortcodes];
+  const favoriteEntries = buildFavoriteEmojiMacros(
+    options.favorites,
+    options.skinTone,
+    options.emoticonStyle,
+  ).filter((entry) => !customTriggers.has(entry.trigger));
+  return [...customEntries, ...favoriteEntries];
 }

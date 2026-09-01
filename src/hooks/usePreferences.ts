@@ -3,6 +3,7 @@ import {
   DEFAULT_PREFERENCES,
   type Macro,
   type MacroTriggerMode,
+  type EmoticonStyle,
   type Preferences,
   type ThemeMode,
   type EmojiSize,
@@ -100,8 +101,12 @@ export function usePreferences() {
     (sortBy: SortBy) => update({ sortBy }),
     [update],
   );
-  const setShowShortcodeMacros = useCallback(
-    (showShortcodeMacros: boolean) => update({ showShortcodeMacros }),
+  const setFavoriteEmojiMacros = useCallback(
+    (favoriteEmojiMacros: boolean) => update({ favoriteEmojiMacros }),
+    [update],
+  );
+  const setEmoticonStyle = useCallback(
+    (emoticonStyle: EmoticonStyle) => update({ emoticonStyle }),
     [update],
   );
   const setAutoPasteOnCopy = useCallback(
@@ -241,7 +246,8 @@ export function usePreferences() {
     setStartMinimizedToTray,
     setAllowMultipleInstances,
     setSortBy,
-    setShowShortcodeMacros,
+    setFavoriteEmojiMacros,
+    setEmoticonStyle,
     setAutoPasteOnCopy,
     setExpandAsYouType,
     setExpandTriggerMode,

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.10] - 2026-09-01
+
+### Added
+
+- Favorite emoji macros: shortcodes and emoticons only for emojis in **Favorites**
+- Settings → **Emoticon style** (`:) ` vs `:-) `)
+- `emobie-inputd` bootstraps expand match rules from `preferences.json` when persisted state is empty (e.g. helper starts at login before the app)
+
+### Changed
+
+- Macros UI and docs: favorite-based emoji macros replace global built-in shortcode packs
+
+### Fixed
+
+- AppImage: stage WebKit network/web helper processes and fix gtk plugin library paths (reduces blank WebView on Wayland)
+- AppImage icon staging: prefer larger root icon and set `.DirIcon`
+
 ## [0.6.9] - 2026-08-28
 
 ### Added
@@ -227,7 +244,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Horizontal mouse-wheel scrolling in wide layouts
 - Tray icon temp path for Flatpak-friendly sandboxing
 
-[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.9...HEAD
+[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.10...HEAD
+[0.6.10]: https://github.com/asafelobotomy/emobie/compare/v0.6.9...v0.6.10
 [0.6.9]: https://github.com/asafelobotomy/emobie/compare/v0.6.8...v0.6.9
 [0.6.8]: https://github.com/asafelobotomy/emobie/compare/v0.6.7...v0.6.8
 [0.6.7]: https://github.com/asafelobotomy/emobie/compare/v0.6.6...v0.6.7

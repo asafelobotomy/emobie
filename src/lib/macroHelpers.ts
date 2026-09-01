@@ -1,9 +1,9 @@
 import type { Macro, MacroTriggerMode } from "../types/preferences.ts";
 
 export type MacroEntry = Macro & {
-  source: "custom" | "shortcode";
+  source: "custom" | "favorite";
   label?: string;
-  /** Emojibase group id for shortcode macros. */
+  /** Emojibase group id for favorite emoji macros. */
   group?: number;
 };
 
@@ -45,14 +45,16 @@ export function expansionMatches(
     });
 }
 
-/** Matches for emobie-inputd — never include shortcode catalog (daemon max 2000). */
+/** Matches for emobie-inputd — custom macros plus optional favorited emoji subset. */
 export function customExpansionMatches(
   macros: MacroEntry[],
   mode: MacroTriggerMode,
   keepTriggerSpace = false,
 ): { trigger: string; expansion: string; mode: MacroTriggerMode }[] {
   return expansionMatches(
-    macros.filter((macro) => macro.source !== "shortcode"),
+    macros.filter(
+      (macro) => macro.source === "custom" || macro.source === "favorite",
+    ),
     mode,
     keepTriggerSpace,
   );

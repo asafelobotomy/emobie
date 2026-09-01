@@ -2,6 +2,7 @@ import {
   DEFAULT_PREFERENCES,
   type Macro,
   type MacroTriggerMode,
+  type EmoticonStyle,
   type Preferences,
   type ThemeMode,
   type EmojiSize,
@@ -76,6 +77,10 @@ function normalizeTriggerMode(raw: unknown): MacroTriggerMode {
   return raw === "immediate" ? "immediate" : "space";
 }
 
+function normalizeEmoticonStyle(raw: unknown): EmoticonStyle {
+  return raw === "classic" ? "classic" : "minimal";
+}
+
 export function normalizePreferences(
   saved: Partial<Preferences> | undefined,
 ): Preferences {
@@ -116,7 +121,8 @@ export function normalizePreferences(
       ? merged.favorites.filter(Boolean)
       : [],
     macros: normalizeMacros(merged.macros),
-    showShortcodeMacros: merged.showShortcodeMacros !== false,
+    favoriteEmojiMacros: Boolean(merged.favoriteEmojiMacros),
+    emoticonStyle: normalizeEmoticonStyle(merged.emoticonStyle),
     autoPasteOnCopy: Boolean(merged.autoPasteOnCopy),
     expandAsYouType: Boolean(merged.expandAsYouType),
     expandTriggerMode: normalizeTriggerMode(merged.expandTriggerMode),

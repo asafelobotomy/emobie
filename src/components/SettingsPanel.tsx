@@ -8,8 +8,10 @@ import { SettingsLifecycleHints } from "./SettingsLifecycleHints";
 import { UpdateBanner } from "./UpdateBanner";
 import {
   SORT_OPTIONS,
+  EMOTICON_STYLE_OPTIONS,
   type Macro,
   type MacroTriggerMode,
+  type EmoticonStyle,
   type Preferences,
   type ThemeMode,
   type EmojiSize,
@@ -44,7 +46,8 @@ type SettingsPanelProps = {
   onStartMinimizedToTray: (enabled: boolean) => void;
   onAllowMultipleInstances: (enabled: boolean) => void;
   onSortBy: (sortBy: SortBy) => void;
-  onShowShortcodeMacros: (value: boolean) => void;
+  onFavoriteEmojiMacros: (value: boolean) => void;
+  onEmoticonStyle: (style: EmoticonStyle) => void;
   onAutoPasteOnCopy: (value: boolean) => void;
   onExpandAsYouType: (value: boolean) => void;
   onExpandTriggerMode: (value: MacroTriggerMode) => void;
@@ -85,7 +88,8 @@ export function SettingsPanel({
   onStartMinimizedToTray,
   onAllowMultipleInstances,
   onSortBy,
-  onShowShortcodeMacros,
+  onFavoriteEmojiMacros,
+  onEmoticonStyle,
   onAutoPasteOnCopy,
   onExpandAsYouType,
   onExpandTriggerMode,
@@ -291,6 +295,27 @@ export function SettingsPanel({
         </div>
 
         <div className="settings-row">
+          <label htmlFor="emoticon-style">Emoticon style</label>
+          <select
+            id="emoticon-style"
+            value={prefs.emoticonStyle}
+            onChange={(event) =>
+              onEmoticonStyle(event.target.value as EmoticonStyle)
+            }
+          >
+            {EMOTICON_STYLE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="settings-hint settings-hint-block">
+          Controls which ASCII emoticon triggers are used for favorite emoji
+          macros — for example <code>:)</code> vs <code>:-)</code>.
+        </p>
+
+        <div className="settings-row">
           <label htmlFor="recent-max">Recent history size</label>
           <input
             id="recent-max"
@@ -349,8 +374,9 @@ export function SettingsPanel({
 
         <MacrosSettings
           macros={prefs.macros}
-          showShortcodeMacros={prefs.showShortcodeMacros}
-          onShowShortcodes={onShowShortcodeMacros}
+          favorites={prefs.favorites}
+          favoriteEmojiMacros={prefs.favoriteEmojiMacros}
+          onFavoriteEmojiMacros={onFavoriteEmojiMacros}
           onSetMacros={onSetMacros}
         />
 

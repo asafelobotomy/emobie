@@ -152,27 +152,27 @@ export function MacroList({
   const [openGroups, setOpenGroups] = useState<Set<number>>(() => new Set());
   const wasSearching = useRef(false);
 
-  const { custom, shortcodes } = useMemo(() => {
+  const { custom, favoriteMacros } = useMemo(() => {
     const nextCustom: MacroEntry[] = [];
-    const nextShortcodes: MacroEntry[] = [];
+    const nextFavorite: MacroEntry[] = [];
     for (const macro of macros) {
       if (macro.source === "custom") nextCustom.push(macro);
-      else nextShortcodes.push(macro);
+      else nextFavorite.push(macro);
     }
-    return { custom: nextCustom, shortcodes: nextShortcodes };
+    return { custom: nextCustom, favoriteMacros: nextFavorite };
   }, [macros]);
 
-  const shortcodeGroups = useMemo(
-    () => groupShortcodes(shortcodes),
-    [shortcodes],
+  const favoriteGroups = useMemo(
+    () => groupShortcodes(favoriteMacros),
+    [favoriteMacros],
   );
 
   useEffect(() => {
-    if (searchActive && shortcodes.length > 0) {
+    if (searchActive && favoriteMacros.length > 0) {
       wasSearching.current = true;
       setEmojiOpen(true);
       setOpenGroups(
-        new Set(shortcodeGroups.map((group) => group.category.id)),
+        new Set(favoriteGroups.map((group) => group.category.id)),
       );
       return;
     }
@@ -181,9 +181,9 @@ export function MacroList({
       setEmojiOpen(false);
       setOpenGroups(new Set());
     }
-  }, [searchActive, shortcodes.length, shortcodeGroups]);
+  }, [searchActive, favoriteMacros.length, favoriteGroups]);
 
-  const nothingVisible = custom.length === 0 && shortcodes.length === 0;
+  const nothingVisible = custom.length === 0 && favoriteMacros.length === 0;
 
   const toggleEmojiSection = () => {
     setEmojiOpen((open) => {
@@ -252,7 +252,7 @@ export function MacroList({
         )}
       </section>
 
-      {shortcodes.length > 0 ? (
+      {favoriteMacros.length > 0 ? (
         <section
           className="macro-section macro-section-emoji"
           aria-labelledby="macro-section-emoji"
@@ -261,14 +261,14 @@ export function MacroList({
             <DisclosureButton
               id="macro-section-emoji"
               open={emojiOpen}
-              label="Emoji macros"
-              count={shortcodes.length}
+              label="Favorite emoji macros"
+              count={favoriteMacros.length}
               onToggle={toggleEmojiSection}
             />
           </div>
           {emojiOpen ? (
             <div className="macro-category-list" hidden={!emojiOpen}>
-              {shortcodeGroups.map(({ category, macros: items }) => {
+              {favoriteGroups.map(({ category, macros: items }) => {
                 const open = openGroups.has(category.id);
                 const panelId = `macro-cat-${category.key}`;
                 return (

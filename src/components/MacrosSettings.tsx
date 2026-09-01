@@ -7,15 +7,17 @@ import {
 
 type MacrosSettingsProps = {
   macros: Macro[];
-  showShortcodeMacros: boolean;
-  onShowShortcodes: (value: boolean) => void;
+  favorites: string[];
+  favoriteEmojiMacros: boolean;
+  onFavoriteEmojiMacros: (value: boolean) => void;
   onSetMacros: (macros: Macro[]) => void;
 };
 
 export function MacrosSettings({
   macros,
-  showShortcodeMacros,
-  onShowShortcodes,
+  favorites,
+  favoriteEmojiMacros,
+  onFavoriteEmojiMacros,
   onSetMacros,
 }: MacrosSettingsProps) {
   const [ioMessage, setIoMessage] = useState<string | null>(null);
@@ -58,18 +60,26 @@ export function MacrosSettings({
       </p>
 
       <div className="settings-row settings-toggle-row">
-        <label htmlFor="show-shortcodes">Show emoji shortcodes</label>
+        <label htmlFor="favorite-emoji-macros">
+          Add favorited emojis as macros
+        </label>
         <input
-          id="show-shortcodes"
+          id="favorite-emoji-macros"
           type="checkbox"
-          checked={showShortcodeMacros}
-          onChange={(event) => onShowShortcodes(event.target.checked)}
+          checked={favoriteEmojiMacros}
+          onChange={(event) => onFavoriteEmojiMacros(event.target.checked)}
         />
       </div>
       <p className="settings-hint settings-hint-block">
-        Built-in <code>:smile:</code> shortcodes and emoticons appear in
-        collapsed sections under Macros.
+        When on, shortcodes and emoticons for emojis in your Favorites appear
+        under Macros. Choose <code>:)</code> vs <code>:-)</code> style in
+        Settings → Emoticon style.
       </p>
+      {favoriteEmojiMacros && favorites.length === 0 ? (
+        <p className="settings-hint settings-hint-block">
+          No favorites yet — star some emojis first.
+        </p>
+      ) : null}
 
       <div className="settings-actions macros-io-actions">
         <button type="button" className="btn" onClick={exportYaml}>

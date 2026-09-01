@@ -10,15 +10,16 @@ Open the **Macros** category. Each card shows the expansion on top and the
 trigger below — click to copy. Use **+** to add a custom macro; right-click a
 custom card to edit or delete it.
 
-Built-in emoji macros include shortcodes (`:smile:`) from common packs plus
-ASCII emoticons (`:)`, `;')`, `:')`, `<3`, …). Toggle them in Settings →
-Show emoji shortcodes. YAML import/export remains in Settings.
+Optional **favorite emoji macros** add shortcodes (`:smile:`) and emoticons for
+emojis in your **Favorites** only. Choose **:) style** or **:-) style** under
+Settings → Emoticon style. Right-click emojis in the grid to favorite them.
+YAML import/export remains in Settings.
 
 ## Layers
 
 | Layer | What | Flatpak |
 |-------|------|---------|
-| A | Macros UI, shortcodes, YAML, hotkeys, clipboard copy | Fully supported |
+| A | Macros UI, favorite emoji macros, YAML, hotkeys, clipboard copy | Fully supported |
 | B | Auto-paste after copy (Ctrl+V + clipboard restore) | Needs host `emobie-inputd` |
 | C | As-you-type trigger expansion | Needs host `emobie-inputd` with input access |
 
@@ -118,7 +119,7 @@ you finish a trigger with Space (for example type `.hi` then Space). Optionally
 enable **Keep Space after expansion** so `.hi` + Space becomes `hiya `
 (with a trailing space) instead of `hiya`.
 
-Built-in emoji shortcodes stay in **collapsed** sections on the Macros page.
+Favorite emoji macros (when enabled) stay in **collapsed** sections on the Macros page.
 
 ## Build the helper manually
 

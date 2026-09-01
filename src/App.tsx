@@ -63,7 +63,8 @@ function App() {
     setStartMinimizedToTray,
     setAllowMultipleInstances,
     setSortBy,
-    setShowShortcodeMacros,
+    setFavoriteEmojiMacros,
+    setEmoticonStyle,
     setAutoPasteOnCopy,
     setExpandAsYouType,
     setExpandTriggerMode,
@@ -160,10 +161,18 @@ function App() {
   const mergedMacros = useMemo(
     () =>
       mergeMacros(prefs.macros, {
-        showShortcodes: prefs.showShortcodeMacros,
+        favoriteEmojiMacros: prefs.favoriteEmojiMacros,
+        favorites: prefs.favorites,
         skinTone: prefs.skinTone,
+        emoticonStyle: prefs.emoticonStyle,
       }),
-    [prefs.macros, prefs.showShortcodeMacros, prefs.skinTone],
+    [
+      prefs.macros,
+      prefs.favoriteEmojiMacros,
+      prefs.favorites,
+      prefs.skinTone,
+      prefs.emoticonStyle,
+    ],
   );
 
   const visibleMacros = useMemo(() => {
@@ -214,8 +223,7 @@ function App() {
     expandAsYouType: prefs.expandAsYouType,
     expandTriggerMode: prefs.expandTriggerMode,
     expandKeepTriggerSpace: prefs.expandKeepTriggerSpace,
-    // Custom macros only — shortcode catalog exceeds the daemon match cap.
-    macros: prefs.macros,
+    expansionMacros: mergedMacros,
     onStatus: setInputStatus,
     onSyncError: (message) => {
       setInputStatus((prev) =>
@@ -272,8 +280,9 @@ function App() {
   }, [query, activeCategory, prefs.skinTone, prefs.favorites, sortCtx, macrosMode]);
 
   const emptyMessage = macrosMode
-    ? prefs.macros.length === 0 && !prefs.showShortcodeMacros
-      ? "Tap + to add a macro, or enable emoji shortcodes in Settings."
+    ? prefs.macros.length === 0 &&
+      !(prefs.favoriteEmojiMacros && prefs.favorites.length > 0)
+      ? "Tap + to add a macro, or enable favorited emoji macros in Settings."
       : "No macros match your search."
     : !query.trim() && activeCategory === FAVORITES_CATEGORY_ID
       ? "Right-click an emoji to add it to Favorites."
@@ -376,7 +385,8 @@ function App() {
           onStartMinimizedToTray={setStartMinimizedToTray}
           onAllowMultipleInstances={setAllowMultipleInstances}
           onSortBy={setSortBy}
-          onShowShortcodeMacros={setShowShortcodeMacros}
+          onFavoriteEmojiMacros={setFavoriteEmojiMacros}
+          onEmoticonStyle={setEmoticonStyle}
           onAutoPasteOnCopy={setAutoPasteOnCopy}
           onExpandAsYouType={setExpandAsYouType}
           onExpandTriggerMode={setExpandTriggerMode}

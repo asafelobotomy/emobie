@@ -64,18 +64,26 @@ fix_appdir() {
   fix_hicolor "$appdir/usr/share/icons/hicolor"
   fix_desktop_dir "$appdir/usr/share/applications"
   # AppImage root icon should be a decent size, not 32px.
-  if [[ -f "$appdir/usr/share/icons/hicolor/256x256/apps/${ICON_ID}.png" ]]; then
-    cp -f "$appdir/usr/share/icons/hicolor/256x256/apps/${ICON_ID}.png" "$appdir/${ICON_ID}.png"
+  local root_icon=""
+  for size in 512 256 128; do
+    if [[ -f "$appdir/usr/share/icons/hicolor/${size}x${size}/apps/${ICON_ID}.png" ]]; then
+      root_icon="$appdir/usr/share/icons/hicolor/${size}x${size}/apps/${ICON_ID}.png"
+      break
+    fi
+  done
+  if [[ -n "$root_icon" ]]; then
+    cp -f "$root_icon" "$appdir/${ICON_ID}.png"
     ln -sfn "${ICON_ID}.png" "$appdir/emobie.png"
-  elif [[ -f "$appdir/usr/share/icons/hicolor/128x128/apps/${ICON_ID}.png" ]]; then
-    cp -f "$appdir/usr/share/icons/hicolor/128x128/apps/${ICON_ID}.png" "$appdir/${ICON_ID}.png"
-    ln -sfn "${ICON_ID}.png" "$appdir/emobie.png"
+    ln -sfn "${ICON_ID}.png" "$appdir/.DirIcon"
+  elif [[ -f "$appdir/emobie.png" ]]; then
+    cp -f "$appdir/emobie.png" "$appdir/${ICON_ID}.png"
   fi
   if [[ -f "$appdir/usr/share/applications/${ICON_ID}.desktop" ]]; then
     ln -sfn "usr/share/applications/${ICON_ID}.desktop" "$appdir/${ICON_ID}.desktop"
     ln -sfn "${ICON_ID}.desktop" "$appdir/emobie.desktop"
   fi
   stage_inputd_in_appdir "$appdir"
+  stage_webkit_helpers_in_appdir "$appdir"
 }
 
 stage_inputd_in_appdir() {
@@ -86,6 +94,47 @@ stage_inputd_in_appdir() {
   mkdir -p "$dest"
   echo "Bundling input helper in AppImage: $dest"
   cp -a "$stage"/. "$dest"/
+}
+
+# linuxdeploy's gtk plugin rewrites /usr → ././ in libwebkit* but does not copy
+# WebKitNetworkProcess/WebKitWebProcess; they must live under $APPDIR/lib/webkit2gtk-4.1/.
+stage_webkit_helpers_in_appdir() {
+  local appdir="$1"
+  [[ -f "$appdir/usr/lib/libwebkit2gtk-4.1.so.0" ]] || return 0
+
+  local src=""
+  for candidate in \
+    /usr/lib/webkit2gtk-4.1 \
+    /usr/lib64/webkit2gtk-4.1 \
+    /usr/lib/x86_64-linux-gnu/webkit2gtk-4.1; do
+    if [[ -d "$candidate" && -x "$candidate/WebKitNetworkProcess" ]]; then
+      src="$candidate"
+      break
+    fi
+  done
+  if [[ -z "$src" ]]; then
+    echo "WARNING: system webkit2gtk-4.1 helpers not found; AppImage WebView may fail" >&2
+    return 0
+  fi
+
+  echo "Bundling WebKit helpers from $src"
+  mkdir -p "$appdir/usr/lib/webkit2gtk-4.1" "$appdir/lib/webkit2gtk-4.1"
+  cp -a "$src"/. "$appdir/usr/lib/webkit2gtk-4.1"/
+  cp -a "$src"/. "$appdir/lib/webkit2gtk-4.1"/
+  find "$appdir/usr/lib" "$appdir/lib" -name 'libwebkit*' -exec \
+    sed -i -e 's|/usr|././|g' '{}' \;
+
+  local hook="$appdir/apprun-hooks/linuxdeploy-plugin-gtk.sh"
+  if [[ -f "$hook" ]] && ! grep -q 'dirname "$(realpath "$0")"' "$hook"; then
+    sed -i \
+      -e 's|^export APPDIR=.*|export APPDIR="$(dirname "$(realpath "$0")")"|' \
+      -e 's|^cd "$APPDIR"$|cd "$APPDIR"|' \
+      "$hook"
+    # Ensure cd after APPDIR is set (hook may only have had export before).
+    if ! grep -q '^cd "$APPDIR"$' "$hook"; then
+      sed -i '/^export APPDIR=/a cd "$APPDIR"' "$hook"
+    fi
+  fi
 }
 
 repack_deb() {

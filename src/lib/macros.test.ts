@@ -30,7 +30,8 @@ describe("normalizePreferences macros", () => {
   it("fills macro defaults", () => {
     const prefs = normalizePreferences({});
     assert.deepEqual(prefs.macros, []);
-    assert.equal(prefs.showShortcodeMacros, true);
+    assert.equal(prefs.favoriteEmojiMacros, false);
+    assert.equal(prefs.emoticonStyle, "minimal");
     assert.equal(prefs.autoPasteOnCopy, false);
     assert.equal(prefs.expandAsYouType, false);
     assert.equal(prefs.expandTriggerMode, "space");
@@ -70,7 +71,7 @@ describe("macros helpers", () => {
         expansion: "🙂",
         hotkey: null,
         enabled: true,
-        source: "shortcode",
+        source: "favorite",
       },
     ];
     assert.equal(searchMacros(list, "regards").length, 1);
@@ -113,7 +114,7 @@ describe("macros helpers", () => {
     );
   });
 
-  it("customExpansionMatches drops shortcode catalog entries", () => {
+  it("customExpansionMatches includes custom and favorite entries", () => {
     const list: MacroEntry[] = [
       {
         id: "1",
@@ -129,12 +130,15 @@ describe("macros helpers", () => {
         expansion: "🙂",
         hotkey: null,
         enabled: true,
-        source: "shortcode",
+        source: "favorite",
       },
     ];
     const synced = customExpansionMatches(list, "space");
-    assert.equal(synced.length, 1);
-    assert.equal(synced[0].trigger, ".hi");
+    assert.equal(synced.length, 2);
+    assert.deepEqual(
+      synced.map((m) => m.trigger).sort(),
+      [".hi", ":smile:"],
+    );
   });
 });
 
