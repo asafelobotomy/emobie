@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from "react";
+import type { InputHelperStatus } from "../lib/inputHelper";
 import { prepareInputHelperForExpand } from "../lib/inputHelperClient";
 
 type FirstRunSetupProps = {
