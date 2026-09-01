@@ -38,14 +38,38 @@ fn marker_path() -> Option<PathBuf> {
     Some(data.join(FLATPAK_APP_ID).join(MARKER_NAME))
 }
 
-fn native_desktop_contents() -> Result<String, String> {
+fn native_autostart_exec() -> Result<String, String> {
+    fn escape_desktop_path(path: &PathBuf) -> String {
+        path.display().to_string().replace(' ', "\\ ")
+    }
+
+    // Prefer stable install paths over the ephemeral AppImage mount at current_exe().
+    if let Ok(appimage) = std::env::var("APPIMAGE") {
+        let path = PathBuf::from(&appimage);
+        if path.is_file() {
+            return Ok(escape_desktop_path(&path));
+        }
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        let launcher = PathBuf::from(&home).join(".local/bin/emobie");
+        if launcher.is_file() {
+            return Ok(escape_desktop_path(&launcher));
+        }
+        let appimage = PathBuf::from(&home).join(".local/bin/emobie.AppImage");
+        if appimage.is_file() {
+            return Ok(format!(
+                "env APPIMAGE_EXTRACT_AND_RUN=1 {}",
+                escape_desktop_path(&appimage)
+            ));
+        }
+    }
     let exe = std::env::current_exe().map_err(|err| err.to_string())?;
-    let exe = exe
-        .canonicalize()
-        .unwrap_or(exe)
-        .display()
-        .to_string()
-        .replace(' ', "\\ ");
+    let exe = exe.canonicalize().unwrap_or(exe);
+    Ok(escape_desktop_path(&PathBuf::from(exe)))
+}
+
+fn native_desktop_contents() -> Result<String, String> {
+    let exe = native_autostart_exec()?;
     Ok(format!(
         "\
 [Desktop Entry]

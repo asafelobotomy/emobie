@@ -11,11 +11,15 @@ pub struct KeymapState {
 
 impl KeymapState {
     pub fn new() -> Self {
-        let ctx = xkb::Context::new(xkb::CONTEXT_NO_FLAGS);
-        let keymap = load_keymap(&ctx).unwrap_or_else(|| fallback_keymap(&ctx));
-        let state = xkb::State::new(&keymap);
         Self {
-            state: Mutex::new(state),
+            state: Mutex::new(session_state()),
+        }
+    }
+
+    /// Reload layout from session XKB_DEFAULT_* (handles runtime layout changes).
+    pub fn reload_from_session(&self) {
+        if let Ok(mut guard) = self.state.lock() {
+            *guard = session_state();
         }
     }
 
@@ -42,6 +46,12 @@ impl KeymapState {
             Some(text)
         }
     }
+}
+
+fn session_state() -> xkb::State {
+    let ctx = xkb::Context::new(xkb::CONTEXT_NO_FLAGS);
+    let keymap = load_keymap(&ctx).unwrap_or_else(|| fallback_keymap(&ctx));
+    xkb::State::new(&keymap)
 }
 
 fn load_keymap(ctx: &xkb::Context) -> Option<xkb::Keymap> {

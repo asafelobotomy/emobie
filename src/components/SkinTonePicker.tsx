@@ -14,7 +14,7 @@ export function SkinTonePicker({ skinTone, onSkinTone }: SkinTonePickerProps) {
           key={tone.tone}
           type="button"
           className="skin-swatch"
-          style={{ background: tone.swatch }}
+          data-tone={tone.tone}
           title={tone.label}
           aria-label={tone.label}
           aria-pressed={skinTone === tone.tone}

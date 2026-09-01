@@ -20,11 +20,22 @@ export function UpdateBanner({
   if (!updateInfo.newerAvailable) return null;
 
   const runUpdate = () => {
-    if (!updateInfo.downloadUrl || !updateInfo.assetName || busy) return;
+    if (
+      !updateInfo.downloadUrl ||
+      !updateInfo.assetName ||
+      !updateInfo.latest ||
+      busy
+    ) {
+      return;
+    }
     setBusy(true);
     setError(null);
     setMessage("Downloading and installing…");
-    void applyUpdate(updateInfo.downloadUrl, updateInfo.assetName)
+    void applyUpdate(
+      updateInfo.latest,
+      updateInfo.downloadUrl,
+      updateInfo.assetName,
+    )
       .then((result) => {
         setMessage(result.detail);
         setBusy(false);

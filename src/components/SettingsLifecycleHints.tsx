@@ -5,6 +5,7 @@ type SettingsLifecycleHintsProps = {
   pinDetail?: string | null;
   prefsError?: string | null;
   autostartError?: string | null;
+  multiInstanceEnabled?: boolean;
 };
 
 /** Tray / pin / prefs / autostart status lines for Settings. */
@@ -15,6 +16,7 @@ export function SettingsLifecycleHints({
   pinDetail,
   prefsError,
   autostartError,
+  multiInstanceEnabled,
 }: SettingsLifecycleHintsProps) {
   return (
     <>
@@ -33,6 +35,12 @@ export function SettingsLifecycleHints({
       {prefsError ? <p className="settings-error">{prefsError}</p> : null}
       {autostartError ? (
         <p className="settings-error">{autostartError}</p>
+      ) : null}
+      {multiInstanceEnabled ? (
+        <p className="settings-hint">
+          Multiple instances share the same preference files — concurrent edits
+          can overwrite each other. Use a single instance for macros and settings.
+        </p>
       ) : null}
       <p className="settings-hint settings-hint-block">
         Flatpak prefers the Background portal for startup; native installs use

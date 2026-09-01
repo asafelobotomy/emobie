@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { InputHelperStatus } from "../lib/inputHelper";
 
@@ -13,7 +13,7 @@ function expandReady(status: InputHelperStatus): boolean {
   return Boolean(status.daemon && status.canListen && status.canInject);
 }
 
-/** Ensures the input helper on every launch and opens first-run setup when needed. */
+/** Opens first-run setup when needed; status polling only (start/sync owns ensure). */
 export function useFirstRunSetup({
   ready,
   setupSeen,
@@ -21,45 +21,42 @@ export function useFirstRunSetup({
   onMarkSeen,
 }: Options) {
   const [open, setOpen] = useState(false);
+  const onStatusRef = useRef(onStatus);
+  const onMarkSeenRef = useRef(onMarkSeen);
+  onStatusRef.current = onStatus;
+  onMarkSeenRef.current = onMarkSeen;
 
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
 
-    // Always try to start emobie-inputd with the app (systemd enable --now or spawn).
-    void invoke<InputHelperStatus>("input_helper_ensure_started")
-      .then((status) => {
-        if (cancelled) return;
-        onStatus(status);
-        if (setupSeen) return;
-        // Match Settings: listen + inject required before treating Expand as ready.
-        if (expandReady(status)) {
-          onMarkSeen();
-          return;
-        }
-        setOpen(true);
-      })
-      .catch(() => {
-        if (!cancelled && !setupSeen) setOpen(true);
-      });
-
     const refresh = () => {
       void invoke<InputHelperStatus>("input_helper_status")
         .then((status) => {
-          if (!cancelled) onStatus(status);
+          if (cancelled) return;
+          onStatusRef.current(status);
+          if (setupSeen) return;
+          if (expandReady(status)) {
+            onMarkSeenRef.current();
+            return;
+          }
+          setOpen(true);
         })
-        .catch(() => undefined);
+        .catch(() => {
+          if (!cancelled && !setupSeen) setOpen(true);
+        });
     };
-    // Slow poll — Expand sync owns start/status on the settings path.
+
+    refresh();
     const timer = window.setInterval(refresh, 15000);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [ready, setupSeen, onStatus, onMarkSeen]);
+  }, [ready, setupSeen]);
 
   const finish = () => {
-    onMarkSeen();
+    onMarkSeenRef.current();
     setOpen(false);
   };
 

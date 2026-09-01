@@ -1,5 +1,6 @@
 //! Load expand settings from ~/.local/share/emobie/preferences.json when
-//! persisted inputd state has no matches (e.g. inputd starts at login before emobie).
+//! no inputd-state.json exists yet (e.g. inputd starts at login before emobie).
+//! An existing state file with empty matches is left alone (user cleared macros).
 
 use crate::protocol::{MatchRule, TriggerMode};
 use crate::state::PersistedState;
@@ -81,8 +82,9 @@ fn matches_from_preferences(prefs: &Value) -> Option<Vec<MatchRule>> {
     Some(matches)
 }
 
-/// When persisted state has no matches, mirror expand settings from preferences.json.
-/// Returns true if `state` was updated.
+/// When there is no on-disk state yet and matches are empty, mirror expand
+/// settings from preferences.json. Returns true if `state` was updated.
+/// Callers must only invoke this when `state::load` reported no state file.
 pub fn apply_if_empty(state: &mut PersistedState) -> bool {
     if !state.matches.is_empty() {
         return false;

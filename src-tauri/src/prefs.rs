@@ -29,16 +29,15 @@ pub fn store_path() -> Option<PathBuf> {
     Some(data_home.join(APP_IDENTIFIER).join(PREFERENCES_FILE))
 }
 
-/// Stable host path shared by native, AppImage, deb/rpm, and Flatpak (via xdg-data/emobie).
+/// Stable path under `$XDG_DATA_HOME/emobie` (Flatpak finish-args mount
+/// `xdg-data/emobie`) or `~/.local/share/emobie` on native installs.
 pub fn durable_path() -> Option<PathBuf> {
-    let home = std::env::var_os("HOME")?;
-    Some(
-        PathBuf::from(home)
-            .join(".local")
-            .join("share")
-            .join("emobie")
-            .join(DURABLE_FILE),
-    )
+    let data_home = std::env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local").join("share"))
+        })?;
+    Some(data_home.join("emobie").join(DURABLE_FILE))
 }
 
 fn host_store_path() -> Option<PathBuf> {
@@ -91,7 +90,13 @@ fn preferences_from_file(path: &PathBuf) -> Option<Value> {
 }
 
 fn preferences_value() -> Option<Value> {
-    preferences_from_file(&store_path()?)
+    // Active Tauri store first; durable mirror for early startup before store exists.
+    if let Some(path) = store_path() {
+        if let Some(prefs) = preferences_from_file(&path) {
+            return Some(prefs);
+        }
+    }
+    durable_path().and_then(|path| preferences_from_file(&path))
 }
 
 fn pref_bool(key: &str) -> bool {
@@ -146,15 +151,31 @@ pub fn load_preference_snapshots() -> Vec<PreferenceSnapshot> {
 }
 
 #[tauri::command]
-pub fn save_durable_preferences(preferences: Value) -> Result<(), String> {
+pub fn save_durable_preferences(preferences: Value, write_rev: u64) -> Result<(), String> {
     if !preferences.is_object() {
         return Err("preferences must be a JSON object".into());
     }
     let path = durable_path().ok_or_else(|| "HOME is not set".to_string())?;
+    if write_rev > 0 {
+        if let Ok(raw) = fs::read_to_string(&path) {
+            if let Ok(existing) = serde_json::from_str::<Value>(&raw) {
+                let stored = existing
+                    .get("writeRev")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                if write_rev < stored {
+                    return Ok(());
+                }
+            }
+        }
+    }
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    let wrapped = serde_json::json!({ "preferences": preferences });
+    let wrapped = serde_json::json!({
+        "preferences": preferences,
+        "writeRev": write_rev,
+    });
     let body = serde_json::to_string_pretty(&wrapped).map_err(|e| e.to_string())?;
     let tmp = path.with_extension("json.tmp");
     fs::write(&tmp, body).map_err(|e| e.to_string())?;

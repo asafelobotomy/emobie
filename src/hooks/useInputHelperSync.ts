@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { customExpansionMatches, type MacroEntry } from "../lib/macros";
 import type { InputHelperStatus } from "../lib/inputHelper";
@@ -35,12 +35,78 @@ export function useInputHelperSync({
   onStatus,
   onSyncError,
 }: Options) {
+  const onStatusRef = useRef(onStatus);
+  const onSyncErrorRef = useRef(onSyncError);
+  onStatusRef.current = onStatus;
+  onSyncErrorRef.current = onSyncError;
+
+  const expansionMacrosKey = useMemo(
+    () =>
+      JSON.stringify(
+        expansionMacros.map((m) => [
+          m.trigger,
+          m.expansion,
+          m.enabled,
+          m.source,
+        ]),
+      ),
+    [expansionMacros],
+  );
+  const enableGeneration = useRef(0);
+  const syncGeneration = useRef(0);
+
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
+    const generation = ++enableGeneration.current;
+
+    void (async () => {
+      try {
+        const status = await invoke<InputHelperStatus>(
+          "input_helper_ensure_started",
+        );
+        if (cancelled || generation !== enableGeneration.current) return;
+        onStatusRef.current(status);
+      } catch (error) {
+        if (cancelled || generation !== enableGeneration.current) return;
+        onSyncErrorRef.current?.(
+          errMessage(error, "Could not start emobie-inputd."),
+        );
+      }
+      if (cancelled || generation !== enableGeneration.current) return;
+
+      try {
+        const status = await invoke<InputHelperStatus>(
+          "input_helper_set_enabled",
+          { enabled: expandAsYouType },
+        );
+        if (cancelled || generation !== enableGeneration.current) return;
+        onStatusRef.current(status);
+      } catch (error) {
+        if (cancelled || generation !== enableGeneration.current) return;
+        onSyncErrorRef.current?.(
+          errMessage(
+            error,
+            expandAsYouType
+              ? "Could not enable text expansion on the helper."
+              : "Could not disable text expansion on the helper.",
+          ),
+        );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, expandAsYouType]);
+
+  useEffect(() => {
+    if (!ready || !expandAsYouType) return;
+    let cancelled = false;
+    const generation = ++syncGeneration.current;
 
     const syncToDaemon = async () => {
-      if (cancelled || !expandAsYouType) return;
+      if (cancelled || generation !== syncGeneration.current) return;
       const matches = customExpansionMatches(
         expansionMacros,
         expandTriggerMode,
@@ -51,58 +117,22 @@ export function useInputHelperSync({
           "input_helper_sync_matches",
           { matches },
         );
-        if (!cancelled) onStatus(status);
+        if (cancelled || generation !== syncGeneration.current) return;
+        onStatusRef.current(status);
       } catch (error) {
-        if (!cancelled) {
-          onSyncError?.(
-            errMessage(
-              error,
-              "Could not sync expansion matches — Expand may be using stale macros.",
-            ),
-          );
-        }
+        if (cancelled || generation !== syncGeneration.current) return;
+        onSyncErrorRef.current?.(
+          errMessage(
+            error,
+            "Could not sync expansion matches — Expand may be using stale macros.",
+          ),
+        );
       }
     };
 
-    void (async () => {
-      try {
-        const status = await invoke<InputHelperStatus>(
-          "input_helper_ensure_started",
-        );
-        if (!cancelled) onStatus(status);
-      } catch (error) {
-        if (!cancelled) {
-          onSyncError?.(
-            errMessage(error, "Could not start emobie-inputd."),
-          );
-        }
-      }
-      if (cancelled) return;
-
-      try {
-        const status = await invoke<InputHelperStatus>(
-          "input_helper_set_enabled",
-          { enabled: expandAsYouType },
-        );
-        if (!cancelled) onStatus(status);
-      } catch (error) {
-        if (!cancelled) {
-          onSyncError?.(
-            errMessage(
-              error,
-              expandAsYouType
-                ? "Could not enable text expansion on the helper."
-                : "Could not disable text expansion on the helper.",
-            ),
-          );
-        }
-      }
-      if (cancelled || !expandAsYouType) return;
-      await syncToDaemon();
-    })();
+    void syncToDaemon();
 
     // Re-push matches if inputd restarted while emobie stayed open (tray/minimized).
-    if (!expandAsYouType) return;
     const resync = setInterval(() => {
       void syncToDaemon();
     }, 20_000);
@@ -116,8 +146,6 @@ export function useInputHelperSync({
     expandAsYouType,
     expandTriggerMode,
     expandKeepTriggerSpace,
-    expansionMacros,
-    onStatus,
-    onSyncError,
+    expansionMacrosKey,
   ]);
 }

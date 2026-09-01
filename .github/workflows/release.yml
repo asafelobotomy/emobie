@@ -88,6 +88,7 @@ jobs:
             patchelf \
             libssl-dev \
             libxdo-dev \
+            libxkbcommon-dev \
             build-essential \
             file \
             rpm \
@@ -133,6 +134,34 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN=1 "$APPIMAGE" --appimage-extract >/dev/null
           test -f squashfs-root/usr/share/emobie/inputd-host-bundle.tgz
           echo "AppImage contains inputd-host-bundle.tgz"
+
+      - name: Verify deb and rpm ship inputd assets
+        run: |
+          set -euo pipefail
+          NEED=(
+            usr/bin/emobie-inputd
+            usr/lib/systemd/user/emobie-inputd.service
+            usr/share/emobie/setup-input-access.sh
+            usr/share/emobie/bootstrap-inputd-host.sh
+            usr/share/emobie/99-emobie-input.rules
+            usr/share/emobie/selinux/emobie-inputd.te
+            usr/share/polkit-1/actions/io.github.asafelobotomy.emobie.inputd.policy
+          )
+          DEB="$(find src-tauri/target/release/bundle/deb -name '*.deb' | head -n1)"
+          RPM="$(find src-tauri/target/release/bundle/rpm -name '*.rpm' | head -n1)"
+          test -n "$DEB"
+          test -n "$RPM"
+          for path in "${NEED[@]}"; do
+            dpkg -c "$DEB" | grep -Fq "./${path}" || {
+              echo "deb missing ${path}"
+              exit 1
+            }
+            rpm -qlp "$RPM" | grep -Fq "/${path}" || {
+              echo "rpm missing ${path}"
+              exit 1
+            }
+          done
+          echo "deb and rpm contain all inputd assets"
 
       - name: Stage package artifacts
         run: |

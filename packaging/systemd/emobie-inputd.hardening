@@ -1,0 +1,18 @@
+# Shared [Service] hardening for emobie-inputd user units.
+# Included by packaging/systemd/emobie-inputd.service and install scripts.
+UMask=0077
+RuntimeDirectory=emobie
+RuntimeDirectoryMode=0700
+PrivateDevices=no
+PrivateNetwork=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/share/emobie
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes

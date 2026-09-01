@@ -1,6 +1,6 @@
 use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, SyncSender};
 use std::sync::OnceLock;
 use std::thread;
@@ -22,6 +22,7 @@ const KEY_TYPE_MAX_CHARS: usize = 16;
 
 /// Expand jobs queued or in-flight (listen buffer should ignore keys).
 static LISTEN_SUPPRESS_JOBS: AtomicUsize = AtomicUsize::new(0);
+static EXPAND_ENABLED: AtomicBool = AtomicBool::new(true);
 /// Epoch millis until which listeners should keep suppressing after a job ends.
 static SUPPRESS_UNTIL_MS: AtomicU64 = AtomicU64::new(0);
 static INJECT_TX: OnceLock<SyncSender<InjectJob>> = OnceLock::new();
@@ -39,6 +40,10 @@ enum InjectJob {
 }
 
 /// True while expand jobs are queued/in-flight or within the post-inject grace window.
+pub fn set_expand_enabled(enabled: bool) {
+    EXPAND_ENABLED.store(enabled, Ordering::Relaxed);
+}
+
 pub fn should_suppress_keys() -> bool {
     if LISTEN_SUPPRESS_JOBS.load(Ordering::Acquire) > 0 {
         return true;
@@ -263,7 +268,8 @@ fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
                             eprintln!("expand failed: {err}");
                         }
                         InjectJob::Paste { reply } => {
-                            let _ = reply.send(Err(err));
+                            let _ = reply.send(Err(err.clone()));
+                            finish_listen_suppress();
                         }
                     }
                     continue;
@@ -278,6 +284,10 @@ fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
                 trigger,
                 trigger_committed,
             } => {
+                if !EXPAND_ENABLED.load(Ordering::Relaxed) {
+                    finish_listen_suppress();
+                    continue;
+                }
                 let expand_result = {
                     let backend = enigo.as_mut().expect("enigo just ensured");
                     catch_unwind(AssertUnwindSafe(|| {
@@ -322,6 +332,7 @@ fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
                     }
                 };
                 let _ = reply.send(result);
+                finish_listen_suppress();
             }
         }
     }
@@ -373,13 +384,9 @@ pub fn inject_ctrl_v() -> Result<(), String> {
         }
     }
     match reply_rx.recv_timeout(Duration::from_secs(2)) {
-        Ok(result) => {
-            finish_listen_suppress();
-            result
-        }
+        Ok(result) => result,
         Err(_) => {
-            // Worker may still complete later; drop suppress so typing is not muted.
-            finish_listen_suppress();
+            // Worker still holds suppress until paste finishes — avoids surprise paste.
             Err("inject paste timed out".to_string())
         }
     }

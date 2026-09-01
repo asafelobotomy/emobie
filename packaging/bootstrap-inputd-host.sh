@@ -51,7 +51,23 @@ ExecStart=$EXEC_START
 Restart=on-failure
 RestartSec=2
 NoNewPrivileges=true
-PassEnvironment=WAYLAND_DISPLAY DISPLAY XAUTHORITY XDG_RUNTIME_DIR
+PassEnvironment=WAYLAND_DISPLAY DISPLAY XAUTHORITY XDG_RUNTIME_DIR XKB_DEFAULT_LAYOUT XKB_DEFAULT_MODEL XKB_DEFAULT_VARIANT XKB_DEFAULT_OPTIONS
+UMask=0077
+RuntimeDirectory=emobie
+RuntimeDirectoryMode=0700
+PrivateDevices=no
+PrivateNetwork=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/share/emobie
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
 
 [Install]
 WantedBy=graphical-session.target

@@ -101,11 +101,9 @@ fn request_with_timeout(
 }
 
 pub fn offline_status(detail: &str) -> InputHelperStatus {
-    let native_fallback =
-        cfg!(target_os = "linux") && std::env::var_os("FLATPAK_ID").is_none();
     InputHelperStatus {
         daemon: false,
-        can_inject: native_fallback,
+        can_inject: false,
         can_listen: false,
         detail: detail.to_string(),
         flatpak: false,
@@ -140,16 +138,35 @@ fn wait_until_running(attempts: u32) -> Option<InputHelperStatus> {
     None
 }
 
+fn is_flatpak() -> bool {
+    std::env::var_os("FLATPAK_ID").is_some()
+}
+
+fn run_host_program(program: &str, args: &[&str]) -> bool {
+    let status = if is_flatpak() {
+        Command::new("flatpak-spawn")
+            .arg("--host")
+            .arg(program)
+            .args(args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+    } else {
+        Command::new(program)
+            .args(args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+    };
+    status.map(|s| s.success()).unwrap_or(false)
+}
+
 fn systemctl_user(args: &[&str]) -> bool {
-    Command::new("systemctl")
-        .arg("--user")
-        .args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
+    let mut full: Vec<&str> = vec!["--user"];
+    full.extend_from_slice(args);
+    run_host_program("systemctl", &full)
 }
 
 fn try_systemctl_start() -> bool {
@@ -201,20 +218,20 @@ fn try_spawn_detached() -> bool {
 fn stop_all_helpers() {
     let _ = systemctl_user(&["stop", "emobie-inputd.service"]);
     // Wait for the unit to go inactive before touching sockets.
-    for _ in 0..20 {
+    for _ in 0..40 {
         if !systemctl_user(&["is-active", "--quiet", "emobie-inputd.service"]) {
             break;
         }
         thread::sleep(Duration::from_millis(50));
     }
     // Only clear detached leftovers; prefer systemd for managed instances.
-    let _ = Command::new("pkill")
-        .args(["-x", "emobie-inputd"])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status();
-    thread::sleep(Duration::from_millis(100));
+    let _ = run_host_program("pkill", &["-x", "emobie-inputd"]);
+    for _ in 0..20 {
+        if request(serde_json::json!({ "cmd": "status" })).is_err() {
+            break;
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
 }
 
 pub fn ensure_started() -> InputHelperStatus {
@@ -224,7 +241,11 @@ pub fn ensure_started() -> InputHelperStatus {
         return status_from_resp(resp);
     }
     let _ = super::bootstrap::try_bootstrap_host_helper();
-    // Socket binds before compositor wait — ~5s is enough for "running".
+    // Bootstrap may have started the host helper (Flatpak/AppImage); re-probe
+    // before touching systemd — sandbox systemctl is not the host session.
+    if let Ok(resp) = request(serde_json::json!({ "cmd": "status" })) {
+        return status_from_resp(resp);
+    }
     if try_systemctl_start() {
         if let Some(status) = wait_until_running(34) {
             return InputHelperStatus {

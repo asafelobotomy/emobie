@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   DEFAULT_PREFERENCES,
   type Macro,
@@ -16,22 +16,38 @@ export function usePreferences() {
   const [prefs, setPrefs] = useState<Preferences>(DEFAULT_PREFERENCES);
   const [ready, setReady] = useState(false);
   const [prefsError, setPrefsError] = useState<string | null>(null);
+  const writeGeneration = useRef(0);
+  const pendingWrite = useRef(Promise.resolve());
 
   useEffect(() => {
     let cancelled = false;
-    readPreferences().then((loaded) => {
-      if (!cancelled) {
-        setPrefs(loaded);
-        setReady(true);
-      }
-    });
+    readPreferences()
+      .then((loaded) => {
+        if (!cancelled) {
+          setPrefs(loaded);
+          setReady(true);
+        }
+      })
+      .catch((error) => {
+        console.error("Could not read preferences", error);
+        if (!cancelled) {
+          setPrefs(DEFAULT_PREFERENCES);
+          setPrefsError(
+            "Could not load saved preferences — using defaults. Check Settings for details.",
+          );
+          setReady(true);
+        }
+      });
     return () => {
       cancelled = true;
     };
   }, []);
 
   const persist = useCallback((next: Preferences) => {
-    void writePreferences(next).then((ok) => {
+    const generation = ++writeGeneration.current;
+    pendingWrite.current = pendingWrite.current.then(async () => {
+      const ok = await writePreferences(next, generation);
+      if (generation !== writeGeneration.current) return;
       setPrefsError(ok ? null : "Could not save preferences.");
     });
   }, []);

@@ -65,8 +65,9 @@ if [[ "$(id -u)" -ne 0 ]]; then
   if [[ "$SELF" == "$(readlink -f "$LOCAL_SETUP" 2>/dev/null || echo "$LOCAL_SETUP")" ]]; then
     exec pkexec "$LOCAL_SETUP" "$@"
   fi
-  exec pkexec --keep-cwd env SUDO_USER="${SUDO_USER:-$USER}" PKEXEC_UID="${PKEXEC_UID:-$UID}" \
-    /usr/bin/bash "$(script_path)" "$@"
+  mkdir -p "$(dirname "$LOCAL_SETUP")"
+  pkexec install -D -m 755 "$(script_path)" "$LOCAL_SETUP"
+  exec pkexec "$LOCAL_SETUP" "$@"
 fi
 
 TARGET_USER="${SUDO_USER:-}"
@@ -86,7 +87,7 @@ run_as_user() {
   elif command -v setpriv >/dev/null 2>&1; then
     setpriv --reuid="$TARGET_UID" --regid="$(id -g "$TARGET_USER")" --clear-groups -- "$@"
   else
-    su -s /bin/sh "$TARGET_USER" -c '"$@"' -- "$@"
+    su -s /bin/sh "$TARGET_USER" -c 'exec "$@"' sh "$@"
   fi
 }
 

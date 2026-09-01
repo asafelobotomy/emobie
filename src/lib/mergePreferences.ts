@@ -98,6 +98,8 @@ export function userDataFingerprint(prefs: {
   macros?: Macro[];
   favorites?: string[];
   recents?: string[];
+  usageCounts?: Record<string, number>;
+  firstUsedAt?: Record<string, number>;
   expandAsYouType?: boolean;
   expandTriggerMode?: string;
   expandKeepTriggerSpace?: boolean;
@@ -107,6 +109,8 @@ export function userDataFingerprint(prefs: {
     macros: prefs.macros ?? [],
     favorites: prefs.favorites ?? [],
     recents: prefs.recents ?? [],
+    usageCounts: prefs.usageCounts ?? {},
+    firstUsedAt: prefs.firstUsedAt ?? {},
     expandAsYouType: Boolean(prefs.expandAsYouType),
     expandTriggerMode: prefs.expandTriggerMode ?? "space",
     expandKeepTriggerSpace: Boolean(prefs.expandKeepTriggerSpace),

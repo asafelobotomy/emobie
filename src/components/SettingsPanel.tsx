@@ -18,6 +18,7 @@ import {
   type SortBy,
 } from "../types/preferences";
 import type { SkinTone } from "../data/loadEmojis";
+import { ensureInputHelperStarted } from "../lib/inputHelperClient";
 import type { InputHelperStatus } from "../lib/inputHelper";
 import type { PinCapability } from "../hooks/useAlwaysOnTop";
 import type { UpdateCheckResult } from "../hooks/useUpdateCheck";
@@ -182,6 +183,7 @@ export function SettingsPanel({
           pinDetail={pinCapability?.detail ?? null}
           prefsError={prefsError}
           autostartError={autostartError}
+          multiInstanceEnabled={prefs.allowMultipleInstances}
         />
 
         {updateInfo ? (
@@ -256,7 +258,8 @@ export function SettingsPanel({
         </div>
         <p className="settings-hint settings-hint-block">
           Takes effect immediately. Turn off and restart emobie to enforce a
-          single instance again.
+          single instance again. With multiple instances enabled, preference
+          writes from different windows can race.
         </p>
 
         <div className="settings-row">
@@ -348,7 +351,7 @@ export function SettingsPanel({
               const enabled = event.target.checked;
               onAutoPasteOnCopy(enabled);
               if (enabled) {
-                void invoke<InputHelperStatus>("input_helper_ensure_started")
+                void ensureInputHelperStarted()
                   .then(onInputStatus)
                   .catch(() => undefined);
               }

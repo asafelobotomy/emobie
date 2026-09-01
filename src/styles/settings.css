@@ -5,6 +5,30 @@
   align-items: center;
 }
 
+.skin-swatch[data-tone="0"] {
+  background: #ffcc22;
+}
+
+.skin-swatch[data-tone="1"] {
+  background: #f7d7c4;
+}
+
+.skin-swatch[data-tone="2"] {
+  background: #e2b496;
+}
+
+.skin-swatch[data-tone="3"] {
+  background: #c68642;
+}
+
+.skin-swatch[data-tone="4"] {
+  background: #8d5524;
+}
+
+.skin-swatch[data-tone="5"] {
+  background: #5c3317;
+}
+
 .skin-swatch {
   width: 22px;
   height: 22px;

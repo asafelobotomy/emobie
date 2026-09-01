@@ -1,6 +1,9 @@
-import { invoke } from "@tauri-apps/api/core";
 import type { MacroTriggerMode } from "../types/preferences";
 import type { InputHelperStatus } from "../lib/inputHelper";
+import {
+  prepareInputHelperForExpand,
+  runInputHelperAccessSetup,
+} from "../lib/inputHelperClient";
 import { useState } from "react";
 
 type TextExpansionSettingsProps = {
@@ -45,49 +48,22 @@ export function TextExpansionSettings({
   const daemonReady = Boolean(inputStatus?.daemon);
   const isFlatpak = Boolean(inputStatus?.flatpak);
 
-  const grantAccess = async (): Promise<InputHelperStatus> => {
-    return invoke<InputHelperStatus>("input_helper_run_access_setup");
-  };
-
-  /** Start helper, grant access if needed (one Polkit prompt), then enable. */
+  /** Grant access if needed, then flip pref — useInputHelperSync owns set_enabled. */
   const setExpandEnabled = async (enabled: boolean) => {
     if (!enabled) {
-      setBusy(true);
-      setMessage(null);
-      try {
-        const status = await invoke<InputHelperStatus>("input_helper_set_enabled", {
-          enabled: false,
-        });
-        onInputStatus(status);
-        onExpandAsYouType(false);
-      } catch (error) {
-        setMessage(
-          typeof error === "string" && error.trim()
-            ? error
-            : error instanceof Error
-              ? error.message
-              : "Could not disable expansion on the helper.",
-        );
-      } finally {
-        setBusy(false);
-      }
+      onExpandAsYouType(false);
       return;
     }
     setBusy(true);
     setMessage(null);
     try {
-      let status = await invoke<InputHelperStatus>("input_helper_ensure_started");
+      setMessage(
+        isFlatpak
+          ? "Looking for host keyboard-access setup…"
+          : "Authorizing keyboard access…",
+      );
+      const status = await prepareInputHelperForExpand();
       onInputStatus(status);
-
-      if (!status.canListen) {
-        setMessage(
-          status.flatpak
-            ? "Looking for host keyboard-access setup…"
-            : "Authorizing keyboard access…",
-        );
-        status = await grantAccess();
-        onInputStatus(status);
-      }
 
       if (!status.canListen) {
         setMessage(status.detail);
@@ -100,10 +76,6 @@ export function TextExpansionSettings({
         return;
       }
 
-      status = await invoke<InputHelperStatus>("input_helper_set_enabled", {
-        enabled: true,
-      });
-      onInputStatus(status);
       onExpandAsYouType(true);
       setMessage("Text expansion enabled.");
     } catch (error) {
@@ -123,7 +95,7 @@ export function TextExpansionSettings({
     setBusy(true);
     setMessage(null);
     try {
-      const status = await grantAccess();
+      const status = await runInputHelperAccessSetup();
       onInputStatus(status);
       setMessage(status.detail);
       if (status.canListen && status.canInject && !expandAsYouType) {

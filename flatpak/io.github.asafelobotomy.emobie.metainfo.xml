@@ -59,6 +59,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.11" date="2026-09-01">
+      <description>
+        <p>Full-surface audit fixes: inputd hardening, safer Grant/update paths, Expand IPC cleanup, and preference sync improvements.</p>
+      </description>
+    </release>
     <release version="0.6.10" date="2026-09-01">
       <description>
         <p>Favorite emoji macros, emoticon style setting, inputd preferences bootstrap, and AppImage WebKit bundling fix.</p>

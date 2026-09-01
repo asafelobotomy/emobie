@@ -35,25 +35,43 @@ fix_hicolor() {
   done
 }
 
+APP_EXEC="${APP_EXEC:-emobie}"
+
+normalize_desktop_file() {
+  local desktop="$1"
+  [[ -f "$desktop" ]] || return 0
+  if [[ ! -s "$desktop" ]] || ! grep -q '^Exec=' "$desktop" || grep -q '{{exec}}' "$desktop"; then
+    if [[ -f "$ROOT/flatpak/io.github.asafelobotomy.emobie.desktop" ]]; then
+      install -Dm644 "$ROOT/flatpak/io.github.asafelobotomy.emobie.desktop" "$desktop"
+    elif ! grep -q '^Exec=' "$desktop"; then
+      printf '\nExec=%s\n' "$APP_EXEC" >>"$desktop"
+    fi
+  fi
+  sed -i \
+    -e "s|^Exec=.*|Exec=${APP_EXEC}|" \
+    -e "s|^Icon=.*|Icon=${ICON_ID}|" \
+    -e "s|^StartupWMClass=.*|StartupWMClass=${ICON_ID}|" \
+    "$desktop"
+}
+
 fix_desktop_dir() {
   local apps="$1"
   [[ -d "$apps" ]] || return 0
-  local src=""
-  if [[ -f "$apps/emobie.desktop" ]]; then
-    src="$apps/emobie.desktop"
-  elif [[ -f "$apps/${ICON_ID}.desktop" ]]; then
-    src="$apps/${ICON_ID}.desktop"
-  else
-    return 0
+  local canonical="$apps/${ICON_ID}.desktop"
+
+  if [[ ! -f "$canonical" ]]; then
+    if [[ -f "$apps/emobie.desktop" && ! -L "$apps/emobie.desktop" ]]; then
+      mv -f "$apps/emobie.desktop" "$canonical"
+    elif [[ -f "$ROOT/flatpak/io.github.asafelobotomy.emobie.desktop" ]]; then
+      install -Dm644 "$ROOT/flatpak/io.github.asafelobotomy.emobie.desktop" "$canonical"
+    else
+      return 0
+    fi
   fi
-  sed -i \
-    -e "s|^Icon=.*|Icon=${ICON_ID}|" \
-    -e "s|^StartupWMClass=.*|StartupWMClass=${ICON_ID}|" \
-    "$src"
-  if [[ "$(basename "$src")" != "${ICON_ID}.desktop" ]]; then
-    mv -f "$src" "$apps/${ICON_ID}.desktop"
-  fi
-  # Convenience alias for binary-name lookups.
+
+  rm -f "$apps/emobie.desktop"
+
+  normalize_desktop_file "$canonical"
   ln -sfn "${ICON_ID}.desktop" "$apps/emobie.desktop"
 }
 
@@ -79,8 +97,9 @@ fix_appdir() {
     cp -f "$appdir/emobie.png" "$appdir/${ICON_ID}.png"
   fi
   if [[ -f "$appdir/usr/share/applications/${ICON_ID}.desktop" ]]; then
-    ln -sfn "usr/share/applications/${ICON_ID}.desktop" "$appdir/${ICON_ID}.desktop"
-    ln -sfn "${ICON_ID}.desktop" "$appdir/emobie.desktop"
+    rm -f "$appdir/${ICON_ID}.desktop" "$appdir/emobie.desktop"
+    cp -f "$appdir/usr/share/applications/${ICON_ID}.desktop" "$appdir/${ICON_ID}.desktop"
+    cp -f "$appdir/usr/share/applications/${ICON_ID}.desktop" "$appdir/emobie.desktop"
   fi
   stage_inputd_in_appdir "$appdir"
   stage_webkit_helpers_in_appdir "$appdir"
@@ -125,12 +144,14 @@ stage_webkit_helpers_in_appdir() {
     sed -i -e 's|/usr|././|g' '{}' \;
 
   local hook="$appdir/apprun-hooks/linuxdeploy-plugin-gtk.sh"
-  if [[ -f "$hook" ]] && ! grep -q 'dirname "$(realpath "$0")"' "$hook"; then
-    sed -i \
-      -e 's|^export APPDIR=.*|export APPDIR="$(dirname "$(realpath "$0")")"|' \
-      -e 's|^cd "$APPDIR"$|cd "$APPDIR"|' \
-      "$hook"
-    # Ensure cd after APPDIR is set (hook may only have had export before).
+  if [[ -f "$hook" ]]; then
+    if ! grep -q 'dirname "$(realpath "$0")"' "$hook"; then
+      sed -i \
+        -e 's|^export APPDIR=.*|export APPDIR="$(dirname "$(realpath "$0")")"|' \
+        "$hook"
+    fi
+    # Always ensure cwd is APPDIR — current linuxdeploy hooks often set APPDIR
+    # via realpath but never cd, which breaks relative ././ WebKit paths.
     if ! grep -q '^cd "$APPDIR"$' "$hook"; then
       sed -i '/^export APPDIR=/a cd "$APPDIR"' "$hook"
     fi
@@ -238,12 +259,7 @@ main() {
   fi
   appimage="$(find "$BUNDLE/appimage" -name '*.AppImage' 2>/dev/null | head -n1 || true)"
   if [[ -n "$appimage" && -n "$appdir" ]]; then
-    # Prefer refreshing AppImage when appimagetool exists; otherwise AppDir is fixed for next pack.
-    if command -v appimagetool >/dev/null 2>&1; then
-      ARCH=x86_64 appimagetool "$appdir" "$appimage"
-      chmod +x "$appimage"
-      echo "Repacked AppImage icons: $appimage"
-    fi
+    repack_appimage "$appimage"
   fi
   echo "Done."
 }

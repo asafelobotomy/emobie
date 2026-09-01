@@ -71,12 +71,14 @@ fn sanitize_matches(matches: Vec<MatchRule>) -> Vec<MatchRule> {
         .collect()
 }
 
-pub fn load() -> PersistedState {
+/// Load persisted state. Second value is true when a state file was read from disk
+/// (even if matches are empty) — empty on-disk matches must not re-bootstrap prefs.
+pub fn load() -> (PersistedState, bool) {
     let Some(path) = state_path() else {
-        return PersistedState::default();
+        return (PersistedState::default(), false);
     };
     let Ok(raw) = fs::read_to_string(&path) else {
-        return PersistedState::default();
+        return (PersistedState::default(), false);
     };
     // Cap raw size roughly to one request budget.
     if raw.len() > 512 * 1024 {
@@ -85,11 +87,11 @@ pub fn load() -> PersistedState {
             path.display(),
             raw.len()
         );
-        return PersistedState::default();
+        return (PersistedState::default(), false);
     }
     let mut state: PersistedState = serde_json::from_str(&raw).unwrap_or_default();
     state.matches = sanitize_matches(state.matches);
-    state
+    (state, true)
 }
 
 pub fn save(enabled: bool, matches: &[MatchRule]) {

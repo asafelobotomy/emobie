@@ -91,13 +91,33 @@ function App() {
   const [inputStatus, setInputStatus] = useState<InputHelperStatus | null>(
     null,
   );
+  const [inputError, setInputError] = useState<string | null>(null);
   const markSetupSeen = useCallback(() => {
     setInputHelperSetupSeen(true);
   }, [setInputHelperSetupSeen]);
+
+  const handleInputStatus = useCallback((status: InputHelperStatus) => {
+    setInputStatus(status);
+    setInputError(null);
+  }, []);
+
+  const handleInputSyncError = useCallback((message: string) => {
+    setInputError(message);
+    setInputStatus((prev) =>
+      prev
+        ? { ...prev, detail: message }
+        : {
+            daemon: false,
+            canInject: false,
+            canListen: false,
+            detail: message,
+          },
+    );
+  }, []);
   const { open: firstRunOpen, finish: finishFirstRun } = useFirstRunSetup({
     ready,
     setupSeen: prefs.inputHelperSetupSeen,
-    onStatus: setInputStatus,
+    onStatus: handleInputStatus,
     onMarkSeen: markSetupSeen,
   });
   const pinnedRef = useRef(prefs.pinned);
@@ -224,19 +244,8 @@ function App() {
     expandTriggerMode: prefs.expandTriggerMode,
     expandKeepTriggerSpace: prefs.expandKeepTriggerSpace,
     expansionMacros: mergedMacros,
-    onStatus: setInputStatus,
-    onSyncError: (message) => {
-      setInputStatus((prev) =>
-        prev
-          ? { ...prev, detail: message }
-          : {
-              daemon: false,
-              canInject: false,
-              canListen: false,
-              detail: message,
-            },
-      );
-    },
+    onStatus: handleInputStatus,
+    onSyncError: handleInputSyncError,
   });
 
   const togglePin = useCallback(() => {
@@ -292,15 +301,19 @@ function App() {
     ? copyError
     : hotkeyError
       ? hotkeyError
-      : trayUnavailable
-        ? "System tray unavailable — close quits the app."
-        : updateInfo?.newerAvailable
-          ? updateInfo.detail
-          : lastCopied
-            ? `Copied ${lastCopied}`
-            : null;
+      : inputError
+        ? inputError
+        : trayUnavailable
+          ? "System tray unavailable — close quits the app."
+          : updateInfo?.newerAvailable
+            ? updateInfo.detail
+            : lastCopied
+              ? `Copied ${lastCopied}`
+              : null;
 
-  const statusError = Boolean(copyError || hotkeyError || trayUnavailable);
+  const statusError = Boolean(
+    copyError || hotkeyError || inputError || trayUnavailable,
+  );
   const frameless = !prefs.showTitleBar;
 
   return (
@@ -399,7 +412,7 @@ function App() {
             });
           }}
           onSetMacros={setMacros}
-          onInputStatus={setInputStatus}
+          onInputStatus={handleInputStatus}
           onClearRecents={clearRecents}
           onClearUsageStats={clearUsageStats}
         />
@@ -407,7 +420,7 @@ function App() {
       <FirstRunSetup
         open={firstRunOpen}
         status={inputStatus}
-        onStatus={setInputStatus}
+        onStatus={handleInputStatus}
         onDone={finishFirstRun}
       />
     </div>

@@ -72,14 +72,6 @@ fn read_request_line(
     Ok(true)
 }
 
-fn persist(enabled: &AtomicBool, stored: &Mutex<Vec<MatchRule>>) {
-    let matches = stored
-        .lock()
-        .unwrap_or_else(|p| p.into_inner())
-        .clone();
-    state::save(enabled.load(Ordering::Relaxed), &matches);
-}
-
 fn persist_locked(enabled: &AtomicBool, matches: &[MatchRule]) {
     state::save(enabled.load(Ordering::Relaxed), matches);
 }
@@ -154,10 +146,16 @@ fn handle_client(
             ),
             Ok(Request::SetEnabled { enabled: value }) => {
                 enabled.store(value, Ordering::Relaxed);
+                inject::set_expand_enabled(value);
                 if !value {
                     listen::clear_pending();
                 }
-                persist(enabled, stored);
+                // Hold `stored` while saving so we cannot overwrite a concurrent
+                // SyncMatches with a stale matches snapshot.
+                match stored.lock() {
+                    Ok(guard) => persist_locked(enabled, &guard),
+                    Err(poisoned) => persist_locked(enabled, &poisoned.into_inner()),
+                }
                 Response::status(
                     can_inject,
                     can_listen,
@@ -187,12 +185,14 @@ fn handle_client(
                         Ok(())
                     })();
                     match sync_result {
-                        Ok(()) => Response::status(
-                            can_inject,
-                            can_listen,
-                            enabled.load(Ordering::Relaxed),
-                            &format!("synced {count} matches"),
-                        ),
+                        Ok(()) => {
+                            Response::status(
+                                can_inject,
+                                can_listen,
+                                enabled.load(Ordering::Relaxed),
+                                &format!("synced {count} matches"),
+                            )
+                        },
                         Err(err) => Response::err(can_inject, can_listen, enabled_now, &err),
                     }
                 }
@@ -245,11 +245,14 @@ fn main() {
     };
     let _ = fs::remove_file(&path);
 
-    let mut persisted = state::load();
-    if prefs_bootstrap::apply_if_empty(&mut persisted) {
+    // Only bootstrap from preferences.json when no state file exists yet.
+    // An on-disk empty matches list means the user (or SyncMatches) cleared them.
+    let (mut persisted, from_disk) = state::load();
+    if !from_disk && prefs_bootstrap::apply_if_empty(&mut persisted) {
         state::save(persisted.enabled, &persisted.matches);
     }
     let enabled = Arc::new(AtomicBool::new(persisted.enabled));
+    inject::set_expand_enabled(persisted.enabled);
     let trie = Arc::new(Mutex::new(TriggerTrie::default()));
     let stored = Arc::new(Mutex::new(persisted.matches.clone()));
     if let Ok(mut guard) = trie.lock() {

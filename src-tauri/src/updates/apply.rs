@@ -203,8 +203,11 @@ fn install_appimage(path: &Path) -> Result<(), String> {
             format!("Could not backup current AppImage ({e})")
         })?;
         if let Err(err) = fs::rename(path, &current_path) {
-            let _ = fs::rename(&backup, &current_path);
-            return Err(format!("Could not replace AppImage ({err})"));
+            if fs::copy(path, &current_path).is_err() {
+                let _ = fs::rename(&backup, &current_path);
+                return Err(format!("Could not replace AppImage ({err})"));
+            }
+            let _ = fs::remove_file(path);
         }
         let _ = fs::remove_file(&backup);
         return Ok(());
@@ -290,13 +293,18 @@ fn install_rpm(path: &Path) -> Result<(), String> {
     )
 }
 
-pub fn apply_update(download_url: String, asset_name: String) -> Result<ApplyUpdateResult, String> {
+pub fn apply_update(
+    release_tag: String,
+    download_url: String,
+    asset_name: String,
+) -> Result<ApplyUpdateResult, String> {
     validate_download_url(&download_url)?;
     if asset_name.contains('/') || asset_name.contains("..") {
         return Err("Invalid asset name.".into());
     }
 
     let kind = detect_install_kind();
+    super::verify_update_asset(&release_tag, &download_url, &asset_name, kind)?;
     let expected = match kind {
         InstallKind::Flatpak => ".flatpak",
         InstallKind::AppImage => ".AppImage",

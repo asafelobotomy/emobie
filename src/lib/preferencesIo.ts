@@ -79,7 +79,10 @@ async function writeDurableOnly(prefs: Preferences): Promise<void> {
   }
 }
 
-export async function writePreferences(prefs: Preferences): Promise<boolean> {
+export async function writePreferences(
+  prefs: Preferences,
+  writeRev = 0,
+): Promise<boolean> {
   let storeOk = false;
   try {
     const store = await getStore();
@@ -91,7 +94,10 @@ export async function writePreferences(prefs: Preferences): Promise<boolean> {
   }
 
   try {
-    await invoke("save_durable_preferences", { preferences: prefs });
+    await invoke("save_durable_preferences", {
+      preferences: prefs,
+      writeRev,
+    });
   } catch (error) {
     console.error("Failed to save durable preferences", error);
     // Active store write still counts as success when durable mirror fails

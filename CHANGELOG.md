@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.11] - 2026-09-01
+
+### Added
+
+- Centralized input-helper IPC client; durable preference `writeRev` for multi-instance stale-write rejection
+- Release CI verifies inputd assets in deb and rpm packages
+- systemd hardening for `emobie-inputd` user units; threat-model docs in `MACROS.md`
+
+### Changed
+
+- Expand settings toggle delegates `set_enabled` to `useInputHelperSync`; YAML import size/count limits
+- CSP drops `unsafe-inline` styles; skin-tone swatches use CSS classes
+- Grant staging copies setup script to Polkit-annotated path before `pkexec`
+
+### Fixed
+
+- inputd: SetEnabled persist race, prefs resurrect after delete-all, listen buffer vs trigger length, pending-expand key handling
+- inputd: paste inject suppress held until worker completes; keymap reload from session every ~30s
+- Updates: bind `apply_update` to verified release tag; harden native `.deb` tar extraction
+- AppImage autostart stable path; EXDEV copy fallback on in-place update
+- Flatpak host `systemctl` via `flatpak-spawn`; serialized preference writes and IPC generation guards
+- Helper sync errors surfaced in status bar; preference read failures shown in Settings
+
 ## [0.6.10] - 2026-09-01
 
 ### Added
@@ -244,7 +267,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Horizontal mouse-wheel scrolling in wide layouts
 - Tray icon temp path for Flatpak-friendly sandboxing
 
-[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.10...HEAD
+[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.11...HEAD
+[0.6.11]: https://github.com/asafelobotomy/emobie/compare/v0.6.10...v0.6.11
 [0.6.10]: https://github.com/asafelobotomy/emobie/compare/v0.6.9...v0.6.10
 [0.6.9]: https://github.com/asafelobotomy/emobie/compare/v0.6.8...v0.6.9
 [0.6.8]: https://github.com/asafelobotomy/emobie/compare/v0.6.7...v0.6.8

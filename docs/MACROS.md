@@ -100,15 +100,16 @@ Under Flatpak or AppImage, enabling Expand stages the host helper
 `setup-input-access.sh`. If Grant still fails, run on the host:
 
 ```bash
-pkexec bash ~/.local/share/emobie/setup-input-access.sh
+pkexec /usr/local/share/emobie/setup-input-access.sh
 ```
 
 Only use `bash packaging/install-inputd-user.sh` as a fallback when auto-bootstrap
 cannot find the bundled host tarball.
 
 **Layout note:** trigger matching follows your active XKB layout
-(`XKB_DEFAULT_*` / session keyboard settings). Switch layouts at runtime like
-any other app; remapped keys follow the layout in effect when you type.
+(`XKB_DEFAULT_*` / session keyboard settings). Each keyboard listener reloads
+the layout from session env every ~30 seconds. Modifier state is per device;
+IME compose sequences are not supported.
 
 **Pin:** always-on-top uses GTK keep-above (works on X11) and, on Plasma
 Wayland, KWin `keepAbove`. Other Wayland compositors may ignore pin.
@@ -143,6 +144,23 @@ Packaging assets:
 
 Prefer the dedicated helper over granting the Flatpak sandbox raw input
 devices. Do not run `emobie-inputd` as root or expose a world-writable socket.
+
+### Threat model
+
+| Boundary | Protection | Residual risk |
+|----------|------------|---------------|
+| Cross-user | Socket mode `0600`, directory `0700`, `SO_PEERCRED` rejects foreign UIDs | Misconfigured `/tmp/emobie-$UID` or stale sockets — prefer `$XDG_RUNTIME_DIR/emobie` |
+| Same-user session | Any process running as **you** may call `InjectPaste`, `SyncMatches`, and `SetEnabled` on the Unix socket | Malware or a compromised app in your session can inject keystrokes — same trust as any input helper |
+| Remote | No network listener; JSON line protocol on a local socket only | None without local code execution |
+| Webview → helper | emobie talks to inputd via Tauri IPC; daemon enforces match/trigger caps | XSS in emobie could sync macros or request paste — treat the webview as trusted UI |
+
+**Same-UID trust:** inputd is a session helper, not a privilege boundary against other
+processes owned by your user. Do not run untrusted binaries alongside Expand when
+you rely on as-you-type expansion.
+
+**Polkit / root:** keyboard access setup runs once via `pkexec` on annotated script
+paths only (`/usr/share/emobie/…` or `/usr/local/share/emobie/…`). User-writable
+copies are staged to `/usr/local/share/emobie/` before elevation.
 
 ## YAML format
 

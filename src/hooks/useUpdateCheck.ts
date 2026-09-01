@@ -85,10 +85,12 @@ export async function openReleasePage(url: string): Promise<void> {
 }
 
 export async function applyUpdate(
+  releaseTag: string,
   downloadUrl: string,
   assetName: string,
 ): Promise<ApplyUpdateResult> {
   return invoke<ApplyUpdateResult>("apply_update", {
+    releaseTag,
     downloadUrl,
     assetName,
   });

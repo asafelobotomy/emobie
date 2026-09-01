@@ -191,6 +191,22 @@ describe("macroYaml", () => {
     assert.equal(result.macros[0].hotkey, "F9");
   });
 
+  it("round-trips disabled macros", () => {
+    const macros: Macro[] = [
+      {
+        id: "1",
+        trigger: ":off",
+        expansion: "nope",
+        hotkey: null,
+        enabled: false,
+      },
+    ];
+    const yaml = exportMacrosYaml(macros);
+    assert.match(yaml, /enabled:\s*false/);
+    const result = importMacrosYaml(yaml, []);
+    assert.equal(result.macros[0].enabled, false);
+  });
+
   it("overwrites existing triggers on import", () => {
     const existing: Macro[] = [
       {
@@ -207,5 +223,10 @@ describe("macroYaml", () => {
     );
     assert.equal(result.macros[0].id, "keep");
     assert.equal(result.macros[0].expansion, "new");
+  });
+
+  it("rejects oversized yaml files", () => {
+    const huge = "matches:\n" + "  - trigger: x\n    replace: y\n".repeat(20_000);
+    assert.throws(() => importMacrosYaml(huge, []), /too large/i);
   });
 });

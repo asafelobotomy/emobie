@@ -126,8 +126,11 @@ npm run build     # frontend typecheck + Vite build
 
 ## Build & package
 
+Prefer the packaged npm scripts so AppImage post-processing always runs
+(WebKit helpers, `Exec=`, `inputd-host-bundle.tgz`):
+
 ```bash
-npm run tauri build
+npm run tauri:build
 ```
 
 Artifacts land in `src-tauri/target/release/bundle/`.
@@ -135,16 +138,17 @@ Artifacts land in `src-tauri/target/release/bundle/`.
 On Arch / CachyOS (and some other rolling distros), AppImage bundling needs
 `NO_STRIP=true` so linuxdeploy’s outdated `strip` doesn’t choke on `.relr.dyn`
 sections. If the linuxdeploy AppImage itself won’t run, also set
-`APPIMAGE_EXTRACT_AND_RUN=1`.
+`APPIMAGE_EXTRACT_AND_RUN=1` (already set by `tauri:build`).
 
 ```bash
-# One format
+# One format (always run the fix script after AppImage builds)
 npm run tauri build -- --bundles deb
 npm run tauri build -- --bundles rpm
-NO_STRIP=true APPIMAGE_EXTRACT_AND_RUN=1 npm run tauri build -- --bundles appimage
+NO_STRIP=true APPIMAGE_EXTRACT_AND_RUN=1 npm run tauri build -- --bundles appimage \
+  && bash scripts/fix-linux-bundle-icons.sh
 
-# All three (same env for AppImage)
-NO_STRIP=true APPIMAGE_EXTRACT_AND_RUN=1 npm run tauri build -- --bundles deb,rpm,appimage
+# All three
+npm run tauri:build
 ```
 
 ### Flatpak (GitHub Releases — from a `.deb`)

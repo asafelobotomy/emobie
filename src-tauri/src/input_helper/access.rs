@@ -15,13 +15,14 @@ fn in_flatpak() -> bool {
 
 pub fn host_setup_hint() -> String {
     if in_flatpak() {
-        "Flatpak installs the host input helper when you enable Expand. \
-If Grant fails, run on the host: pkexec bash ~/.local/share/emobie/setup-input-access.sh"
-            .into()
+        format!(
+            "Flatpak installs the host input helper when you enable Expand. \
+If Grant fails, run on the host: pkexec {LOCAL_SETUP}"
+        )
     } else {
-        "Run: pkexec bash ~/.local/share/emobie/setup-input-access.sh \
-(or packaging/setup-input-access.sh), then retry."
-            .into()
+        format!(
+            "Run: pkexec {LOCAL_SETUP} (or {SYSTEM_SETUP}), then retry."
+        )
     }
 }
 
@@ -131,13 +132,62 @@ fn with_session_env(cmd: &mut Command) {
     }
 }
 
-/// Prefer direct pkexec of Polkit-annotated scripts; bash-wrap user copies.
-fn pkexec_args(script: &str) -> Vec<String> {
-    if script == SYSTEM_SETUP || script == LOCAL_SETUP {
-        vec![script.to_string()]
-    } else {
-        vec!["/usr/bin/bash".into(), script.to_string()]
+fn is_polkit_annotated_path(script: &str) -> bool {
+    script == SYSTEM_SETUP || script == LOCAL_SETUP
+}
+
+/// Copy a user/bundle script to the Polkit-annotated path before elevation.
+fn stage_setup_to_local(source: &str, flatpak: bool) -> Result<(), String> {
+    if is_polkit_annotated_path(source) {
+        return Ok(());
     }
+    let install_args = [
+        "install",
+        "-D",
+        "-m",
+        "755",
+        source,
+        LOCAL_SETUP,
+    ];
+    let output = if flatpak {
+        let mut cmd = Command::new("flatpak-spawn");
+        cmd.arg("--host").arg("pkexec").args(install_args);
+        with_session_env(&mut cmd);
+        cmd.stdin(Stdio::null()).output()
+    } else {
+        let mut cmd = Command::new("pkexec");
+        cmd.args(install_args);
+        with_session_env(&mut cmd);
+        cmd.stdin(Stdio::null()).output()
+    }
+    .map_err(|e| format!("Could not stage setup script ({e}). {}", host_setup_hint()))?;
+
+    if output.status.success() {
+        return Ok(());
+    }
+    let detail = String::from_utf8_lossy(&output.stderr)
+        .trim()
+        .to_string();
+    Err(if detail.is_empty() {
+        format!(
+            "Could not install setup script to {LOCAL_SETUP}. {}",
+            host_setup_hint()
+        )
+    } else {
+        format!("Keyboard access setup staging: {detail}")
+    })
+}
+
+fn ensure_polkit_annotated_setup(script: &str, flatpak: bool) -> Result<String, String> {
+    if is_polkit_annotated_path(script) {
+        return Ok(script.to_string());
+    }
+    stage_setup_to_local(script, flatpak)?;
+    Ok(LOCAL_SETUP.to_string())
+}
+
+fn pkexec_args(script: &str) -> Vec<String> {
+    vec![script.to_string()]
 }
 
 fn run_pkexec(script: &str, flatpak: bool) -> Result<(), String> {
@@ -212,6 +262,7 @@ pub fn with_flatpak_flag(mut status: InputHelperStatus) -> InputHelperStatus {
 /// Polkit setup + restart helper; returns fresh status (can_listen after ACLs).
 pub fn run_access_setup() -> Result<InputHelperStatus, String> {
     let (script, flatpak) = resolve_setup_script()?;
+    let script = ensure_polkit_annotated_setup(&script, flatpak)?;
     run_pkexec(&script, flatpak)?;
     let mut status = with_flatpak_flag(unix::restart_helper());
     if status.can_listen && status.can_inject {

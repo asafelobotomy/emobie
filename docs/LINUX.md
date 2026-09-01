@@ -84,7 +84,7 @@ bash scripts/verify-expand-setup.sh
 |---------|---------------|
 | `.deb` / `.rpm` | `/usr/share/emobie/setup-input-access.sh` |
 | AppImage / user helper | `/usr/local/share/emobie/setup-input-access.sh` (created on first Grant) |
-| Fallback | `pkexec bash ~/.local/share/emobie/setup-input-access.sh` |
+| Fallback | `pkexec /usr/local/share/emobie/setup-input-access.sh` |
 
 1. **systemd --user** runs `emobie-inputd` (same user as the session — never root)
 2. **udev** + group `emobie-input` (and optional **setfacl**) grant `/dev/input` read
@@ -162,19 +162,28 @@ sources if one side is missing user data.
 
 ## Building AppImage locally
 
-On Arch / CachyOS, `npm run tauri build -- --bundles appimage` often fails with
+On Arch / CachyOS, raw `tauri build --bundles appimage` often fails with
 `failed to run linuxdeploy` because linuxdeploy’s bundled `strip` cannot handle
-modern libraries (`.relr.dyn`). Use:
+modern libraries (`.relr.dyn`). Prefer:
+
+```bash
+npm run tauri:build
+```
+
+That sets `NO_STRIP` / `APPIMAGE_EXTRACT_AND_RUN` and always runs
+`scripts/fix-linux-bundle-icons.sh` (WebKit helpers, desktop `Exec=`, host
+inputd bundle). If you invoke `tauri build` directly, run the fix script after:
 
 ```bash
 NO_STRIP=true APPIMAGE_EXTRACT_AND_RUN=1 npm run tauri build -- --bundles appimage
+bash scripts/fix-linux-bundle-icons.sh
 ```
 
 ## CachyOS notes
 
 CachyOS is Arch-based. Typical setup:
 
-1. Install Flatpak or AppImage (or build with `npm run tauri build`)
+1. Install Flatpak or AppImage (or build with `npm run tauri:build`)
 2. Enable **Expand** in Settings (auto-installs the host helper + Grant); fallback:
    `bash packaging/install-inputd-user.sh`
 3. On **Plasma** (common default): pin + tray + Grant are on the supported path

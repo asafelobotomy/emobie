@@ -1,6 +1,5 @@
 import { useEffect, useId, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import type { InputHelperStatus } from "../lib/inputHelper";
+import { prepareInputHelperForExpand } from "../lib/inputHelperClient";
 
 type FirstRunSetupProps = {
   open: boolean;
@@ -43,14 +42,8 @@ export function FirstRunSetup({
     setBusy(true);
     setMessage(null);
     try {
-      let next = await invoke<InputHelperStatus>("input_helper_ensure_started");
+      let next = await prepareInputHelperForExpand();
       onStatus(next);
-
-      if (!next.canListen) {
-        setMessage("Admin prompt next — grant keyboard access to continue.");
-        next = await invoke<InputHelperStatus>("input_helper_run_access_setup");
-        onStatus(next);
-      }
 
       if (next.daemon && next.canListen && next.canInject) {
         setMessage("Text expansion is ready — enable it anytime in Settings.");

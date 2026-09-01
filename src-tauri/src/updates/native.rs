@@ -30,7 +30,7 @@ pub fn install_native_from_deb(deb: &Path) -> Result<(), String> {
         .ok_or_else(|| "deb missing data.tar.*".to_string())?;
     run_checked(
         Command::new("tar")
-            .arg("xf")
+            .args(["xf", "--no-absolute-names", "--no-overwrite-dir"])
             .arg(&data_tar)
             .current_dir(&work),
     )?;
@@ -141,7 +141,7 @@ fn install_native_inputd_assets(extracted_root: &Path, inputd_bin: &Path) -> Res
             .join("systemd/user");
         fs::create_dir_all(&unit_dir).map_err(|e| e.to_string())?;
         let unit = format!(
-            "[Unit]\nDescription=emobie input helper (text expansion / paste)\nAfter=graphical-session.target\nPartOf=graphical-session.target\n\n[Service]\nType=simple\nExecStart={}\nRestart=on-failure\nRestartSec=2\nNoNewPrivileges=true\nPassEnvironment=WAYLAND_DISPLAY DISPLAY XAUTHORITY XDG_RUNTIME_DIR\n\n[Install]\nWantedBy=graphical-session.target\n",
+            "[Unit]\nDescription=emobie input helper (text expansion / paste)\nAfter=graphical-session.target\nPartOf=graphical-session.target\n\n[Service]\nType=simple\nExecStart={}\nRestart=on-failure\nRestartSec=2\nNoNewPrivileges=true\nPassEnvironment=WAYLAND_DISPLAY DISPLAY XAUTHORITY XDG_RUNTIME_DIR XKB_DEFAULT_LAYOUT XKB_DEFAULT_MODEL XKB_DEFAULT_VARIANT XKB_DEFAULT_OPTIONS\nUMask=0077\nRuntimeDirectory=emobie\nRuntimeDirectoryMode=0700\nPrivateDevices=no\nPrivateNetwork=yes\nProtectSystem=strict\nProtectHome=read-only\nReadWritePaths=%h/.local/share/emobie\nRestrictAddressFamilies=AF_UNIX\nRestrictNamespaces=yes\nProtectKernelTunables=yes\nProtectKernelModules=yes\nProtectControlGroups=yes\nLockPersonality=yes\nRestrictRealtime=yes\nRestrictSUIDSGID=yes\n\n[Install]\nWantedBy=graphical-session.target\n",
             inputd_bin.display()
         );
         fs::write(unit_dir.join("emobie-inputd.service"), unit).map_err(|e| e.to_string())?;

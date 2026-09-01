@@ -10,8 +10,12 @@ pub use apply::InstallKind;
 use apply::ApplyUpdateResult;
 
 #[tauri::command]
-pub fn apply_update(download_url: String, asset_name: String) -> Result<ApplyUpdateResult, String> {
-    apply::apply_update(download_url, asset_name)
+pub fn apply_update(
+    release_tag: String,
+    download_url: String,
+    asset_name: String,
+) -> Result<ApplyUpdateResult, String> {
+    apply::apply_update(release_tag, download_url, asset_name)
 }
 
 const REPO: &str = "asafelobotomy/emobie";
@@ -88,6 +92,44 @@ fn pick_asset<'a>(
             .any(|suffix| asset.name.ends_with(suffix))
             && asset.browser_download_url.starts_with(apply::ALLOWED_PREFIX)
     })
+}
+
+/// Ensure the frontend-provided asset matches a release on GitHub (not an older tag).
+pub(crate) fn verify_update_asset(
+    release_tag: &str,
+    download_url: &str,
+    asset_name: &str,
+    kind: InstallKind,
+) -> Result<(), String> {
+    let trimmed = release_tag.trim();
+    if trimmed.is_empty() {
+        return Err("Missing release tag.".into());
+    }
+    let tag = if trimmed.starts_with('v') {
+        trimmed.to_string()
+    } else {
+        format!("v{trimmed}")
+    };
+    let url = format!("https://api.github.com/repos/{REPO}/releases/tags/{tag}");
+    let response = ureq::get(&url)
+        .set("User-Agent", USER_AGENT)
+        .set("Accept", "application/vnd.github+json")
+        .call()
+        .map_err(|_| "Could not verify release on GitHub.".to_string())?;
+    let release = response
+        .into_json::<GithubRelease>()
+        .map_err(|_| "Unexpected GitHub Releases response.".to_string())?;
+    if release.draft || release.prerelease {
+        return Err("Refusing to install draft or prerelease.".into());
+    }
+    let asset = pick_asset(&release.assets, kind)
+        .ok_or_else(|| "No matching asset for this install type.".to_string())?;
+    if asset.browser_download_url != download_url || asset.name != asset_name {
+        return Err(
+            "Update metadata mismatch — check for updates again before installing.".into(),
+        );
+    }
+    Ok(())
 }
 
 fn offline_result(current: String, detail: &str, kind: InstallKind) -> UpdateCheckResult {

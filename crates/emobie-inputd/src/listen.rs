@@ -170,6 +170,9 @@ fn handle_key(
         if let Some(p) = to_fire {
             // Completing key still down — allow a short settle before erase.
             fire_expand(p, false, enabled, buffer);
+            // Do not also push this key into the match buffer: erase count is
+            // still the trigger length, and inject suppress arms after queue.
+            return;
         }
     }
 
@@ -207,11 +210,13 @@ fn handle_key(
             return;
         };
         guard.push(ch);
-        if guard.chars().count() > 128 {
+        // Keep at least MAX_TRIGGER_LEN so validated triggers can still match.
+        let max_buf = crate::state::MAX_TRIGGER_LEN;
+        if guard.chars().count() > max_buf {
             let trim: String = guard
                 .chars()
                 .rev()
-                .take(96)
+                .take(max_buf)
                 .collect::<String>()
                 .chars()
                 .rev()
@@ -260,11 +265,16 @@ fn spawn_device_thread(
 ) {
     thread::spawn(move || {
         let keymap = KeymapState::new();
+        let mut last_reload = Instant::now();
         let result = (|| -> Result<(), ()> {
             let mut device = Device::open(&path).map_err(|_| ())?;
             loop {
                 if stop.load(Ordering::Relaxed) {
                     return Ok(());
+                }
+                if last_reload.elapsed() >= Duration::from_secs(30) {
+                    keymap.reload_from_session();
+                    last_reload = Instant::now();
                 }
                 let events = match device.fetch_events() {
                     Ok(events) => events,
