@@ -191,7 +191,7 @@ repack_deb() {
       ln -sfn "${ICON_ID}.desktop" \
         "$tmp/data/usr/share/applications/emobie.desktop"
     fi
-    tar -C data -cJf data.tar.xz .
+    tar -C data -cJf data.tar.xz --owner=root --group=root .
     tar -C control -czf control.tar.gz .
     local out="$tmp/fixed.deb"
     ar rcs "$out" debian-binary control.tar.gz data.tar.xz

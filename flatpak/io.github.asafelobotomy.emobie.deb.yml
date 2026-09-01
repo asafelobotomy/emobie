@@ -47,7 +47,7 @@ modules:
         (
           cd deb-extract
           ar -x ../emobie.deb
-          tar -xf data.tar.*
+          tar --no-same-owner -xf data.tar.*
         )
       - install -Dm755 deb-extract/usr/bin/emobie /app/bin/emobie
       - |
