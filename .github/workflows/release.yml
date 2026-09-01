@@ -115,7 +115,12 @@ jobs:
           NO_STRIP: "true"
           # Avoid FUSE mount issues when running the linuxdeploy AppImage itself.
           APPIMAGE_EXTRACT_AND_RUN: "1"
-        run: npm run tauri build -- --bundles deb,rpm,appimage
+        run: |
+          npm run tauri build -- --bundles deb,rpm
+          npm run tauri build -- --bundles appimage || {
+            test -d src-tauri/target/release/bundle/appimage/*.AppDir || exit 1
+            echo "linuxdeploy failed; fix-linux-bundle-icons.sh will seal the AppImage"
+          }
 
       - name: Fix Linux package icons for GTK app id
         env:

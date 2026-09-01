@@ -258,6 +258,11 @@ main() {
     fix_appdir "$appdir"
   fi
   appimage="$(find "$BUNDLE/appimage" -name '*.AppImage' 2>/dev/null | head -n1 || true)"
+  if [[ -z "$appimage" && -n "$appdir" ]]; then
+    local ver
+    ver="$(node -p "require('$ROOT/package.json').version")"
+    appimage="$BUNDLE/appimage/emobie_${ver}_amd64.AppImage"
+  fi
   if [[ -n "$appimage" && -n "$appdir" ]]; then
     repack_appimage "$appimage"
   fi
