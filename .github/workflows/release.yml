@@ -155,12 +155,15 @@ jobs:
           RPM="$(find src-tauri/target/release/bundle/rpm -name '*.rpm' | head -n1)"
           test -n "$DEB"
           test -n "$RPM"
+          # List once — piping dpkg-deb into grep triggers SIGPIPE under pipefail when grep exits early.
+          deb_contents="$(dpkg-deb -c "$DEB")"
+          rpm_contents="$(rpm -qlp "$RPM")"
           for path in "${NEED[@]}"; do
-            dpkg -c "$DEB" | grep -Fq "./${path}" || {
+            grep -Fq "./${path}" <<< "$deb_contents" || {
               echo "deb missing ${path}"
               exit 1
             }
-            rpm -qlp "$RPM" | grep -Fq "/${path}" || {
+            grep -Fq "/${path}" <<< "$rpm_contents" || {
               echo "rpm missing ${path}"
               exit 1
             }
