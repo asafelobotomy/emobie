@@ -100,7 +100,7 @@ modules:
           exit 1
         fi
         for asset in setup-input-access.sh bootstrap-inputd-host.sh \
-          99-emobie-input.rules io.github.asafelobotomy.emobie.inputd.policy; do
+          99-emobie-input.rules; do
           src="deb-extract/usr/share/emobie/$asset"
           if [ ! -f "$src" ]; then
             echo "emobie.deb missing usr/share/emobie/$asset" >&2
@@ -111,6 +111,15 @@ modules:
             *) install -Dm644 "$src" "$HOST/$asset" ;;
           esac
         done
+        policy_src="deb-extract/usr/share/polkit-1/actions/io.github.asafelobotomy.emobie.inputd.policy"
+        if [ ! -f "$policy_src" ]; then
+          policy_src="deb-extract/usr/share/emobie/io.github.asafelobotomy.emobie.inputd.policy"
+        fi
+        if [ ! -f "$policy_src" ]; then
+          echo "emobie.deb missing io.github.asafelobotomy.emobie.inputd.policy" >&2
+          exit 1
+        fi
+        install -Dm644 "$policy_src" "$HOST/io.github.asafelobotomy.emobie.inputd.policy"
         if [ -f deb-extract/usr/share/emobie/selinux/emobie-inputd.te ]; then
           install -Dm644 deb-extract/usr/share/emobie/selinux/emobie-inputd.te \
             "$HOST/selinux/emobie-inputd.te"
