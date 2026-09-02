@@ -103,6 +103,7 @@ export function userDataFingerprint(prefs: {
   expandAsYouType?: boolean;
   expandTriggerMode?: string;
   expandKeepTriggerSpace?: boolean;
+  expandRestoreClipboard?: boolean;
   inputHelperSetupSeen?: boolean;
 }): string {
   return JSON.stringify({
@@ -114,6 +115,7 @@ export function userDataFingerprint(prefs: {
     expandAsYouType: Boolean(prefs.expandAsYouType),
     expandTriggerMode: prefs.expandTriggerMode ?? "space",
     expandKeepTriggerSpace: Boolean(prefs.expandKeepTriggerSpace),
+    expandRestoreClipboard: Boolean(prefs.expandRestoreClipboard),
     inputHelperSetupSeen: Boolean(prefs.inputHelperSetupSeen),
   });
 }

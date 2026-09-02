@@ -22,6 +22,11 @@ pub enum Request {
     Status,
     SetEnabled { enabled: bool },
     SyncMatches { matches: Vec<MatchRule> },
+    /// Update inject options without touching matches.
+    SetOptions {
+        #[serde(default)]
+        restore_clipboard: Option<bool>,
+    },
     InjectPaste,
 }
 
@@ -35,6 +40,12 @@ pub struct Response {
     pub detail: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suppress_jobs: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub restore_clipboard: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_inject_backend: Option<String>,
 }
 
 impl Response {
@@ -47,6 +58,9 @@ impl Response {
             enabled,
             detail: detail.to_string(),
             error: None,
+            suppress_jobs: Some(crate::inject::suppress_job_count()),
+            restore_clipboard: Some(crate::inject::restore_clipboard_enabled()),
+            last_inject_backend: crate::inject::last_inject_backend().map(|s| s.to_string()),
         }
     }
 
@@ -65,6 +79,9 @@ impl Response {
             enabled,
             detail: detail.to_string(),
             error: Some(detail.to_string()),
+            suppress_jobs: Some(crate::inject::suppress_job_count()),
+            restore_clipboard: Some(crate::inject::restore_clipboard_enabled()),
+            last_inject_backend: crate::inject::last_inject_backend().map(|s| s.to_string()),
         }
     }
 }

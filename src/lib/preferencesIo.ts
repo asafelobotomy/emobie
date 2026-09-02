@@ -73,7 +73,8 @@ export async function readPreferences(): Promise<Preferences> {
 
 async function writeDurableOnly(prefs: Preferences): Promise<void> {
   try {
-    await invoke("save_durable_preferences", { preferences: prefs });
+    // writeRev 0 = mirror refresh: Rust keeps the existing rev (never resets to 0).
+    await invoke("save_durable_preferences", { preferences: prefs, writeRev: 0 });
   } catch (error) {
     console.warn("Could not write durable preferences", error);
   }

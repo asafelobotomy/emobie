@@ -1,63 +1,88 @@
 mod clipboard;
+mod ei;
 mod enigo;
+mod keys_type;
 mod uinput;
+mod worker;
 
-use enigo::{
-    ctrl_v_enigo, expand_with_enigo, new_enigo, retype_trigger_enigo, warm_up_enigo, ENIGO_MAX_IDLE,
-    POST_PASTE_DELAY,
-};
-use uinput::{expand_with_uinput, retype_trigger_uinput};
+use worker::{inject_worker_loop, InjectJob};
 
-use ::enigo::Enigo;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, SyncSender};
 use std::sync::{Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use crate::listen;
 use crate::session_env;
-use crate::uinput_kbd::UInputKeyboard;
 
 /// Ignore synthetic keys after inject finishes (Wayland can deliver late).
 const SUPPRESS_GRACE: Duration = Duration::from_millis(150);
+/// If an inject job never finishes, force-open listen without zeroing the job
+/// counter (zeroing would desync later `finish_listen_suppress` calls).
+/// Must exceed worst-case set+ensure clipboard budgets on a healthy path.
+const SUPPRESS_STUCK_MS: u64 = 4_000;
 const INJECT_CACHE_TTL: Duration = Duration::from_secs(2);
 
 /// Expand jobs queued or in-flight (listen buffer should ignore keys).
 static LISTEN_SUPPRESS_JOBS: AtomicUsize = AtomicUsize::new(0);
-static EXPAND_ENABLED: AtomicBool = AtomicBool::new(true);
+pub(super) static EXPAND_ENABLED: AtomicBool = AtomicBool::new(true);
 /// Epoch millis until which listeners should keep suppressing after a job ends.
 static SUPPRESS_UNTIL_MS: AtomicU64 = AtomicU64::new(0);
+/// When suppress jobs went from 0 → N, refreshed when each job starts on the worker.
+pub(super) static SUPPRESS_STARTED_MS: AtomicU64 = AtomicU64::new(0);
+/// Stuck-job escape: listen despite jobs > 0 until the counter drains.
+static SUPPRESS_FORCE_OPEN: AtomicBool = AtomicBool::new(false);
 static INJECT_TX: OnceLock<SyncSender<InjectJob>> = OnceLock::new();
 static INJECT_CACHE: Mutex<Option<(Instant, bool)>> = Mutex::new(None);
-
-enum InjectJob {
-    Expand {
-        erase: usize,
-        expansion: String,
-        trigger: String,
-        trigger_committed: bool,
-    },
-    Paste {
-        reply: SyncSender<Result<(), String>>,
-    },
-}
 
 /// True while expand jobs are queued/in-flight or within the post-inject grace window.
 pub fn set_expand_enabled(enabled: bool) {
     EXPAND_ENABLED.store(enabled, Ordering::Relaxed);
 }
 
+pub fn set_restore_clipboard(enabled: bool) {
+    clipboard::set_restore_clipboard(enabled);
+}
+
+pub fn restore_clipboard_enabled() -> bool {
+    clipboard::restore_clipboard_enabled()
+}
+
+pub fn suppress_job_count() -> usize {
+    LISTEN_SUPPRESS_JOBS.load(Ordering::Acquire)
+}
+
+pub fn last_inject_backend() -> Option<&'static str> {
+    clipboard::last_backend()
+}
+
 pub fn should_suppress_keys() -> bool {
-    if LISTEN_SUPPRESS_JOBS.load(Ordering::Acquire) > 0 {
+    let jobs = LISTEN_SUPPRESS_JOBS.load(Ordering::Acquire);
+    if jobs > 0 {
+        let started = SUPPRESS_STARTED_MS.load(Ordering::Acquire);
+        let now = now_ms();
+        if started > 0 && now.saturating_sub(started) >= SUPPRESS_STUCK_MS {
+            if !SUPPRESS_FORCE_OPEN.swap(true, Ordering::AcqRel) {
+                eprintln!(
+                    "emobie-inputd: force-open listen (stuck suppress, {jobs} job(s) > {SUPPRESS_STUCK_MS}ms)"
+                );
+            }
+            // Do not zero LISTEN_SUPPRESS_JOBS — that desyncs finish_listen_suppress.
+            return false;
+        }
+        if SUPPRESS_FORCE_OPEN.load(Ordering::Acquire) {
+            return false;
+        }
         return true;
+    }
+    if SUPPRESS_FORCE_OPEN.load(Ordering::Acquire) {
+        SUPPRESS_FORCE_OPEN.store(false, Ordering::Release);
     }
     let until = SUPPRESS_UNTIL_MS.load(Ordering::Acquire);
     now_ms() < until
 }
 
-fn now_ms() -> u64 {
+pub(super) fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
@@ -69,11 +94,12 @@ fn arm_suppress_grace() {
     SUPPRESS_UNTIL_MS.store(until, Ordering::Release);
 }
 
-fn finish_listen_suppress() {
+pub(super) fn finish_listen_suppress() {
     // Saturating decrement — never underflow if a path double-finishes.
     let mut prev = LISTEN_SUPPRESS_JOBS.load(Ordering::Acquire);
     loop {
         if prev == 0 {
+            SUPPRESS_STARTED_MS.store(0, Ordering::Release);
             arm_suppress_grace();
             return;
         }
@@ -84,6 +110,9 @@ fn finish_listen_suppress() {
             Ordering::Acquire,
         ) {
             Ok(_) => {
+                if prev == 1 {
+                    SUPPRESS_STARTED_MS.store(0, Ordering::Release);
+                }
                 arm_suppress_grace();
                 return;
             }
@@ -139,166 +168,6 @@ pub fn can_inject() -> bool {
     ok
 }
 
-fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
-    // Prefer uinput: reaches native Wayland (Cursor, Plasma apps). Enigo is
-    // fallback when /dev/uinput is unavailable (no Grant / missing udev).
-    let mut uinput = match UInputKeyboard::open() {
-        Ok(kbd) => {
-            eprintln!("emobie-inputd: inject via /dev/uinput");
-            Some(kbd)
-        }
-        Err(err) => {
-            eprintln!("emobie-inputd: uinput unavailable ({err}); Enigo fallback");
-            None
-        }
-    };
-    let mut enigo: Option<Enigo> = None;
-    let mut last_inject = Instant::now();
-
-    while let Ok(job) = rx.recv() {
-        if uinput.is_none() {
-            if enigo.is_some() && last_inject.elapsed() >= ENIGO_MAX_IDLE {
-                enigo = None;
-            }
-            if enigo.is_none() {
-                match new_enigo() {
-                    Ok(mut backend) => {
-                        warm_up_enigo(&mut backend);
-                        enigo = Some(backend);
-                    }
-                    Err(err) => {
-                        match job {
-                            InjectJob::Expand { trigger, .. } => {
-                                listen::restore_to_buffer(&trigger);
-                                finish_listen_suppress();
-                                eprintln!("expand failed: {err}");
-                            }
-                            InjectJob::Paste { reply } => {
-                                let _ = reply.send(Err(err.clone()));
-                                finish_listen_suppress();
-                            }
-                        }
-                        continue;
-                    }
-                }
-            }
-        }
-
-        match job {
-            InjectJob::Expand {
-                erase,
-                expansion,
-                trigger,
-                trigger_committed,
-            } => {
-                if !EXPAND_ENABLED.load(Ordering::Relaxed) {
-                    listen::restore_to_buffer(&trigger);
-                    finish_listen_suppress();
-                    continue;
-                }
-                let expand_result = if let Some(kbd) = uinput.as_mut() {
-                    catch_unwind(AssertUnwindSafe(|| {
-                        expand_with_uinput(kbd, erase, &expansion, &trigger, trigger_committed)
-                    }))
-                } else {
-                    let backend = enigo.as_mut().expect("enigo ensured");
-                    catch_unwind(AssertUnwindSafe(|| {
-                        expand_with_enigo(backend, erase, &expansion, &trigger, trigger_committed)
-                    }))
-                };
-
-                finish_listen_suppress();
-                match expand_result {
-                    Ok(Ok(())) => {
-                        last_inject = Instant::now();
-                    }
-                    Ok(Err(err)) => {
-                        if uinput.is_some() {
-                            // Recreate uinput device; best-effort retype via paste.
-                            uinput = UInputKeyboard::open().ok();
-                            if let Some(kbd) = uinput.as_mut() {
-                                retype_trigger_uinput(kbd, &trigger);
-                                last_inject = Instant::now();
-                            }
-                        } else {
-                            enigo = None;
-                            if let Ok(mut backend) = new_enigo() {
-                                retype_trigger_enigo(&mut backend, &trigger);
-                                enigo = Some(backend);
-                                last_inject = Instant::now();
-                            }
-                        }
-                        listen::restore_to_buffer(&trigger);
-                        eprintln!("expand failed: {err}");
-                    }
-                    Err(_) => {
-                        if uinput.is_some() {
-                            uinput = UInputKeyboard::open().ok();
-                            if let Some(kbd) = uinput.as_mut() {
-                                retype_trigger_uinput(kbd, &trigger);
-                                last_inject = Instant::now();
-                            }
-                        } else {
-                            enigo = None;
-                            if let Ok(mut backend) = new_enigo() {
-                                retype_trigger_enigo(&mut backend, &trigger);
-                                enigo = Some(backend);
-                                last_inject = Instant::now();
-                            }
-                        }
-                        listen::restore_to_buffer(&trigger);
-                        eprintln!("expand failed: input injection backend panicked");
-                    }
-                }
-            }
-            InjectJob::Paste { reply } => {
-                let paste_result = if let Some(kbd) = uinput.as_mut() {
-                    catch_unwind(AssertUnwindSafe(|| {
-                        let result = kbd.ctrl_v();
-                        if result.is_ok() {
-                            thread::sleep(POST_PASTE_DELAY);
-                        }
-                        result
-                    }))
-                } else {
-                    let backend = enigo.as_mut().expect("enigo ensured");
-                    catch_unwind(AssertUnwindSafe(|| {
-                        let result = ctrl_v_enigo(backend);
-                        if result.is_ok() {
-                            thread::sleep(POST_PASTE_DELAY);
-                        }
-                        result
-                    }))
-                };
-                let result = match paste_result {
-                    Ok(Ok(())) => {
-                        last_inject = Instant::now();
-                        Ok(())
-                    }
-                    Ok(Err(err)) => {
-                        if uinput.is_some() {
-                            uinput = None;
-                        } else {
-                            enigo = None;
-                        }
-                        Err(err)
-                    }
-                    Err(_) => {
-                        if uinput.is_some() {
-                            uinput = None;
-                        } else {
-                            enigo = None;
-                        }
-                        Err("input injection backend panicked".to_string())
-                    }
-                };
-                let _ = reply.send(result);
-                finish_listen_suppress();
-            }
-        }
-    }
-}
-
 fn inject_sender() -> SyncSender<InjectJob> {
     INJECT_TX
         .get_or_init(|| {
@@ -322,7 +191,10 @@ pub fn expand_trigger(
     let erase = trigger_chars
         .min(trigger.chars().count())
         .min(crate::state::MAX_TRIGGER_LEN);
-    LISTEN_SUPPRESS_JOBS.fetch_add(1, Ordering::AcqRel);
+    let prev_jobs = LISTEN_SUPPRESS_JOBS.fetch_add(1, Ordering::AcqRel);
+    if prev_jobs == 0 {
+        SUPPRESS_STARTED_MS.store(now_ms(), Ordering::Release);
+    }
     match inject_sender().try_send(InjectJob::Expand {
         erase,
         expansion: expansion.to_string(),
@@ -353,7 +225,10 @@ pub fn expand_trigger(
 pub fn inject_ctrl_v() -> Result<(), String> {
     let (reply_tx, reply_rx) = mpsc::sync_channel(1);
     // Suppress listen briefly so synthetic Ctrl+V does not pollute the match buffer.
-    LISTEN_SUPPRESS_JOBS.fetch_add(1, Ordering::AcqRel);
+    let prev_jobs = LISTEN_SUPPRESS_JOBS.fetch_add(1, Ordering::AcqRel);
+    if prev_jobs == 0 {
+        SUPPRESS_STARTED_MS.store(now_ms(), Ordering::Release);
+    }
     match inject_sender().try_send(InjectJob::Paste { reply: reply_tx }) {
         Ok(()) => {}
         Err(_) => {

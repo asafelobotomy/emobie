@@ -60,6 +60,7 @@ function App() {
     setExpandAsYouType,
     setExpandTriggerMode,
     setExpandKeepTriggerSpace,
+    setExpandRestoreClipboard,
     setCheckUpdatesOnStartup,
     setDismissedUpdateVersion,
     setInputHelperSetupSeen,
@@ -83,6 +84,10 @@ function App() {
     null,
   );
   const [inputError, setInputError] = useState<string | null>(null);
+  const [reconcileNonce, setReconcileNonce] = useState(0);
+  const bumpHelperReconcile = useCallback(() => {
+    setReconcileNonce((n) => n + 1);
+  }, []);
   const markSetupSeen = useCallback(() => {
     setInputHelperSetupSeen(true);
   }, [setInputHelperSetupSeen]);
@@ -235,6 +240,8 @@ function App() {
     expandAsYouType: prefs.expandAsYouType,
     expandTriggerMode: prefs.expandTriggerMode,
     expandKeepTriggerSpace: prefs.expandKeepTriggerSpace,
+    expandRestoreClipboard: prefs.expandRestoreClipboard,
+    reconcileNonce,
     expansionMacros: mergedMacros,
     onStatus: handleInputStatus,
     onSyncError: handleInputSyncError,
@@ -361,6 +368,8 @@ function App() {
       setExpandAsYouType={setExpandAsYouType}
       setExpandTriggerMode={setExpandTriggerMode}
       setExpandKeepTriggerSpace={setExpandKeepTriggerSpace}
+      setExpandRestoreClipboard={setExpandRestoreClipboard}
+      onHelperReconcile={bumpHelperReconcile}
       setCheckUpdatesOnStartup={setCheckUpdatesOnStartup}
       setDismissedUpdateVersion={setDismissedUpdateVersion}
       setMacros={setMacros}

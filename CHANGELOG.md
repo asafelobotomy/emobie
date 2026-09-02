@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.15] - 2026-09-02
+
+### Fixed
+
+- Expand insert races on Plasma Wayland: key-safe ASCII types via uinput; clipboard restore off by default
+- Clipboard path prefers `wl-copy`/`wl-paste`, then arboard, with Ctrl+V plus Shift+Insert
+- AppImage bootstrap no longer overwrites a newer host `emobie-inputd` (semver/`--version`, not mtime-only)
+- After Grant/restart, Expand re-syncs matches (disable → sync → enable)
+
+### Changed
+
+- Status/journal report insert backend and suppress job count; Settings toggle for clipboard restore
+- Optional `eitype` / feature-flagged libei for Unicode; smoke treats unfocused empty fields as INFRA
+- Docs: Plasma Grant, `wl-clipboard`, and clipboard-restore default
+
 ## [0.6.14] - 2026-09-02
 
 ### Fixed
@@ -315,7 +330,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Horizontal mouse-wheel scrolling in wide layouts
 - Tray icon temp path for Flatpak-friendly sandboxing
 
-[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.14...HEAD
+[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.15...HEAD
+[0.6.15]: https://github.com/asafelobotomy/emobie/compare/v0.6.14...v0.6.15
 [0.6.14]: https://github.com/asafelobotomy/emobie/compare/v0.6.13...v0.6.14
 [0.6.13]: https://github.com/asafelobotomy/emobie/compare/v0.6.12...v0.6.13
 [0.6.12]: https://github.com/asafelobotomy/emobie/compare/v0.6.11...v0.6.12

@@ -79,14 +79,23 @@ Polkit prompt that:
 3. Applies session ACLs with `setfacl` when available (no logout required)
 4. Restarts `emobie-inputd` so it can open keyboards and inject immediately
 
-On Wayland/Plasma, expansions paste through a kernel virtual keyboard (`/dev/uinput`).
-Compositor “virtual keyboard” protocols are often missing; X11/XTest alone does not reach
-native Wayland apps. Grant’s udev rule covers both listen (`event*`) and inject (`uinput`)
+On Wayland/Plasma, short ASCII expansions type via a kernel virtual keyboard
+(`/dev/uinput`). Longer text, newlines, and emoji use clipboard paste (`wl-copy`
+when available, else arboard) plus Ctrl+V / Shift+Insert. Compositor “virtual
+keyboard” protocols are often missing; X11/XTest alone does not reach native
+Wayland apps. Grant’s udev rule covers both listen (`event*`) and inject (`uinput`)
 for every package channel (`.deb` / `.rpm` / Arch / AppImage / Flatpak host helper).
+
+**Clipboard restore** after paste is **off by default** (Settings → Restore clipboard
+after paste). Leaving it off avoids a common Plasma race where a delayed restore
+wipes the next expansion. Install optional `wl-clipboard` for stabler Wayland
+clipboard offers.
 
 Grant is **idempotent** and re-runs when permanent config is missing even if the
 helper can already open keyboards via a temporary ACL or an orphaned group id
-(session `groups` shows a bare number instead of `emobie-input`).
+(session `groups` shows a bare number instead of `emobie-input`). After Grant,
+emobie re-syncs matches (disable → sync → enable) so Expand does not keep a
+stale trie from before the restart.
 
 Manual host setup (same script):
 

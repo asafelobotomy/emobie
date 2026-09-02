@@ -10,6 +10,12 @@ export type InputHelperStatus = {
    * Can be false even when `canListen` is true (temporary ACL / orphaned GID).
    */
   accessConfigured?: boolean;
+  /** In-flight expand jobs holding listen suppress (debug). */
+  suppressJobs?: number;
+  /** Clipboard restore after paste (default false). */
+  restoreClipboard?: boolean;
+  /** Last expand insert backend: keys | ei | wl-copy | arboard. */
+  lastInjectBackend?: string;
 };
 
 export type InputMatch = {

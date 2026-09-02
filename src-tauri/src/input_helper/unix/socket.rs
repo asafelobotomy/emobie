@@ -14,6 +14,12 @@ pub struct DaemonResponse {
     pub can_listen: bool,
     pub detail: String,
     pub error: Option<String>,
+    #[serde(default)]
+    pub suppress_jobs: Option<usize>,
+    #[serde(default)]
+    pub restore_clipboard: Option<bool>,
+    #[serde(default)]
+    pub last_inject_backend: Option<String>,
 }
 
 pub(super) fn current_uid() -> u32 {

@@ -18,6 +18,9 @@ pub fn offline_status(detail: &str) -> InputHelperStatus {
         detail: detail.to_string(),
         flatpak: false,
         access_configured: false,
+        suppress_jobs: None,
+        restore_clipboard: None,
+        last_inject_backend: None,
     }
 }
 
@@ -29,6 +32,9 @@ fn status_from_resp(resp: DaemonResponse) -> InputHelperStatus {
         detail: resp.detail,
         flatpak: false,
         access_configured: false,
+        suppress_jobs: resp.suppress_jobs,
+        restore_clipboard: resp.restore_clipboard,
+        last_inject_backend: resp.last_inject_backend,
     }
 }
 
@@ -96,6 +102,18 @@ pub fn sync_matches(matches: Vec<InputMatch>) -> Result<InputHelperStatus, Strin
         }),
         Duration::from_secs(8),
     ) {
+        Ok(resp) if resp.ok => Ok(status_from_resp(resp)),
+        Ok(resp) => Err(resp.error.unwrap_or(resp.detail)),
+        Err(err) => Err(err),
+    }
+}
+
+pub fn set_options(restore_clipboard: Option<bool>) -> Result<InputHelperStatus, String> {
+    let _ = ensure_started();
+    match request(serde_json::json!({
+        "cmd": "set_options",
+        "restore_clipboard": restore_clipboard,
+    })) {
         Ok(resp) if resp.ok => Ok(status_from_resp(resp)),
         Ok(resp) => Err(resp.error.unwrap_or(resp.detail)),
         Err(err) => Err(err),

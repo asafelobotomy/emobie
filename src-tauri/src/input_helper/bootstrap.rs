@@ -134,18 +134,72 @@ fn host_mtime(path: &Path) -> Option<SystemTime> {
     Some(SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(secs))
 }
 
-/// True when the bundled tarball is newer than the installed helper (or helper missing).
+/// Parse `x.y.z` (optional leading text) into comparable triple.
+fn parse_semver(raw: &str) -> Option<(u64, u64, u64)> {
+    let token = raw
+        .split_whitespace()
+        .find(|t| t.chars().next().is_some_and(|c| c.is_ascii_digit()))?;
+    let mut parts = token.split('.');
+    let major = parts.next()?.parse().ok()?;
+    let minor = parts.next()?.parse().ok()?;
+    let patch = parts
+        .next()
+        .unwrap_or("0")
+        .chars()
+        .take_while(|c| c.is_ascii_digit())
+        .collect::<String>()
+        .parse()
+        .ok()?;
+    Some((major, minor, patch))
+}
+
+fn host_run_version(path: &Path) -> Option<String> {
+    let path_str = path.to_string_lossy();
+    let output = if std::env::var_os("FLATPAK_ID").is_some() {
+        Command::new("flatpak-spawn")
+            .args(["--host", path_str.as_ref(), "--version"])
+            .output()
+            .ok()?
+    } else {
+        Command::new(path).arg("--version").output().ok()?
+    };
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8_lossy(&output.stdout);
+    text.lines().next().map(|l| l.trim().to_string())
+}
+
+fn version_lt(installed: &str, bundled: &str) -> Option<bool> {
+    let a = parse_semver(installed)?;
+    let b = parse_semver(bundled)?;
+    Some(a < b)
+}
+
+/// Bundled helper version matches the app crate when staged together.
+fn bundled_helper_version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}
+
+/// True when the bundled helper should replace the installed one.
+/// Prefer semver (installed < bundled); fall back to mtime when versions unknown.
 fn bundled_helper_newer_than_installed(tarball: &Path) -> bool {
-    let Some(installed) = host_helper_path() else {
+    let Some(installed_path) = host_helper_path() else {
         return true;
     };
-    if !host_file_executable(&installed) {
+    if !host_file_executable(&installed_path) {
         return true;
+    }
+    if let Some(installed_ver) = host_run_version(&installed_path) {
+        if let Some(older) = version_lt(&installed_ver, bundled_helper_version()) {
+            // Refuse to downgrade or no-op replace when installed >= bundled.
+            return older;
+        }
     }
     let Some(bundle_mtime) = mtime(tarball) else {
         return false;
     };
-    match host_mtime(&installed) {
+    match host_mtime(&installed_path) {
         Some(installed_mtime) => bundle_mtime > installed_mtime,
         None => true,
     }
@@ -263,6 +317,17 @@ fn install_from_loose_dir(dir: &Path) -> bool {
     if !binary.is_file() || !bootstrap.is_file() {
         return false;
     }
+    // Same gate as tarball: do not clobber a newer host helper with an older bundle.
+    if let (Some(installed), Some(bundled_ver)) = (
+        host_helper_path().filter(|p| host_file_executable(p)),
+        host_run_version(&binary),
+    ) {
+        if let Some(installed_ver) = host_run_version(&installed) {
+            if version_lt(&installed_ver, &bundled_ver) == Some(false) {
+                return true; // already >= bundled
+            }
+        }
+    }
     run_host_bootstrap(&bootstrap, &binary)
 }
 
@@ -305,4 +370,22 @@ pub fn refresh_host_helper() -> bool {
         }
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_semver, version_lt};
+
+    #[test]
+    fn parses_version_line() {
+        assert_eq!(parse_semver("emobie-inputd 0.6.14"), Some((0, 6, 14)));
+        assert_eq!(parse_semver("0.6.14"), Some((0, 6, 14)));
+    }
+
+    #[test]
+    fn refuses_downgrade_when_installed_newer_or_equal() {
+        assert_eq!(version_lt("emobie-inputd 0.6.14", "0.6.14"), Some(false));
+        assert_eq!(version_lt("0.7.0", "0.6.14"), Some(false));
+        assert_eq!(version_lt("0.6.13", "0.6.14"), Some(true));
+    }
 }

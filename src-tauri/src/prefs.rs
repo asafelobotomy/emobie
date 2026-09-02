@@ -156,25 +156,31 @@ pub fn save_durable_preferences(preferences: Value, write_rev: u64) -> Result<()
         return Err("preferences must be a JSON object".into());
     }
     let path = durable_path().ok_or_else(|| "HOME is not set".to_string())?;
-    if write_rev > 0 {
-        if let Ok(raw) = fs::read_to_string(&path) {
-            if let Ok(existing) = serde_json::from_str::<Value>(&raw) {
-                let stored = existing
-                    .get("writeRev")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(0);
-                if write_rev < stored {
-                    return Ok(());
-                }
-            }
+    let mut stored_rev = 0u64;
+    if let Ok(raw) = fs::read_to_string(&path) {
+        if let Ok(existing) = serde_json::from_str::<Value>(&raw) {
+            stored_rev = existing
+                .get("writeRev")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
         }
     }
+    // write_rev == 0: mirror refresh — update preferences body but never reset
+    // writeRev to 0 (that would let a stale concurrent writer win later).
+    // write_rev > 0: reject if older than disk.
+    let effective_rev = if write_rev == 0 {
+        stored_rev
+    } else if write_rev < stored_rev {
+        return Ok(());
+    } else {
+        write_rev
+    };
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     let wrapped = serde_json::json!({
         "preferences": preferences,
-        "writeRev": write_rev,
+        "writeRev": effective_rev,
     });
     let body = serde_json::to_string_pretty(&wrapped).map_err(|e| e.to_string())?;
     let tmp = path.with_extension("json.tmp");

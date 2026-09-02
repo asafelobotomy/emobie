@@ -75,6 +75,8 @@ export type AppShellProps = {
   setExpandAsYouType: (value: boolean) => void;
   setExpandTriggerMode: (value: MacroTriggerMode) => void;
   setExpandKeepTriggerSpace: (value: boolean) => void;
+  setExpandRestoreClipboard: (value: boolean) => void;
+  onHelperReconcile?: () => void;
   setCheckUpdatesOnStartup: (value: boolean) => void;
   setDismissedUpdateVersion: (version: string) => void;
   setMacros: (macros: Macro[]) => void;
@@ -137,6 +139,8 @@ export function AppShell(props: AppShellProps) {
     setExpandAsYouType,
     setExpandTriggerMode,
     setExpandKeepTriggerSpace,
+    setExpandRestoreClipboard,
+    onHelperReconcile,
     setCheckUpdatesOnStartup,
     setDismissedUpdateVersion,
     setMacros,
@@ -234,6 +238,8 @@ export function AppShell(props: AppShellProps) {
           onExpandAsYouType={setExpandAsYouType}
           onExpandTriggerMode={setExpandTriggerMode}
           onExpandKeepTriggerSpace={setExpandKeepTriggerSpace}
+          onExpandRestoreClipboard={setExpandRestoreClipboard}
+          onHelperReconcile={onHelperReconcile}
           onCheckUpdatesOnStartup={setCheckUpdatesOnStartup}
           onDismissUpdate={(version) => setDismissedUpdateVersion(version)}
           onOpenRelease={(url) => {

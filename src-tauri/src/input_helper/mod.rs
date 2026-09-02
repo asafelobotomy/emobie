@@ -24,6 +24,15 @@ pub struct InputHelperStatus {
     /// orphaned GID even when permanent Grant config is missing.
     #[serde(default)]
     pub access_configured: bool,
+    /// In-flight expand jobs holding listen suppress (debug).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suppress_jobs: Option<usize>,
+    /// Whether clipboard restore after paste is enabled (default false).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub restore_clipboard: Option<bool>,
+    /// Last expand insert backend: keys | ei | wl-copy | arboard.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_inject_backend: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,6 +56,9 @@ fn offline_linux_only() -> InputHelperStatus {
         detail: "Input helper is Linux-only.".into(),
         flatpak: false,
         access_configured: false,
+        suppress_jobs: None,
+        restore_clipboard: None,
+        last_inject_backend: None,
     }
 }
 
@@ -97,6 +109,21 @@ pub fn input_helper_sync_matches(matches: Vec<InputMatch>) -> Result<InputHelper
     {
         let _ = matches;
         Ok(offline_linux_only())
+    }
+}
+
+#[tauri::command]
+pub fn input_helper_set_options(
+    restore_clipboard: Option<bool>,
+) -> Result<InputHelperStatus, String> {
+    #[cfg(unix)]
+    {
+        return unix::set_options(restore_clipboard).map(access::with_flatpak_flag);
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = restore_clipboard;
+        Err("Input helper is Linux-only.".into())
     }
 }
 

@@ -48,6 +48,11 @@ export type Preferences = {
   expandTriggerMode: MacroTriggerMode;
   /** When trigger mode is Space: re-type a Space after the expansion. */
   expandKeepTriggerSpace: boolean;
+  /**
+   * After paste, restore the previous clipboard (off by default — restore races
+   * are a common Expand failure on Plasma Wayland).
+   */
+  expandRestoreClipboard: boolean;
   checkUpdatesOnStartup: boolean;
   dismissedUpdateVersion: string | null;
   /** True after the user finishes or skips first-run input helper setup. */
@@ -77,6 +82,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   expandAsYouType: false,
   expandTriggerMode: "space",
   expandKeepTriggerSpace: false,
+  expandRestoreClipboard: false,
   checkUpdatesOnStartup: true,
   dismissedUpdateVersion: null,
   inputHelperSetupSeen: false,

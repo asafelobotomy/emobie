@@ -82,7 +82,7 @@ fn read_request_line(
 }
 
 fn persist_locked(enabled: &AtomicBool, matches: &[MatchRule]) {
-    state::save(enabled.load(Ordering::Relaxed), matches);
+    state::save_reloading_enabled(enabled, matches);
 }
 
 struct ClientSlot<'a>(&'a AtomicUsize);
@@ -198,7 +198,7 @@ fn handle_client(
                     match sync_result {
                         Ok((unchanged, snapshot)) => {
                             if !unchanged {
-                                state::save(enabled.load(Ordering::Relaxed), &snapshot);
+                                state::save_reloading_enabled(enabled, &snapshot);
                             }
                             Response::status(
                                 can_inject,
@@ -215,6 +215,20 @@ fn handle_client(
                     }
                 }
                 Err(err) => Response::err(can_inject, can_listen, enabled_now, &err),
+            },
+            Ok(Request::SetOptions { restore_clipboard }) => {
+                if let Some(value) = restore_clipboard {
+                    inject::set_restore_clipboard(value);
+                }
+                Response::status(
+                    can_inject,
+                    can_listen,
+                    enabled_now,
+                    &format!(
+                        "options updated (restore_clipboard={})",
+                        inject::restore_clipboard_enabled()
+                    ),
+                )
             },
             Ok(Request::InjectPaste) => match inject::inject_ctrl_v() {
                 Ok(()) => Response::status(
@@ -237,6 +251,25 @@ fn handle_client(
 }
 
 fn main() {
+    let mut args = std::env::args().skip(1);
+    if let Some(arg) = args.next() {
+        if arg == "--version" || arg == "-V" {
+            println!("emobie-inputd {}", env!("CARGO_PKG_VERSION"));
+            return;
+        }
+        if arg == "--help" || arg == "-h" {
+            println!(
+                "emobie-inputd {} — host input helper for emobie Expand\n\
+                 Usage: emobie-inputd [--version]\n\
+                 Talks over a per-user Unix socket (XDG_RUNTIME_DIR/emobie/).",
+                env!("CARGO_PKG_VERSION")
+            );
+            return;
+        }
+        eprintln!("unknown argument: {arg} (try --help)");
+        std::process::exit(2);
+    }
+
     let path = resolve_socket_path();
     let lock_dir = instance_lock_dir();
     // Always create the per-uid lock dir (and socket parent if different).

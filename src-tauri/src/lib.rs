@@ -112,6 +112,7 @@ pub fn run() {
             input_helper::input_helper_ensure_started,
             input_helper::input_helper_set_enabled,
             input_helper::input_helper_sync_matches,
+            input_helper::input_helper_set_options,
             input_helper::input_helper_inject_paste,
             input_helper::input_helper_run_access_setup,
             updates::check_for_updates,

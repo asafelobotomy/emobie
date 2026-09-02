@@ -1,6 +1,6 @@
 [package]
 name = "emobie-inputd"
-version = "0.6.14"
+version = "0.6.15"
 edition = "2021"
 description = "Privileged input helper for emobie text expansion"
 license = "MIT"
@@ -9,14 +9,22 @@ license = "MIT"
 name = "emobie-inputd"
 path = "src/main.rs"
 
+[features]
+default = []
+# Experimental Emulated Input path (portal/EIS). Prefer system `eitype` when available.
+libei = ["dep:reis", "dep:ashpd", "dep:tokio"]
+
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 arboard = "3"
-# libei is intentionally omitted: enigo 0.3 unwraps on missing RemoteDesktop portal
+# libei is intentionally omitted from enigo: 0.3 unwraps on missing RemoteDesktop portal
 # and panics/hangs on X11 (and some Wayland) sessions, killing the listen thread.
 enigo = { version = "0.3", default-features = false, features = ["x11rb", "wayland"] }
 evdev = "0.12"
 xkbcommon = "0.8"
 nix = { version = "0.29", features = ["fs", "uio", "socket", "user"] }
 ctrlc = "3"
+reis = { version = "0.7", optional = true }
+ashpd = { version = "0.11", optional = true, features = ["tokio"] }
+tokio = { version = "1", optional = true, features = ["rt", "macros"] }

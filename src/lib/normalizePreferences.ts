@@ -128,6 +128,7 @@ export function normalizePreferences(
     expandAsYouType: Boolean(merged.expandAsYouType),
     expandTriggerMode: normalizeTriggerMode(merged.expandTriggerMode),
     expandKeepTriggerSpace: Boolean(merged.expandKeepTriggerSpace),
+    expandRestoreClipboard: Boolean(merged.expandRestoreClipboard),
     checkUpdatesOnStartup: merged.checkUpdatesOnStartup !== false,
     dismissedUpdateVersion:
       typeof merged.dismissedUpdateVersion === "string" &&

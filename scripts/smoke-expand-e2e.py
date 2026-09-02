@@ -174,10 +174,15 @@ def main() -> int:
     scrolled.add(entry)
     win.add(scrolled)
     win.connect("destroy", Gtk.main_quit)
+    win.set_keep_above(True)
     win.show_all()
     win.present()
+    try:
+        win.activate()
+    except Exception:
+        pass
 
-    result: dict[str, str | bool] = {"ok": False, "text": ""}
+    result: dict[str, str | bool] = {"ok": False, "text": "", "active": False}
 
     def buffer_text() -> str:
         start, end = buf.get_bounds()
@@ -188,10 +193,14 @@ def main() -> int:
         kbd = UInputKbd()
         try:
             time.sleep(5.5)
+            win.present()
+            win.set_keep_above(True)
             entry.grab_focus()
             while Gtk.events_pending():
                 Gtk.main_iteration_do(False)
             time.sleep(0.2)
+            active = bool(win.is_active()) and entry.has_focus()
+            result["active"] = active
             kbd.type_text(TYPE_CHARS)
             # Erase + paste can take ~1s with clipboard settle.
             time.sleep(2.0)
@@ -214,9 +223,15 @@ def main() -> int:
         print("PASS: Expand E2E — expansion appeared in focused field")
         print("got:", repr(result["text"][:120]))
         return 0
+    text = str(result.get("text") or "")
+    if not text.strip() and not result.get("active"):
+        print("INFRA: Expand E2E — empty field and window unfocused (focus steal)")
+        print("expected prefix:", repr(expansion[:80]))
+        print("got:", repr(text))
+        return 2
     print("FAIL: Expand E2E — expected expansion missing")
     print("expected prefix:", repr(expansion[:80]))
-    print("got:", repr(result["text"]))
+    print("got:", repr(text))
     return 1
 
 

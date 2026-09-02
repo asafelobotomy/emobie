@@ -50,6 +50,8 @@ type SettingsPanelProps = {
   onExpandAsYouType: (value: boolean) => void;
   onExpandTriggerMode: (value: MacroTriggerMode) => void;
   onExpandKeepTriggerSpace: (value: boolean) => void;
+  onExpandRestoreClipboard: (value: boolean) => void;
+  onHelperReconcile?: () => void;
   onCheckUpdatesOnStartup: (value: boolean) => void;
   onDismissUpdate: (version: string) => void;
   onOpenRelease: (url: string) => void;
@@ -92,6 +94,8 @@ export function SettingsPanel({
   onExpandAsYouType,
   onExpandTriggerMode,
   onExpandKeepTriggerSpace,
+  onExpandRestoreClipboard,
+  onHelperReconcile,
   onCheckUpdatesOnStartup,
   onDismissUpdate,
   onOpenRelease,
@@ -245,11 +249,14 @@ export function SettingsPanel({
           expandAsYouType={prefs.expandAsYouType}
           expandTriggerMode={prefs.expandTriggerMode}
           expandKeepTriggerSpace={prefs.expandKeepTriggerSpace}
+          expandRestoreClipboard={prefs.expandRestoreClipboard}
           inputStatus={inputStatus}
           onExpandAsYouType={onExpandAsYouType}
           onExpandTriggerMode={onExpandTriggerMode}
           onExpandKeepTriggerSpace={onExpandKeepTriggerSpace}
+          onExpandRestoreClipboard={onExpandRestoreClipboard}
           onInputStatus={onInputStatus}
+          onHelperReconcile={onHelperReconcile}
         />
 
         <MacrosSettings

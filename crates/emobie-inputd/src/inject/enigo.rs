@@ -4,7 +4,8 @@ use std::thread;
 use std::time::Duration;
 
 use super::clipboard::{
-    prefers_literal_insert, restore_clipboard_now, schedule_clipboard_restore, set_clipboard_text,
+    ensure_clipboard_text, prefers_literal_insert, restore_clipboard_now,
+    schedule_clipboard_restore, set_clipboard_text,
 };
 use crate::session_env;
 
@@ -138,6 +139,12 @@ pub(super) fn expand_with_enigo(
 
     if expansion.is_empty() {
         return Ok(());
+    }
+
+    if let Err(err) = ensure_clipboard_text(expansion) {
+        retype_trigger_enigo(enigo, trigger);
+        restore_clipboard_now();
+        return Err(err);
     }
 
     match ctrl_v_enigo(enigo) {

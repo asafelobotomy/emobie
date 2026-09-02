@@ -79,6 +79,11 @@ description = "Allows syncing macro matches to emobie-inputd"
 commands.allow = ["input_helper_sync_matches"]
 
 [[permission]]
+identifier = "allow-input-helper-set-options"
+description = "Allows updating emobie-inputd inject options (clipboard restore)"
+commands.allow = ["input_helper_set_options"]
+
+[[permission]]
 identifier = "allow-input-helper-inject-paste"
 description = "Allows requesting a Ctrl+V paste injection"
 commands.allow = ["input_helper_inject_paste"]

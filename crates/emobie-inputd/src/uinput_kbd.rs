@@ -31,13 +31,26 @@ impl UInputKeyboard {
             Key::KEY_LEFTMETA,
             Key::KEY_V,
             Key::KEY_C,
+            Key::KEY_INSERT,
             Key::KEY_BACKSPACE,
             Key::KEY_ENTER,
             Key::KEY_SPACE,
             Key::KEY_TAB,
             Key::KEY_ESC,
+            Key::KEY_GRAVE,
+            Key::KEY_MINUS,
+            Key::KEY_EQUAL,
+            Key::KEY_LEFTBRACE,
+            Key::KEY_RIGHTBRACE,
+            Key::KEY_BACKSLASH,
+            Key::KEY_SEMICOLON,
+            Key::KEY_APOSTROPHE,
+            Key::KEY_COMMA,
+            Key::KEY_DOT,
+            Key::KEY_SLASH,
             Key::KEY_A,
             Key::KEY_B,
+            Key::KEY_C,
             Key::KEY_D,
             Key::KEY_E,
             Key::KEY_F,
@@ -56,6 +69,7 @@ impl UInputKeyboard {
             Key::KEY_S,
             Key::KEY_T,
             Key::KEY_U,
+            Key::KEY_V,
             Key::KEY_W,
             Key::KEY_X,
             Key::KEY_Y,
@@ -70,13 +84,6 @@ impl UInputKeyboard {
             Key::KEY_8,
             Key::KEY_9,
             Key::KEY_0,
-            Key::KEY_MINUS,
-            Key::KEY_EQUAL,
-            Key::KEY_DOT,
-            Key::KEY_COMMA,
-            Key::KEY_SLASH,
-            Key::KEY_SEMICOLON,
-            Key::KEY_APOSTROPHE,
         ] {
             keys.insert(key);
         }
@@ -111,6 +118,20 @@ impl UInputKeyboard {
         Ok(())
     }
 
+    /// Tap `key`, optionally holding LeftShift.
+    pub fn tap(&mut self, key: Key, shift: bool) -> Result<(), String> {
+        if shift {
+            self.emit_key(Key::KEY_LEFTSHIFT, 1)?;
+        }
+        let typed = self.click(key);
+        let released = if shift {
+            self.emit_key(Key::KEY_LEFTSHIFT, 0)
+        } else {
+            Ok(())
+        };
+        typed.and(released)
+    }
+
     pub fn erase_chars(&mut self, count: usize) -> Result<(), String> {
         for _ in 0..count {
             self.click(Key::KEY_BACKSPACE)?;
@@ -125,6 +146,14 @@ impl UInputKeyboard {
         self.emit_key(Key::KEY_LEFTCTRL, 1)?;
         let typed = self.click(Key::KEY_V);
         let released = self.emit_key(Key::KEY_LEFTCTRL, 0);
+        typed.and(released)
+    }
+
+    /// Shift+Insert paste (common terminal / fallback chord).
+    pub fn shift_insert(&mut self) -> Result<(), String> {
+        self.emit_key(Key::KEY_LEFTSHIFT, 1)?;
+        let typed = self.click(Key::KEY_INSERT);
+        let released = self.emit_key(Key::KEY_LEFTSHIFT, 0);
         typed.and(released)
     }
 }

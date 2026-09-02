@@ -141,6 +141,10 @@ export function usePreferences() {
     (expandKeepTriggerSpace: boolean) => update({ expandKeepTriggerSpace }),
     [update],
   );
+  const setExpandRestoreClipboard = useCallback(
+    (expandRestoreClipboard: boolean) => update({ expandRestoreClipboard }),
+    [update],
+  );
   const setCheckUpdatesOnStartup = useCallback(
     (checkUpdatesOnStartup: boolean) => update({ checkUpdatesOnStartup }),
     [update],
@@ -268,6 +272,7 @@ export function usePreferences() {
     setExpandAsYouType,
     setExpandTriggerMode,
     setExpandKeepTriggerSpace,
+    setExpandRestoreClipboard,
     setCheckUpdatesOnStartup,
     setDismissedUpdateVersion,
     setInputHelperSetupSeen,

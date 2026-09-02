@@ -61,7 +61,7 @@ Text expansion needs three layers on every distro:
 |-------|------|-----|
 | **Helper daemon** | `emobie-inputd` on the **host** (same user as the desktop session) | Bundled in `.deb`/`.rpm`; AppImage/Flatpak auto-install on first Expand |
 | **Keyboard read** | Open `/dev/input/event*` | udev group `emobie-input` + one-time **Grant** (Polkit); `setfacl` when `acl` package installed |
-| **Text inject** | Erase trigger + paste expansion into the focused app | **`/dev/uinput`** via the same Grant (required on Wayland/Plasma — Enigo virtual-keyboard is often unavailable); X11 can fall back to Enigo |
+| **Text inject** | Erase trigger + insert expansion into the focused app | **`/dev/uinput`** via the same Grant (required on Wayland/Plasma — Enigo virtual-keyboard is often unavailable); short ASCII types as keys; rich text uses clipboard (`wl-copy` / arboard) + paste chords; X11 can fall back to Enigo |
 
 Grant’s udev rule sets `GROUP=emobie-input MODE=0660` on `/dev/uinput` and applies a session
 `setfacl` so Expand works without logout. Deb/rpm/Arch/AppImage/Flatpak all ship the same
@@ -102,7 +102,9 @@ Expand treats access as ready only when **both** are true:
 
 On Wayland, inject also needs a writable `/dev/uinput` (same Grant). Without it the helper
 reports `can_inject=false` even if a compositor socket exists — Enigo alone cannot reach
-native Wayland apps such as Cursor or many Plasma clients.
+native Wayland apps such as Cursor or many Plasma clients. Rich expansions use the
+clipboard; install **`wl-clipboard`** (`wl-copy` / `wl-paste`) when possible. Clipboard
+restore after paste is **off by default** in Settings (avoids Plasma restore races).
 
 If listen works but the group/udev files are missing (common after a partial Grant,
 orphaned GID, or ACL-only session), emobie re-runs Grant instead of skipping it.
@@ -205,7 +207,9 @@ CachyOS is Arch-based. Typical setup:
 1. Install Flatpak or AppImage (or build with `npm run tauri:build`)
 2. Enable **Expand** in Settings (auto-installs the host helper + Grant); fallback:
    `bash packaging/install-inputd-user.sh`
-3. On **Plasma** (common default): pin + tray + Grant are on the supported path
+3. On **Plasma** (common default): pin + tray + Grant are on the supported path.
+   Optional `pacman -S wl-clipboard` for richer expansions. Clipboard restore is
+   off by default. Complex Unicode can also use a system `eitype` binary (libei).
 
 ## Related docs
 

@@ -36,6 +36,7 @@ describe("normalizePreferences macros", () => {
     assert.equal(prefs.expandAsYouType, false);
     assert.equal(prefs.expandTriggerMode, "space");
     assert.equal(prefs.expandKeepTriggerSpace, false);
+    assert.equal(prefs.expandRestoreClipboard, false);
   });
 
   it("accepts immediate expand trigger mode", () => {

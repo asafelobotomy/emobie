@@ -9,6 +9,9 @@ type Options = {
   expandAsYouType: boolean;
   expandTriggerMode: MacroTriggerMode;
   expandKeepTriggerSpace: boolean;
+  expandRestoreClipboard: boolean;
+  /** Bump after Grant/restart to force disable→sync→enable once. */
+  reconcileNonce?: number;
   /** Custom macros plus optional favorited-emoji macros (subset, not full catalog). */
   expansionMacros: MacroEntry[];
   onStatus: (status: InputHelperStatus) => void;
@@ -22,18 +25,31 @@ function errMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+/** Serialize helper IPC so cancelled effect runs cannot reorder enable/sync. */
+let helperSyncChain: Promise<void> = Promise.resolve();
+
+function enqueueHelperSync(work: () => Promise<void>): Promise<void> {
+  const run = helperSyncChain.then(work, work);
+  // Keep the chain alive even when work rejects.
+  helperSyncChain = run.catch(() => {});
+  return run;
+}
+
 /**
  * Starts emobie-inputd on app ready, enables listening when expand-as-you-type
  * is on, and syncs custom + favorited-emoji macro matches.
  *
- * When enabling, matches are synced *before* set_enabled so the first keystrokes
- * cannot expand against a stale on-disk rule set.
+ * When enabling: disable → sync matches → enable, so a daemon that was already
+ * enabled at login cannot expand stale rules, and in-flight toggles cannot
+ * reorder across overlapping effect runs.
  */
 export function useInputHelperSync({
   ready,
   expandAsYouType,
   expandTriggerMode,
   expandKeepTriggerSpace,
+  expandRestoreClipboard,
+  reconcileNonce = 0,
   expansionMacros,
   onStatus,
   onSyncError,
@@ -62,13 +78,16 @@ export function useInputHelperSync({
     let cancelled = false;
     const generation = ++syncGeneration.current;
 
+    const isCurrent = () =>
+      !cancelled && generation === syncGeneration.current;
+
     const pushStatus = (status: InputHelperStatus) => {
-      if (cancelled || generation !== syncGeneration.current) return;
+      if (!isCurrent()) return;
       onStatusRef.current(status);
     };
 
     const fail = (error: unknown, fallback: string) => {
-      if (cancelled || generation !== syncGeneration.current) return;
+      if (!isCurrent()) return;
       onSyncErrorRef.current?.(errMessage(error, fallback));
     };
 
@@ -79,16 +98,9 @@ export function useInputHelperSync({
         expandKeepTriggerSpace,
       );
 
-    const syncMatches = async () => {
-      const status = await invoke<InputHelperStatus>(
-        "input_helper_sync_matches",
-        { matches: matches() },
-      );
-      pushStatus(status);
-      return status;
-    };
+    void enqueueHelperSync(async () => {
+      if (!isCurrent()) return;
 
-    void (async () => {
       try {
         const status = await invoke<InputHelperStatus>(
           "input_helper_ensure_started",
@@ -98,11 +110,43 @@ export function useInputHelperSync({
         fail(error, "Could not start emobie-inputd.");
         return;
       }
-      if (cancelled || generation !== syncGeneration.current) return;
+      if (!isCurrent()) return;
+
+      try {
+        const status = await invoke<InputHelperStatus>(
+          "input_helper_set_options",
+          { restoreClipboard: expandRestoreClipboard },
+        );
+        pushStatus(status);
+      } catch (error) {
+        // Options are best-effort; older helpers may lack set_options.
+        if (isCurrent()) {
+          console.warn("input_helper_set_options failed", error);
+        }
+      }
+      if (!isCurrent()) return;
 
       if (expandAsYouType) {
+        // Pause matching before swapping the trie when the daemon may already
+        // be enabled from a prior session / login unit.
         try {
-          await syncMatches();
+          const status = await invoke<InputHelperStatus>(
+            "input_helper_set_enabled",
+            { enabled: false },
+          );
+          pushStatus(status);
+        } catch (error) {
+          fail(error, "Could not pause text expansion before syncing macros.");
+          return;
+        }
+        if (!isCurrent()) return;
+
+        try {
+          const status = await invoke<InputHelperStatus>(
+            "input_helper_sync_matches",
+            { matches: matches() },
+          );
+          pushStatus(status);
         } catch (error) {
           fail(
             error,
@@ -110,7 +154,8 @@ export function useInputHelperSync({
           );
           return;
         }
-        if (cancelled || generation !== syncGeneration.current) return;
+        if (!isCurrent()) return;
+
         try {
           const status = await invoke<InputHelperStatus>(
             "input_helper_set_enabled",
@@ -131,19 +176,28 @@ export function useInputHelperSync({
           fail(error, "Could not disable text expansion on the helper.");
         }
       }
-    })();
+    });
 
     // Re-push matches if inputd restarted while emobie stayed open (tray/minimized).
     // Daemon no-ops identical syncs without rewriting disk.
     let resync: ReturnType<typeof setInterval> | undefined;
     if (expandAsYouType) {
       resync = setInterval(() => {
-        if (cancelled || generation !== syncGeneration.current) return;
-        void syncMatches().catch((error) => {
-          fail(
-            error,
-            "Could not sync expansion matches — Expand may be using stale macros.",
-          );
+        if (!isCurrent()) return;
+        void enqueueHelperSync(async () => {
+          if (!isCurrent()) return;
+          try {
+            const status = await invoke<InputHelperStatus>(
+              "input_helper_sync_matches",
+              { matches: matches() },
+            );
+            pushStatus(status);
+          } catch (error) {
+            fail(
+              error,
+              "Could not sync expansion matches — Expand may be using stale macros.",
+            );
+          }
         });
       }, 20_000);
     }
@@ -157,6 +211,8 @@ export function useInputHelperSync({
     expandAsYouType,
     expandTriggerMode,
     expandKeepTriggerSpace,
+    expandRestoreClipboard,
+    reconcileNonce,
     expansionMacrosKey,
   ]);
 }

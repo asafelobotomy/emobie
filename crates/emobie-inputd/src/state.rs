@@ -6,6 +6,7 @@ use std::fs;
 use std::io::Write;
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -125,6 +126,19 @@ pub fn save(enabled: bool, matches: &[MatchRule]) {
     let Ok(_guard) = SAVE_MUTEX.lock() else {
         return;
     };
+    save_locked(enabled, matches);
+}
+
+/// Persist under `SAVE_MUTEX`, re-reading `enabled` after the lock so a concurrent
+/// SetEnabled cannot be overwritten by a stale SyncMatches snapshot.
+pub fn save_reloading_enabled(enabled: &AtomicBool, matches: &[MatchRule]) {
+    let Ok(_guard) = SAVE_MUTEX.lock() else {
+        return;
+    };
+    save_locked(enabled.load(Ordering::Relaxed), matches);
+}
+
+fn save_locked(enabled: bool, matches: &[MatchRule]) {
     let Some(path) = state_path() else {
         return;
     };

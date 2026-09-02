@@ -28,12 +28,31 @@ const HOTPLUG_INTERVAL: Duration = Duration::from_secs(5);
 
 static PENDING_HOLDER: OnceLock<Arc<Mutex<Option<PendingExpand>>>> = OnceLock::new();
 static BUFFER_HOLDER: OnceLock<Arc<Mutex<String>>> = OnceLock::new();
+/// Serialize key handling across device threads that share one buffer/pending.
+static KEY_HANDLER: Mutex<()> = Mutex::new(());
 
-/// Drop any pending expand (e.g. when expansion is disabled).
+/// Drop any pending expand (e.g. when expansion is disabled), restoring the
+/// trigger into the match buffer so it stays aligned with the focused app.
 pub fn clear_pending() {
-    if let Some(pending) = PENDING_HOLDER.get() {
+    let Some(pending) = PENDING_HOLDER.get() else {
+        return;
+    };
+    let Some(buffer) = BUFFER_HOLDER.get() else {
         if let Ok(mut guard) = pending.lock() {
             *guard = None;
+        }
+        return;
+    };
+    let cancelled = {
+        let Ok(mut guard) = pending.lock() else {
+            return;
+        };
+        guard.take()
+    };
+    if let Some(p) = cancelled {
+        if let Ok(mut guard) = buffer.lock() {
+            guard.push_str(&p.trigger);
+            trim_buffer(&mut guard, crate::state::MAX_TRIGGER_LEN);
         }
     }
 }
@@ -83,6 +102,7 @@ fn spawn_device_thread(
                 };
                 for event in events {
                     if let InputEventKind::Key(key) = event.kind() {
+                        let _gate = KEY_HANDLER.lock().unwrap_or_else(|e| e.into_inner());
                         handle_key(
                             key,
                             event.value(),

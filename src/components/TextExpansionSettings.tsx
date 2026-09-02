@@ -10,11 +10,15 @@ type TextExpansionSettingsProps = {
   expandAsYouType: boolean;
   expandTriggerMode: MacroTriggerMode;
   expandKeepTriggerSpace: boolean;
+  expandRestoreClipboard: boolean;
   inputStatus: InputHelperStatus | null;
   onExpandAsYouType: (value: boolean) => void;
   onExpandTriggerMode: (value: MacroTriggerMode) => void;
   onExpandKeepTriggerSpace: (value: boolean) => void;
+  onExpandRestoreClipboard: (value: boolean) => void;
   onInputStatus: (status: InputHelperStatus) => void;
+  /** After Grant/restart, force a full disable→sync→enable. */
+  onHelperReconcile?: () => void;
 };
 
 function helperStatusLabel(status: InputHelperStatus | null): string {
@@ -43,11 +47,14 @@ export function TextExpansionSettings({
   expandAsYouType,
   expandTriggerMode,
   expandKeepTriggerSpace,
+  expandRestoreClipboard,
   inputStatus,
   onExpandAsYouType,
   onExpandTriggerMode,
   onExpandKeepTriggerSpace,
+  onExpandRestoreClipboard,
   onInputStatus,
+  onHelperReconcile,
 }: TextExpansionSettingsProps) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -97,6 +104,7 @@ export function TextExpansionSettings({
       }
 
       onExpandAsYouType(true);
+      onHelperReconcile?.();
       setMessage("Text expansion enabled.");
     } catch (error) {
       setMessage(
@@ -121,6 +129,7 @@ export function TextExpansionSettings({
       if (status.canListen && status.canInject && status.accessConfigured !== false && !expandAsYouType) {
         onExpandAsYouType(true);
       }
+      onHelperReconcile?.();
     } catch (error) {
       setMessage(
         error instanceof Error ? error.message : "Keyboard access setup failed.",
@@ -230,6 +239,29 @@ export function TextExpansionSettings({
         <p className="settings-hint settings-hint-block">
           Off: <code>.hi</code> + Space → <code>hiya</code>. On: expands to{" "}
           <code>hiya </code> (Space stays after the text).
+        </p>
+      ) : null}
+
+      {expandAsYouType ? (
+        <div className="settings-row settings-toggle-row">
+          <label htmlFor="expand-restore-clipboard">
+            Restore clipboard after paste
+          </label>
+          <input
+            id="expand-restore-clipboard"
+            type="checkbox"
+            checked={expandRestoreClipboard}
+            onChange={(event) =>
+              onExpandRestoreClipboard(event.target.checked)
+            }
+          />
+        </div>
+      ) : null}
+      {expandAsYouType ? (
+        <p className="settings-hint settings-hint-block">
+          Off by default (recommended on Plasma Wayland). Short ASCII macros type
+          as keys; rich text uses clipboard paste. Optional{" "}
+          <code>wl-clipboard</code> improves paste reliability.
         </p>
       ) : null}
 
