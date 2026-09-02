@@ -59,8 +59,8 @@ modules:
     sources:
       - type: git
         url: https://github.com/asafelobotomy/emobie.git
-        tag: v0.6.14
-        commit: 90710f87e8d926e022310a72f480f2844bf885b5
+        tag: v0.6.15
+        commit: 26457419fde447b4ca0344c588f70a02e3d66d61
         x-checker-data:
           type: git
           tag-pattern: ^v([0-9]+(\.[0-9]+)*)$
