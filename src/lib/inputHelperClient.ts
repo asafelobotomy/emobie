@@ -22,10 +22,15 @@ export function runInputHelperAccessSetup(): Promise<InputHelperStatus> {
  * Ensure helper is running with listen + inject, granting access when needed.
  * Does not toggle the expand preference — caller updates prefs; useInputHelperSync
  * applies set_enabled from the pref.
+ *
+ * Runs Grant when listen fails OR permanent group/udev config is missing
+ * (ACL-only / orphaned-GID listen must not skip Polkit).
  */
 export async function prepareInputHelperForExpand(): Promise<InputHelperStatus> {
   let status = await ensureInputHelperStarted();
-  if (!status.canListen) {
+  const needsGrant =
+    !status.canListen || status.accessConfigured === false;
+  if (needsGrant) {
     status = await runInputHelperAccessSetup();
   }
   return status;

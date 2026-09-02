@@ -78,6 +78,10 @@ Polkit prompt that:
 2. Applies session ACLs with `setfacl` when available (no logout required)
 3. Restarts `emobie-inputd` so it can open keyboards immediately
 
+Grant is **idempotent** and re-runs when permanent config is missing even if the
+helper can already open keyboards via a temporary ACL or an orphaned group id
+(session `groups` shows a bare number instead of `emobie-input`).
+
 Manual host setup (same script):
 
 ```bash

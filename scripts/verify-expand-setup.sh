@@ -81,9 +81,18 @@ PY
 fi
 
 # --- group membership ---
-if id -nG | tr ' ' '\n' | grep -qx "$GROUP"; then
+if getent group "$GROUP" >/dev/null 2>&1; then
+  pass "Group $GROUP exists"
+else
+  fail "Group $GROUP missing — run Grant in emobie or: pkexec /usr/share/emobie/setup-input-access.sh (AppImage: pkexec /usr/local/share/emobie/setup-input-access.sh)"
+fi
+
+if id -nG 2>/dev/null | tr ' ' '\n' | grep -qx "$GROUP"; then
   pass "User is in group $GROUP"
 else
+  if groups 2>/dev/null | grep -Eq '(^|[[:space:]])[0-9]+([[:space:]]|$)'; then
+    warn "Session has numeric supplementary GIDs (possible orphaned group) — re-run Grant to recreate $GROUP"
+  fi
   warn "User not in $GROUP yet — run Grant or log out/in after setup-input-access.sh"
 fi
 
@@ -92,6 +101,15 @@ if [[ -f /etc/udev/rules.d/99-emobie-input.rules ]]; then
   pass "udev rules installed"
 else
   fail "Missing /etc/udev/rules.d/99-emobie-input.rules — run setup-input-access.sh"
+fi
+
+# Ephemeral listen must not hide broken permanent config
+if [[ -S "$SOCK" ]] && command -v python3 >/dev/null; then
+  if echo "${RESP:-}" | grep -q '"can_listen":true'; then
+    if ! getent group "$GROUP" >/dev/null 2>&1 || [[ ! -f /etc/udev/rules.d/99-emobie-input.rules ]]; then
+      fail "Daemon can_listen is true but permanent group/udev config is incomplete — Expand would break after reboot; run Grant"
+    fi
+  fi
 fi
 
 # --- keyboard device nodes (ignore mice/joysticks after keyboard-only udev) ---

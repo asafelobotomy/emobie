@@ -19,6 +19,11 @@ pub struct InputHelperStatus {
     /// True when running inside a Flatpak sandbox.
     #[serde(default)]
     pub flatpak: bool,
+    /// True when group `emobie-input` and system udev rules are present.
+    /// Distinct from `can_listen`, which can be true via a temporary ACL or
+    /// orphaned GID even when permanent Grant config is missing.
+    #[serde(default)]
+    pub access_configured: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,6 +46,7 @@ fn offline_linux_only() -> InputHelperStatus {
         can_listen: false,
         detail: "Input helper is Linux-only.".into(),
         flatpak: false,
+        access_configured: false,
     }
 }
 

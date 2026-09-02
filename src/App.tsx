@@ -111,6 +111,7 @@ function App() {
             canInject: false,
             canListen: false,
             detail: message,
+            accessConfigured: false,
           },
     );
   }, []);

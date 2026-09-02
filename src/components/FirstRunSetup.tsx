@@ -46,8 +46,13 @@ export function FirstRunSetup({
       let next = await prepareInputHelperForExpand();
       onStatus(next);
 
-      if (next.daemon && next.canListen && next.canInject) {
+      if (next.daemon && next.canListen && next.canInject && next.accessConfigured !== false) {
         setMessage("Text expansion is ready — enable it anytime in Settings.");
+      } else if (next.daemon && next.canListen && next.accessConfigured === false) {
+        setMessage(
+          next.detail ||
+            "Helper can listen temporarily, but permanent keyboard access (group/udev) still needs Grant.",
+        );
       } else if (next.daemon && next.canListen && !next.canInject) {
         setMessage(
           "Keyboard access OK, but text injection needs a desktop session. Restart emobie-inputd or log out/in, then enable Expand in Settings.",
@@ -63,7 +68,10 @@ export function FirstRunSetup({
   };
 
   const ready = Boolean(
-    status?.daemon && status.canListen && status.canInject,
+    status?.daemon &&
+      status.canListen &&
+      status.canInject &&
+      status.accessConfigured !== false,
   );
   const isFlatpak = Boolean(status?.flatpak);
 

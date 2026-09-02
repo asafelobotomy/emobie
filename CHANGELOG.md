@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.12] - 2026-09-02
+
+### Fixed
+
+- Expand Grant no longer skips Polkit when listen works via temporary ACL or orphaned GID
+- AppImage/Flatpak Grant stages udev/policy siblings with the setup script under `/usr/local/share/emobie`
+- `setup-input-access.sh` resolves rules from user bootstrap trees; recreates `emobie-input` idempotently; clearer immutable-/etc errors
+- `setpriv` verification keeps supplementary groups (`--init-groups`)
+
+### Changed
+
+- Input helper status exposes `accessConfigured`; Settings/first-run show Repair when permanent access is incomplete
+- `verify-expand-setup.sh` fails when `can_listen` is true but group/udev config is missing
+
 ## [0.6.11] - 2026-09-01
 
 ### Added
@@ -267,7 +281,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Horizontal mouse-wheel scrolling in wide layouts
 - Tray icon temp path for Flatpak-friendly sandboxing
 
-[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.11...HEAD
+[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.12...HEAD
+[0.6.12]: https://github.com/asafelobotomy/emobie/compare/v0.6.11...v0.6.12
 [0.6.11]: https://github.com/asafelobotomy/emobie/compare/v0.6.10...v0.6.11
 [0.6.10]: https://github.com/asafelobotomy/emobie/compare/v0.6.9...v0.6.10
 [0.6.9]: https://github.com/asafelobotomy/emobie/compare/v0.6.8...v0.6.9

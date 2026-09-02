@@ -19,6 +19,14 @@ type TextExpansionSettingsProps = {
 
 function helperStatusLabel(status: InputHelperStatus | null): string {
   if (!status) return "Checking input helper…";
+  if (
+    status.daemon &&
+    status.canListen &&
+    status.canInject &&
+    status.accessConfigured === false
+  ) {
+    return `Helper can listen for now, but permanent keyboard access is incomplete (group/udev). Use Grant to repair. ${status.detail}`;
+  }
   if (status.daemon && status.canListen && status.canInject) {
     return `Helper running (listen + inject). ${status.detail}`;
   }
@@ -45,8 +53,10 @@ export function TextExpansionSettings({
   const [message, setMessage] = useState<string | null>(null);
 
   const canListen = Boolean(inputStatus?.canListen);
+  const accessConfigured = inputStatus?.accessConfigured !== false;
   const daemonReady = Boolean(inputStatus?.daemon);
   const isFlatpak = Boolean(inputStatus?.flatpak);
+  const needsGrant = daemonReady && (!canListen || !accessConfigured);
 
   /** Grant access if needed, then flip pref — useInputHelperSync owns set_enabled. */
   const setExpandEnabled = async (enabled: boolean) => {
@@ -67,6 +77,13 @@ export function TextExpansionSettings({
 
       if (!status.canListen) {
         setMessage(status.detail);
+        return;
+      }
+      if (status.accessConfigured === false) {
+        setMessage(
+          status.detail ||
+            "Grant did not finish installing permanent keyboard access (group/udev).",
+        );
         return;
       }
       if (!status.canInject) {
@@ -98,7 +115,7 @@ export function TextExpansionSettings({
       const status = await runInputHelperAccessSetup();
       onInputStatus(status);
       setMessage(status.detail);
-      if (status.canListen && status.canInject && !expandAsYouType) {
+      if (status.canListen && status.canInject && status.accessConfigured !== false && !expandAsYouType) {
         onExpandAsYouType(true);
       }
     } catch (error) {
@@ -136,7 +153,7 @@ export function TextExpansionSettings({
           : "Starts emobie-inputd and turns on listening. If keyboard access is missing, you get one admin prompt — no logout when session ACLs apply."}
       </p>
 
-      {daemonReady && !canListen ? (
+      {needsGrant ? (
         <div className="settings-actions macros-io-actions">
           <button
             type="button"
@@ -144,7 +161,11 @@ export function TextExpansionSettings({
             disabled={busy}
             onClick={() => void retryGrant()}
           >
-            {busy ? "Working…" : "Grant keyboard access"}
+            {busy
+              ? "Working…"
+              : canListen && !accessConfigured
+                ? "Repair keyboard access"
+                : "Grant keyboard access"}
           </button>
         </div>
       ) : null}

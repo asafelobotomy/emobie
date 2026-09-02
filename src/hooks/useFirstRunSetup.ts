@@ -10,7 +10,12 @@ type Options = {
 };
 
 function expandReady(status: InputHelperStatus): boolean {
-  return Boolean(status.daemon && status.canListen && status.canInject);
+  return Boolean(
+    status.daemon &&
+      status.canListen &&
+      status.canInject &&
+      status.accessConfigured !== false,
+  );
 }
 
 /** Opens first-run setup when needed; status polling only (start/sync owns ensure). */

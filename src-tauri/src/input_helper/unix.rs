@@ -107,6 +107,7 @@ pub fn offline_status(detail: &str) -> InputHelperStatus {
         can_listen: false,
         detail: detail.to_string(),
         flatpak: false,
+        access_configured: false,
     }
 }
 
@@ -117,6 +118,7 @@ fn status_from_resp(resp: DaemonResponse) -> InputHelperStatus {
         can_listen: resp.can_listen,
         detail: resp.detail,
         flatpak: false,
+        access_configured: false,
     }
 }
 

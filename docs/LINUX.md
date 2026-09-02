@@ -90,6 +90,17 @@ bash scripts/verify-expand-setup.sh
 2. **udev** + group `emobie-input` (and optional **setfacl**) grant `/dev/input` read
 3. **Polkit** prompts once for `setup-input-access.sh`
 
+Expand treats access as ready only when **both** are true:
+
+- the helper can open a keyboard now (`can_listen`, may use a session ACL), **and**
+- permanent config exists: group `emobie-input` in `/etc/group` **and**
+  `/etc/udev/rules.d/99-emobie-input.rules`
+
+If listen works but the group/udev files are missing (common after a partial Grant,
+orphaned GID, or ACL-only session), emobie re-runs Grant instead of skipping it.
+AppImage/Flatpak Grant stages the setup script **and** udev/policy siblings under
+`/usr/local/share/emobie/` so Polkit always has the assets it needs.
+
 ### SELinux (Fedora / RHEL)
 
 Packaged `.rpm` installs standard paths under `/usr`. If Expand/Grant fails with

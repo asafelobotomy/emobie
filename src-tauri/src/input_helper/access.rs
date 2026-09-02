@@ -1,4 +1,7 @@
 //! Keyboard-access setup via pkexec (host path under Flatpak).
+//!
+//! Permanent access = group `emobie-input` + `/etc/udev/rules.d/99-emobie-input.rules`.
+//! Ephemeral `can_listen` (ACL / orphaned GID) must not skip Grant.
 
 use super::unix;
 use super::InputHelperStatus;
@@ -8,6 +11,9 @@ use std::time::SystemTime;
 
 const SYSTEM_SETUP: &str = "/usr/share/emobie/setup-input-access.sh";
 const LOCAL_SETUP: &str = "/usr/local/share/emobie/setup-input-access.sh";
+const LOCAL_DIR: &str = "/usr/local/share/emobie";
+const UDEV_RULES: &str = "/etc/udev/rules.d/99-emobie-input.rules";
+const GROUP_NAME: &str = "emobie-input";
 
 fn in_flatpak() -> bool {
     std::env::var_os("FLATPAK_ID").is_some()
@@ -20,9 +26,7 @@ pub fn host_setup_hint() -> String {
 If Grant fails, run on the host: pkexec {LOCAL_SETUP}"
         )
     } else {
-        format!(
-            "Run: pkexec {LOCAL_SETUP} (or {SYSTEM_SETUP}), then retry."
-        )
+        format!("Run: pkexec {LOCAL_SETUP} (or {SYSTEM_SETUP}), then retry.")
     }
 }
 
@@ -30,6 +34,10 @@ fn user_setup_script() -> Option<PathBuf> {
     std::env::var_os("HOME").map(|h| {
         PathBuf::from(h).join(".local/share/emobie/setup-input-access.sh")
     })
+}
+
+fn user_data_dir() -> Option<PathBuf> {
+    std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share/emobie"))
 }
 
 fn sandbox_setup_scripts() -> Vec<PathBuf> {
@@ -96,6 +104,66 @@ fn host_file_exists(path: &str) -> bool {
         .unwrap_or(false)
 }
 
+fn host_cmd_succeeds(args: &[&str]) -> bool {
+    Command::new("flatpak-spawn")
+        .arg("--host")
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+fn local_cmd_succeeds(program: &str, args: &[&str]) -> bool {
+    Command::new(program)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+/// True when group + udev rules are permanently configured (survives reboot).
+pub fn permanent_access_configured() -> bool {
+    if in_flatpak() {
+        return host_cmd_succeeds(&["getent", "group", GROUP_NAME])
+            && host_file_exists(UDEV_RULES);
+    }
+    local_cmd_succeeds("getent", &["group", GROUP_NAME]) && Path::new(UDEV_RULES).is_file()
+}
+
+fn permanent_access_gap_detail() -> String {
+    let mut missing = Vec::new();
+    let group_ok = if in_flatpak() {
+        host_cmd_succeeds(&["getent", "group", GROUP_NAME])
+    } else {
+        local_cmd_succeeds("getent", &["group", GROUP_NAME])
+    };
+    let rules_ok = if in_flatpak() {
+        host_file_exists(UDEV_RULES)
+    } else {
+        Path::new(UDEV_RULES).is_file()
+    };
+    if !group_ok {
+        missing.push(format!("group `{GROUP_NAME}`"));
+    }
+    if !rules_ok {
+        missing.push(format!("udev rules `{UDEV_RULES}`"));
+    }
+    if missing.is_empty() {
+        "permanent keyboard access looks configured".into()
+    } else {
+        format!(
+            "permanent keyboard access incomplete (missing {}) — Grant will repair",
+            missing.join(" and ")
+        )
+    }
+}
+
 fn mtime(path: &Path) -> Option<SystemTime> {
     std::fs::metadata(path).ok()?.modified().ok()
 }
@@ -136,19 +204,8 @@ fn is_polkit_annotated_path(script: &str) -> bool {
     script == SYSTEM_SETUP || script == LOCAL_SETUP
 }
 
-/// Copy a user/bundle script to the Polkit-annotated path before elevation.
-fn stage_setup_to_local(source: &str, flatpak: bool) -> Result<(), String> {
-    if is_polkit_annotated_path(source) {
-        return Ok(());
-    }
-    let install_args = [
-        "install",
-        "-D",
-        "-m",
-        "755",
-        source,
-        LOCAL_SETUP,
-    ];
+fn pkexec_install(flatpak: bool, mode: &str, source: &str, dest: &str) -> Result<(), String> {
+    let install_args = ["install", "-D", "-m", mode, source, dest];
     let output = if flatpak {
         let mut cmd = Command::new("flatpak-spawn");
         cmd.arg("--host").arg("pkexec").args(install_args);
@@ -160,7 +217,7 @@ fn stage_setup_to_local(source: &str, flatpak: bool) -> Result<(), String> {
         with_session_env(&mut cmd);
         cmd.stdin(Stdio::null()).output()
     }
-    .map_err(|e| format!("Could not stage setup script ({e}). {}", host_setup_hint()))?;
+    .map_err(|e| format!("Could not stage {dest} ({e}). {}", host_setup_hint()))?;
 
     if output.status.success() {
         return Ok(());
@@ -169,17 +226,100 @@ fn stage_setup_to_local(source: &str, flatpak: bool) -> Result<(), String> {
         .trim()
         .to_string();
     Err(if detail.is_empty() {
-        format!(
-            "Could not install setup script to {LOCAL_SETUP}. {}",
-            host_setup_hint()
-        )
+        format!("Could not install {dest}. {}", host_setup_hint())
     } else {
-        format!("Keyboard access setup staging: {detail}")
+        format!("Keyboard access setup staging ({dest}): {detail}")
     })
+}
+
+/// Copy setup script + udev/policy siblings to the Polkit-annotated local path.
+fn stage_setup_to_local(source: &str, flatpak: bool) -> Result<(), String> {
+    if is_polkit_annotated_path(source) {
+        // Still ensure udev rules sit beside LOCAL_SETUP for AppImage re-Grants.
+        if source == LOCAL_SETUP {
+            stage_local_siblings(source, flatpak)?;
+        }
+        return Ok(());
+    }
+    pkexec_install(flatpak, "755", source, LOCAL_SETUP)?;
+    stage_local_siblings(source, flatpak)?;
+    Ok(())
+}
+
+fn stage_local_siblings(setup_source: &str, flatpak: bool) -> Result<(), String> {
+    let setup_path = Path::new(setup_source);
+    let sibling_dir = setup_path
+        .parent()
+        .map(Path::to_path_buf)
+        .or_else(user_data_dir);
+
+    let rules_candidates: Vec<PathBuf> = {
+        let mut v = Vec::new();
+        if let Some(dir) = &sibling_dir {
+            v.push(dir.join("99-emobie-input.rules"));
+        }
+        if let Some(dir) = user_data_dir() {
+            v.push(dir.join("99-emobie-input.rules"));
+        }
+        v.push(PathBuf::from("/usr/share/emobie/99-emobie-input.rules"));
+        v
+    };
+    let rules_src = rules_candidates.into_iter().find(|p| {
+        if flatpak {
+            host_file_exists(&p.to_string_lossy())
+        } else {
+            p.is_file()
+        }
+    });
+    if let Some(rules) = rules_src {
+        let dest = format!("{LOCAL_DIR}/99-emobie-input.rules");
+        let missing = if flatpak {
+            !host_file_exists(&dest)
+        } else {
+            !Path::new(&dest).is_file()
+        };
+        if missing {
+            pkexec_install(flatpak, "644", &rules.to_string_lossy(), &dest)?;
+        }
+    }
+
+    let policy_candidates: Vec<PathBuf> = {
+        let mut v = Vec::new();
+        if let Some(dir) = &sibling_dir {
+            v.push(dir.join("io.github.asafelobotomy.emobie.inputd.policy"));
+        }
+        if let Some(dir) = user_data_dir() {
+            v.push(dir.join("io.github.asafelobotomy.emobie.inputd.policy"));
+        }
+        v
+    };
+    let policy_src = policy_candidates.into_iter().find(|p| {
+        if flatpak {
+            host_file_exists(&p.to_string_lossy())
+        } else {
+            p.is_file()
+        }
+    });
+    if let Some(policy) = policy_src {
+        let dest = format!("{LOCAL_DIR}/io.github.asafelobotomy.emobie.inputd.policy");
+        let missing = if flatpak {
+            !host_file_exists(&dest)
+        } else {
+            !Path::new(&dest).is_file()
+        };
+        if missing {
+            let _ = pkexec_install(flatpak, "644", &policy.to_string_lossy(), &dest);
+        }
+    }
+
+    Ok(())
 }
 
 fn ensure_polkit_annotated_setup(script: &str, flatpak: bool) -> Result<String, String> {
     if is_polkit_annotated_path(script) {
+        if script == LOCAL_SETUP {
+            stage_local_siblings(script, flatpak)?;
+        }
         return Ok(script.to_string());
     }
     stage_setup_to_local(script, flatpak)?;
@@ -202,6 +342,10 @@ fn run_pkexec(script: &str, flatpak: bool) -> Result<(), String> {
         c
     };
     with_session_env(&mut cmd);
+    // Ensure setup script can resolve the invoking user on all distros.
+    if let Ok(user) = std::env::var("USER") {
+        cmd.env("SUDO_USER", user);
+    }
 
     let output = cmd.stdin(Stdio::null()).output().map_err(|e| {
         if flatpak {
@@ -247,6 +391,7 @@ packaging/setup-input-access.sh"
 
 pub fn with_flatpak_flag(mut status: InputHelperStatus) -> InputHelperStatus {
     status.flatpak = in_flatpak();
+    status.access_configured = permanent_access_configured();
     if !status.daemon
         && status.flatpak
         && !status.detail.contains("Flatpak needs a host helper")
@@ -255,6 +400,13 @@ pub fn with_flatpak_flag(mut status: InputHelperStatus) -> InputHelperStatus {
             "{} Enable Expand to install the host helper automatically.",
             status.detail
         );
+    }
+    // Surface permanent gaps even when ephemeral listen already works.
+    if status.daemon && status.can_listen && !status.access_configured {
+        let gap = permanent_access_gap_detail();
+        if !status.detail.contains("permanent keyboard access") {
+            status.detail = format!("{} — {gap}", status.detail);
+        }
     }
     status
 }
@@ -265,7 +417,13 @@ pub fn run_access_setup() -> Result<InputHelperStatus, String> {
     let script = ensure_polkit_annotated_setup(&script, flatpak)?;
     run_pkexec(&script, flatpak)?;
     let mut status = with_flatpak_flag(unix::restart_helper());
-    if status.can_listen && status.can_inject {
+    if !status.access_configured {
+        status.detail = format!(
+            "Grant finished but {} — {}",
+            permanent_access_gap_detail(),
+            host_setup_hint()
+        );
+    } else if status.can_listen && status.can_inject {
         status.detail =
             "Keyboard access ready — Expand as you type can watch keys and inject text.".into();
     } else if status.can_listen {
