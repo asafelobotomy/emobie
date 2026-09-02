@@ -59,6 +59,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.14" date="2026-09-02">
+      <description>
+        <p>Wayland Expand via /dev/uinput, smoke checklist tooling, and LOC module splits for CI.</p>
+      </description>
+    </release>
     <release version="0.6.13" date="2026-09-02">
       <description>
         <p>Text-expansion reliability: safer pending/release handling, inject-worker recovery, match/socket hardening, and layout-aware XKB reload.</p>

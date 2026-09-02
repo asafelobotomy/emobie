@@ -1,34 +1,13 @@
-//! Keyboard-access setup via pkexec (host path under Flatpak).
-//!
-//! Permanent access = group `emobie-input` + `/etc/udev/rules.d/99-emobie-input.rules`.
-//! Ephemeral `can_listen` (ACL / orphaned GID) must not skip Grant.
+//! Resolve, stage, and run the Polkit-annotated setup script.
 
-use super::unix;
-use super::InputHelperStatus;
+use super::permanent::{
+    host_file_exists, host_setup_hint, in_flatpak, LOCAL_SETUP, SYSTEM_SETUP,
+};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::SystemTime;
 
-const SYSTEM_SETUP: &str = "/usr/share/emobie/setup-input-access.sh";
-const LOCAL_SETUP: &str = "/usr/local/share/emobie/setup-input-access.sh";
 const LOCAL_DIR: &str = "/usr/local/share/emobie";
-const UDEV_RULES: &str = "/etc/udev/rules.d/99-emobie-input.rules";
-const GROUP_NAME: &str = "emobie-input";
-
-fn in_flatpak() -> bool {
-    std::env::var_os("FLATPAK_ID").is_some()
-}
-
-pub fn host_setup_hint() -> String {
-    if in_flatpak() {
-        format!(
-            "Flatpak installs the host input helper when you enable Expand. \
-If Grant fails, run on the host: pkexec {LOCAL_SETUP}"
-        )
-    } else {
-        format!("Run: pkexec {LOCAL_SETUP} (or {SYSTEM_SETUP}), then retry.")
-    }
-}
 
 fn user_setup_script() -> Option<PathBuf> {
     std::env::var_os("HOME").map(|h| {
@@ -91,77 +70,6 @@ fn host_setup_candidates() -> Vec<String> {
         paths.push(LOCAL_SETUP.to_string());
     }
     paths
-}
-
-fn host_file_exists(path: &str) -> bool {
-    Command::new("flatpak-spawn")
-        .args(["--host", "test", "-f", path])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
-}
-
-fn host_cmd_succeeds(args: &[&str]) -> bool {
-    Command::new("flatpak-spawn")
-        .arg("--host")
-        .args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
-}
-
-fn local_cmd_succeeds(program: &str, args: &[&str]) -> bool {
-    Command::new(program)
-        .args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
-}
-
-/// True when group + udev rules are permanently configured (survives reboot).
-pub fn permanent_access_configured() -> bool {
-    if in_flatpak() {
-        return host_cmd_succeeds(&["getent", "group", GROUP_NAME])
-            && host_file_exists(UDEV_RULES);
-    }
-    local_cmd_succeeds("getent", &["group", GROUP_NAME]) && Path::new(UDEV_RULES).is_file()
-}
-
-fn permanent_access_gap_detail() -> String {
-    let mut missing = Vec::new();
-    let group_ok = if in_flatpak() {
-        host_cmd_succeeds(&["getent", "group", GROUP_NAME])
-    } else {
-        local_cmd_succeeds("getent", &["group", GROUP_NAME])
-    };
-    let rules_ok = if in_flatpak() {
-        host_file_exists(UDEV_RULES)
-    } else {
-        Path::new(UDEV_RULES).is_file()
-    };
-    if !group_ok {
-        missing.push(format!("group `{GROUP_NAME}`"));
-    }
-    if !rules_ok {
-        missing.push(format!("udev rules `{UDEV_RULES}`"));
-    }
-    if missing.is_empty() {
-        "permanent keyboard access looks configured".into()
-    } else {
-        format!(
-            "permanent keyboard access incomplete (missing {}) — Grant will repair",
-            missing.join(" and ")
-        )
-    }
 }
 
 fn mtime(path: &Path) -> Option<SystemTime> {
@@ -315,7 +223,7 @@ fn stage_local_siblings(setup_source: &str, flatpak: bool) -> Result<(), String>
     Ok(())
 }
 
-fn ensure_polkit_annotated_setup(script: &str, flatpak: bool) -> Result<String, String> {
+pub(super) fn ensure_polkit_annotated_setup(script: &str, flatpak: bool) -> Result<String, String> {
     if is_polkit_annotated_path(script) {
         if script == LOCAL_SETUP {
             stage_local_siblings(script, flatpak)?;
@@ -330,7 +238,7 @@ fn pkexec_args(script: &str) -> Vec<String> {
     vec![script.to_string()]
 }
 
-fn run_pkexec(script: &str, flatpak: bool) -> Result<(), String> {
+pub(super) fn run_pkexec(script: &str, flatpak: bool) -> Result<(), String> {
     let args = pkexec_args(script);
     let mut cmd = if flatpak {
         let mut c = Command::new("flatpak-spawn");
@@ -368,7 +276,7 @@ fn run_pkexec(script: &str, flatpak: bool) -> Result<(), String> {
     Err(format!("Keyboard access setup: {detail}"))
 }
 
-fn resolve_setup_script() -> Result<(String, bool), String> {
+pub(super) fn resolve_setup_script() -> Result<(String, bool), String> {
     let flatpak = in_flatpak();
     if flatpak {
         for path in host_setup_candidates() {
@@ -387,62 +295,4 @@ packaging/setup-input-access.sh"
             .to_string()
     })?;
     Ok((script.to_string_lossy().into_owned(), false))
-}
-
-pub fn with_flatpak_flag(mut status: InputHelperStatus) -> InputHelperStatus {
-    status.flatpak = in_flatpak();
-    status.access_configured = permanent_access_configured();
-    if !status.daemon
-        && status.flatpak
-        && !status.detail.contains("Flatpak needs a host helper")
-    {
-        status.detail = format!(
-            "{} Enable Expand to install the host helper automatically.",
-            status.detail
-        );
-    }
-    // Surface permanent gaps even when ephemeral listen already works.
-    if status.daemon && status.can_listen && !status.access_configured {
-        let gap = permanent_access_gap_detail();
-        if !status.detail.contains("permanent keyboard access") {
-            status.detail = format!("{} — {gap}", status.detail);
-        }
-    }
-    status
-}
-
-/// Polkit setup + restart helper; returns fresh status (can_listen after ACLs).
-pub fn run_access_setup() -> Result<InputHelperStatus, String> {
-    let (script, flatpak) = resolve_setup_script()?;
-    let script = ensure_polkit_annotated_setup(&script, flatpak)?;
-    run_pkexec(&script, flatpak)?;
-    let mut status = with_flatpak_flag(unix::restart_helper());
-    if !status.access_configured {
-        status.detail = format!(
-            "Grant finished but {} — {}",
-            permanent_access_gap_detail(),
-            host_setup_hint()
-        );
-    } else if status.can_listen && status.can_inject {
-        status.detail =
-            "Keyboard access ready — Expand as you type can watch keys and inject text.".into();
-    } else if status.can_listen {
-        status.detail = "Keyboard access ready, but text injection needs writable /dev/uinput \
-(run Grant again, install the acl package for setfacl, or log out/in so group emobie-input applies)."
-            .into();
-    } else if status.daemon && !status.can_inject {
-        status.detail = "Helper running but text injection is unavailable (need /dev/uinput on Wayland). \
-Run Grant or log out/in after setup-input-access.sh."
-            .into();
-    } else if status.daemon {
-        status.detail = "Helper restarted but keyboard devices are still closed. \
-If session ACLs failed, log out/in once so the emobie-input group applies."
-            .into();
-    } else {
-        status.detail = format!(
-            "Access script finished but helper is not running. {}",
-            status.detail
-        );
-    }
-    Ok(status)
 }

@@ -1,18 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { Toolbar } from "./components/Toolbar";
-import { CategoryNav } from "./components/CategoryNav";
-import { EmojiGrid } from "./components/EmojiGrid";
-import { MacroList } from "./components/MacroList";
-import { RecentStrip } from "./components/RecentStrip";
-import { FirstRunSetup } from "./components/FirstRunSetup";
-import { SettingsPanel } from "./components/SettingsPanel";
-import { WindowResizeHandles } from "./components/WindowResizeHandles";
+import { AppShell } from "./components/AppShell";
 import {
   FAVORITES_CATEGORY_ID,
   MACROS_CATEGORY_ID,
-  NAV_CATEGORIES,
   emojisForCategory,
   searchEmojis,
 } from "./data/loadEmojis";
@@ -30,7 +22,6 @@ import { useAllowMultipleInstances } from "./hooks/useAllowMultipleInstances";
 import { useFirstRunSetup } from "./hooks/useFirstRunSetup";
 import { useInputHelperSync } from "./hooks/useInputHelperSync";
 import {
-  openReleasePage,
   useUpdateCheck,
   type TrayStatus,
 } from "./hooks/useUpdateCheck";
@@ -318,113 +309,66 @@ function App() {
   const frameless = !prefs.showTitleBar;
 
   return (
-    <div className="app-shell" ref={setRootEl}>
-      <WindowResizeHandles enabled={frameless && !settingsOpen} />
-      <div
-        className="app"
-        data-layout={layout}
-        data-scroll={scrollAxis}
-        data-compact={compact ? "true" : "false"}
-        data-frameless={frameless ? "true" : "false"}
-      >
-        <Toolbar
-          query={query}
-          onQueryChange={setQuery}
-          pinned={prefs.pinned}
-          onTogglePin={togglePin}
-          onOpenSettings={() => setSettingsOpen(true)}
-          frameless={frameless}
-          trayUnavailable={trayUnavailable}
-        />
-        <div className="body">
-          <CategoryNav
-            categories={NAV_CATEGORIES}
-            activeId={activeCategory}
-            onSelect={(id) => {
-              setActiveCategory(id);
-              setQuery("");
-            }}
-          />
-          {macrosMode ? (
-            <MacroList
-              macros={visibleMacros}
-              customMacros={prefs.macros}
-              summonHotkey={prefs.hotkey}
-              flashKey={flashKey}
-              emptyMessage={emptyMessage}
-              searchActive={query.trim().length > 0}
-              onCopy={copyMacro}
-              onUpsert={upsertMacro}
-              onRemove={removeMacro}
-            />
-          ) : (
-            <EmojiGrid
-              emojis={visibleEmojis}
-              flashKey={flashKey}
-              favorites={prefs.favorites}
-              scrollAxis={scrollAxis}
-              emptyMessage={emptyMessage}
-              onCopy={copyEmojiWithPaste}
-              onToggleFavorite={toggleFavorite}
-            />
-          )}
-        </div>
-        <RecentStrip
-          recents={prefs.recents}
-          flashKey={flashKey}
-          status={status}
-          statusError={statusError}
-          onCopy={copyEmojiWithPaste}
-        />
-      </div>
-      {settingsOpen ? (
-        <SettingsPanel
-          prefs={prefs}
-          hotkeyError={hotkeyError}
-          autostartError={autostartError}
-          prefsError={prefsError}
-          trayUnavailable={trayUnavailable}
-          trayDetail={trayDetail}
-          pinCapability={pinCapability}
-          updateInfo={updateInfo}
-          inputStatus={inputStatus}
-          onClose={() => setSettingsOpen(false)}
-          onTheme={setTheme}
-          onEmojiSize={setEmojiSize}
-          onRecentMax={setRecentMax}
-          onSkinTone={setSkinTone}
-          onHotkey={setHotkey}
-          onShowTitleBar={setShowTitleBar}
-          onLaunchOnStartup={setLaunchOnStartup}
-          onStartMinimizedToTray={setStartMinimizedToTray}
-          onAllowMultipleInstances={setAllowMultipleInstances}
-          onSortBy={setSortBy}
-          onFavoriteEmojiMacros={setFavoriteEmojiMacros}
-          onEmoticonStyle={setEmoticonStyle}
-          onAutoPasteOnCopy={setAutoPasteOnCopy}
-          onExpandAsYouType={setExpandAsYouType}
-          onExpandTriggerMode={setExpandTriggerMode}
-          onExpandKeepTriggerSpace={setExpandKeepTriggerSpace}
-          onCheckUpdatesOnStartup={setCheckUpdatesOnStartup}
-          onDismissUpdate={(version) => setDismissedUpdateVersion(version)}
-          onOpenRelease={(url) => {
-            void openReleasePage(url).catch((error) => {
-              console.error("Failed to open release page", error);
-            });
-          }}
-          onSetMacros={setMacros}
-          onInputStatus={handleInputStatus}
-          onClearRecents={clearRecents}
-          onClearUsageStats={clearUsageStats}
-        />
-      ) : null}
-      <FirstRunSetup
-        open={firstRunOpen}
-        status={inputStatus}
-        onStatus={handleInputStatus}
-        onDone={finishFirstRun}
-      />
-    </div>
+    <AppShell
+      rootRef={setRootEl}
+      layout={layout}
+      scrollAxis={scrollAxis}
+      compact={compact}
+      frameless={frameless}
+      settingsOpen={settingsOpen}
+      query={query}
+      setQuery={setQuery}
+      prefs={prefs}
+      activeCategory={activeCategory}
+      setActiveCategory={setActiveCategory}
+      macrosMode={macrosMode}
+      visibleMacros={visibleMacros}
+      visibleEmojis={visibleEmojis}
+      emptyMessage={emptyMessage}
+      flashKey={flashKey ?? null}
+      status={status}
+      statusError={statusError}
+      trayUnavailable={trayUnavailable}
+      trayDetail={trayDetail}
+      hotkeyError={hotkeyError}
+      autostartError={autostartError}
+      prefsError={prefsError}
+      pinCapability={pinCapability}
+      updateInfo={updateInfo}
+      inputStatus={inputStatus}
+      firstRunOpen={firstRunOpen}
+      onTogglePin={togglePin}
+      onOpenSettings={() => setSettingsOpen(true)}
+      onCloseSettings={() => setSettingsOpen(false)}
+      onCopyMacro={copyMacro}
+      onCopyEmoji={copyEmojiWithPaste}
+      onToggleFavorite={toggleFavorite}
+      upsertMacro={upsertMacro}
+      removeMacro={removeMacro}
+      setTheme={setTheme}
+      setEmojiSize={setEmojiSize}
+      setRecentMax={setRecentMax}
+      setSkinTone={setSkinTone}
+      setHotkey={setHotkey}
+      setShowTitleBar={setShowTitleBar}
+      setLaunchOnStartup={setLaunchOnStartup}
+      setStartMinimizedToTray={setStartMinimizedToTray}
+      setAllowMultipleInstances={setAllowMultipleInstances}
+      setSortBy={setSortBy}
+      setFavoriteEmojiMacros={setFavoriteEmojiMacros}
+      setEmoticonStyle={setEmoticonStyle}
+      setAutoPasteOnCopy={setAutoPasteOnCopy}
+      setExpandAsYouType={setExpandAsYouType}
+      setExpandTriggerMode={setExpandTriggerMode}
+      setExpandKeepTriggerSpace={setExpandKeepTriggerSpace}
+      setCheckUpdatesOnStartup={setCheckUpdatesOnStartup}
+      setDismissedUpdateVersion={setDismissedUpdateVersion}
+      setMacros={setMacros}
+      handleInputStatus={handleInputStatus}
+      clearRecents={clearRecents}
+      clearUsageStats={clearUsageStats}
+      finishFirstRun={finishFirstRun}
+    />
   );
 }
 

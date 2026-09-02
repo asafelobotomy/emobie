@@ -1,4 +1,14 @@
-use enigo::{Direction, Enigo, Key, Keyboard, Settings};
+mod clipboard;
+mod enigo;
+mod uinput;
+
+use enigo::{
+    ctrl_v_enigo, expand_with_enigo, new_enigo, retype_trigger_enigo, warm_up_enigo, ENIGO_MAX_IDLE,
+    POST_PASTE_DELAY,
+};
+use uinput::{expand_with_uinput, retype_trigger_uinput};
+
+use ::enigo::Enigo;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, SyncSender};
@@ -10,36 +20,15 @@ use crate::listen;
 use crate::session_env;
 use crate::uinput_kbd::UInputKeyboard;
 
-/// Only used when expand fires before the completing key is released (overlap).
-const PRE_ERASE_DELAY: Duration = Duration::from_millis(12);
-/// Brief settle so the focused app applies backspaces before insert.
-const POST_ERASE_DELAY: Duration = Duration::from_millis(8);
-const KEY_GAP: Duration = Duration::from_millis(1);
-/// Poll interval while waiting for the compositor to advertise clipboard text.
-const PASTE_SETTLE: Duration = Duration::from_millis(25);
-/// Cold Wayland/KDE clipboards often need hundreds of ms before Ctrl+V sees our offer.
-const CLIPBOARD_READY_TIMEOUT: Duration = Duration::from_millis(500);
-/// Must outlive slow first-paste reads; restoring early pastes empty/old text.
-/// (UI auto-paste uses 500ms; expand needs more headroom after idle.)
-const CLIPBOARD_RESTORE_DELAY: Duration = Duration::from_millis(900);
-/// Let the focused app process Ctrl+V before we drop listen suppress.
-const POST_PASTE_DELAY: Duration = Duration::from_millis(40);
 /// Ignore synthetic keys after inject finishes (Wayland can deliver late).
 const SUPPRESS_GRACE: Duration = Duration::from_millis(150);
-/// Short ASCII fallback typing only (paste is the primary path).
-const KEY_TYPE_MAX_CHARS: usize = 16;
 const INJECT_CACHE_TTL: Duration = Duration::from_secs(2);
-/// Recreate Enigo after idle — Wayland virtual-keyboard seats go stale.
-const ENIGO_MAX_IDLE: Duration = Duration::from_secs(45);
 
 /// Expand jobs queued or in-flight (listen buffer should ignore keys).
 static LISTEN_SUPPRESS_JOBS: AtomicUsize = AtomicUsize::new(0);
 static EXPAND_ENABLED: AtomicBool = AtomicBool::new(true);
 /// Epoch millis until which listeners should keep suppressing after a job ends.
 static SUPPRESS_UNTIL_MS: AtomicU64 = AtomicU64::new(0);
-/// Clipboard restore generation — only the latest expand restores the original.
-static CLIPBOARD_EPOCH: AtomicU64 = AtomicU64::new(0);
-static CLIPBOARD_ORIGINAL: Mutex<Option<String>> = Mutex::new(None);
 static INJECT_TX: OnceLock<SyncSender<InjectJob>> = OnceLock::new();
 static INJECT_CACHE: Mutex<Option<(Instant, bool)>> = Mutex::new(None);
 
@@ -150,310 +139,6 @@ pub fn can_inject() -> bool {
     ok
 }
 
-fn new_enigo() -> Result<Enigo, String> {
-    catch_unwind(AssertUnwindSafe(|| {
-        let mut settings = Settings::default();
-        // Re-detect every time: systemd often starts us before Wayland exists.
-        // Read-only — do not call ensure_session_env from worker threads.
-        settings.wayland_display = session_env::wayland_display_for_enigo();
-        Enigo::new(&settings)
-    }))
-    .map_err(|_| "input injection backend panicked".to_string())?
-    .map_err(|e| e.to_string())
-}
-
-/// Map paste chord keys into the virtual keymap and let the compositor adopt it.
-/// Without this, the first Unicode('v') regenerates the keymap mid-chord and the
-/// Click is dropped — trigger is erased, expansion never appears; retry works.
-fn warm_up_enigo(enigo: &mut Enigo) {
-    for c in ['v', 'V', 'c', 'C'] {
-        let _ = enigo.key(Key::Unicode(c), Direction::Release);
-    }
-    let _ = enigo.key(Key::Control, Direction::Release);
-    let _ = enigo.key(Key::Shift, Direction::Release);
-    let _ = enigo.key(Key::Alt, Direction::Release);
-    let _ = enigo.key(Key::Meta, Direction::Release);
-    thread::sleep(Duration::from_millis(40));
-}
-
-fn click_key(enigo: &mut Enigo, key: Key) -> Result<(), String> {
-    enigo
-        .key(key, Direction::Click)
-        .map_err(|e| e.to_string())?;
-    thread::sleep(KEY_GAP);
-    Ok(())
-}
-
-fn ensure_paste_key_mapped(enigo: &mut Enigo) {
-    // Release-only maps the keysym + applies keymap without inserting a character.
-    let _ = enigo.key(Key::Unicode('v'), Direction::Release);
-    thread::sleep(Duration::from_millis(15));
-}
-
-fn ctrl_v_enigo(enigo: &mut Enigo) -> Result<(), String> {
-    ensure_paste_key_mapped(enigo);
-    enigo
-        .key(Key::Control, Direction::Press)
-        .map_err(|e| e.to_string())?;
-    let typed = (|| -> Result<(), String> {
-        thread::sleep(KEY_GAP);
-        enigo
-            .key(Key::Unicode('v'), Direction::Click)
-            .map_err(|e| e.to_string())?;
-        thread::sleep(KEY_GAP);
-        Ok(())
-    })();
-    // Always release Control — a stuck modifier poisons the session.
-    let released = enigo
-        .key(Key::Control, Direction::Release)
-        .map_err(|e| e.to_string());
-    typed.and(released)
-}
-
-fn erase_chars(enigo: &mut Enigo, count: usize) -> Result<(), String> {
-    let count = count.min(crate::state::MAX_TRIGGER_LEN);
-    for _ in 0..count {
-        click_key(enigo, Key::Backspace)?;
-    }
-    if count > 0 {
-        thread::sleep(POST_ERASE_DELAY);
-    }
-    Ok(())
-}
-
-/// True when fallback key-typing is unsafe (newline/tab/unicode/long).
-fn prefers_literal_insert(body: &str) -> bool {
-    let mut chars = 0usize;
-    for c in body.chars() {
-        if c == '\n' || c == '\r' || c == '\t' || !c.is_ascii() {
-            return true;
-        }
-        chars += 1;
-        if chars > KEY_TYPE_MAX_CHARS {
-            return true;
-        }
-    }
-    false
-}
-
-/// Restore the pre-burst clipboard only if this expand is still the latest.
-fn schedule_clipboard_restore(expected: String, epoch: u64) {
-    thread::spawn(move || {
-        thread::sleep(CLIPBOARD_RESTORE_DELAY);
-        if CLIPBOARD_EPOCH.load(Ordering::Acquire) != epoch {
-            return;
-        }
-        if let Ok(mut clipboard) = arboard::Clipboard::new() {
-            let current = clipboard.get_text().unwrap_or_default();
-            if current == expected {
-                // Only restore when we captured a prior value. Clearing to "" on
-                // a failed read races a still-in-flight paste and pastes nothing.
-                let previous = CLIPBOARD_ORIGINAL.lock().ok().and_then(|mut g| g.take());
-                if let Some(previous) = previous {
-                    let _ = clipboard.set_text(previous);
-                }
-            } else if let Ok(mut guard) = CLIPBOARD_ORIGINAL.lock() {
-                // User copied something else — drop our claim on the original.
-                *guard = None;
-            }
-        }
-    });
-}
-
-fn set_clipboard_text(body: &str) -> Result<u64, String> {
-    let epoch = CLIPBOARD_EPOCH.fetch_add(1, Ordering::AcqRel) + 1;
-    let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
-    let current = clipboard.get_text().ok();
-    if let Ok(mut guard) = CLIPBOARD_ORIGINAL.lock() {
-        // First expand in a burst captures the user's clipboard; later expands
-        // in the same burst keep that original so restore does not chain.
-        // Leave None when get_text failed so restore will not clear mid-paste.
-        if guard.is_none() {
-            if let Some(cur) = current {
-                *guard = Some(cur);
-            }
-        }
-    }
-
-    // Offer text and wait until a read-back matches. Cold Wayland clipboards
-    // often accept set_text before Ctrl+V can see the offer — first expand then
-    // erases the trigger and pastes nothing; the second try works once warm.
-    let deadline = Instant::now() + CLIPBOARD_READY_TIMEOUT;
-    loop {
-        match clipboard.set_text(body) {
-            Ok(()) => {}
-            Err(err) => {
-                let set_err = err.to_string();
-                match arboard::Clipboard::new() {
-                    Ok(fresh) => clipboard = fresh,
-                    Err(err2) => return Err(format!("{set_err}; recreate: {err2}")),
-                }
-                if Instant::now() >= deadline {
-                    return Err(set_err);
-                }
-                thread::sleep(PASTE_SETTLE);
-                continue;
-            }
-        }
-        thread::sleep(PASTE_SETTLE);
-        match clipboard.get_text() {
-            Ok(got) if got == body => break,
-            Ok(_) | Err(_) => {
-                if Instant::now() >= deadline {
-                    // Some compositors never echo get_text but still serve paste.
-                    thread::sleep(PASTE_SETTLE);
-                    break;
-                }
-                thread::sleep(PASTE_SETTLE);
-            }
-        }
-    }
-    Ok(epoch)
-}
-
-fn restore_clipboard_now() {
-    if let Ok(mut guard) = CLIPBOARD_ORIGINAL.lock() {
-        if let Some(prev) = guard.take() {
-            if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                let _ = clipboard.set_text(prev);
-            }
-        }
-    }
-}
-
-fn paste_with_uinput(kbd: &mut UInputKeyboard, body: &str) -> Result<(), String> {
-    let epoch = set_clipboard_text(body)?;
-    kbd.ctrl_v()?;
-    thread::sleep(POST_PASTE_DELAY);
-    schedule_clipboard_restore(body.to_string(), epoch);
-    Ok(())
-}
-
-fn paste_with_enigo(enigo: &mut Enigo, body: &str) -> Result<(), String> {
-    let epoch = set_clipboard_text(body)?;
-    ctrl_v_enigo(enigo)?;
-    thread::sleep(POST_PASTE_DELAY);
-    schedule_clipboard_restore(body.to_string(), epoch);
-    Ok(())
-}
-
-fn retype_trigger_uinput(kbd: &mut UInputKeyboard, trigger: &str) {
-    if trigger.is_empty() {
-        return;
-    }
-    let _ = paste_with_uinput(kbd, trigger);
-}
-
-fn retype_trigger_enigo(enigo: &mut Enigo, trigger: &str) {
-    if trigger.is_empty() {
-        return;
-    }
-    if prefers_literal_insert(trigger) {
-        let _ = paste_with_enigo(enigo, trigger);
-    } else {
-        let _ = enigo.text(trigger);
-    }
-}
-
-fn expand_with_uinput(
-    kbd: &mut UInputKeyboard,
-    trigger_chars: usize,
-    expansion: &str,
-    trigger: &str,
-    trigger_committed: bool,
-) -> Result<(), String> {
-    if !trigger_committed {
-        thread::sleep(PRE_ERASE_DELAY);
-    }
-    if expansion.contains('\0') {
-        return Err("expansion contains NUL".into());
-    }
-    let epoch = if expansion.is_empty() {
-        None
-    } else {
-        Some(set_clipboard_text(expansion)?)
-    };
-
-    let erase = trigger_chars.min(crate::state::MAX_TRIGGER_LEN);
-    if let Err(err) = kbd.erase_chars(erase) {
-        if epoch.is_some() {
-            restore_clipboard_now();
-        }
-        return Err(err);
-    }
-
-    if expansion.is_empty() {
-        return Ok(());
-    }
-
-    match kbd.ctrl_v() {
-        Ok(()) => {
-            thread::sleep(POST_PASTE_DELAY);
-            if let Some(epoch) = epoch {
-                schedule_clipboard_restore(expansion.to_string(), epoch);
-            }
-            Ok(())
-        }
-        Err(paste_err) => {
-            retype_trigger_uinput(kbd, trigger);
-            restore_clipboard_now();
-            Err(paste_err)
-        }
-    }
-}
-
-fn expand_with_enigo(
-    enigo: &mut Enigo,
-    trigger_chars: usize,
-    expansion: &str,
-    trigger: &str,
-    trigger_committed: bool,
-) -> Result<(), String> {
-    if !trigger_committed {
-        thread::sleep(PRE_ERASE_DELAY);
-    }
-
-    // Clipboard first so erase failure can restore it; paste failure can retype trigger.
-    if expansion.contains('\0') {
-        return Err("expansion contains NUL".into());
-    }
-    let epoch = if expansion.is_empty() {
-        None
-    } else {
-        Some(set_clipboard_text(expansion)?)
-    };
-
-    if let Err(err) = erase_chars(enigo, trigger_chars) {
-        if epoch.is_some() {
-            restore_clipboard_now();
-        }
-        return Err(err);
-    }
-
-    if expansion.is_empty() {
-        return Ok(());
-    }
-
-    match ctrl_v_enigo(enigo) {
-        Ok(()) => {
-            // Give the focused app time to handle paste before suppress ends.
-            thread::sleep(POST_PASTE_DELAY);
-            if let Some(epoch) = epoch {
-                schedule_clipboard_restore(expansion.to_string(), epoch);
-            }
-            Ok(())
-        }
-        Err(paste_err) => {
-            retype_trigger_enigo(enigo, trigger);
-            restore_clipboard_now();
-            if !prefers_literal_insert(expansion) && enigo.text(expansion).is_ok() {
-                return Ok(());
-            }
-            Err(paste_err)
-        }
-    }
-}
-
 fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
     // Prefer uinput: reaches native Wayland (Cursor, Plasma apps). Enigo is
     // fallback when /dev/uinput is unavailable (no Grant / missing udev).
@@ -513,24 +198,12 @@ fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
                 }
                 let expand_result = if let Some(kbd) = uinput.as_mut() {
                     catch_unwind(AssertUnwindSafe(|| {
-                        expand_with_uinput(
-                            kbd,
-                            erase,
-                            &expansion,
-                            &trigger,
-                            trigger_committed,
-                        )
+                        expand_with_uinput(kbd, erase, &expansion, &trigger, trigger_committed)
                     }))
                 } else {
                     let backend = enigo.as_mut().expect("enigo ensured");
                     catch_unwind(AssertUnwindSafe(|| {
-                        expand_with_enigo(
-                            backend,
-                            erase,
-                            &expansion,
-                            &trigger,
-                            trigger_committed,
-                        )
+                        expand_with_enigo(backend, erase, &expansion, &trigger, trigger_committed)
                     }))
                 };
 
@@ -694,30 +367,5 @@ pub fn inject_ctrl_v() -> Result<(), String> {
             // Worker still holds suppress until paste finishes — avoids surprise paste.
             Err("inject paste timed out".to_string())
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::prefers_literal_insert;
-
-    #[test]
-    fn paragraphs_prefer_literal_insert() {
-        assert!(prefers_literal_insert("line1\nline2"));
-        assert!(prefers_literal_insert("line1\r\nline2"));
-        assert!(prefers_literal_insert("a\tb"));
-    }
-
-    #[test]
-    fn short_ascii_can_use_keys() {
-        assert!(!prefers_literal_insert("hiya"));
-        assert!(!prefers_literal_insert("hello world"));
-    }
-
-    #[test]
-    fn long_and_unicode_prefer_literal() {
-        assert!(prefers_literal_insert("😀"));
-        assert!(prefers_literal_insert(&"a".repeat(17)));
-        assert!(!prefers_literal_insert(&"a".repeat(16)));
     }
 }

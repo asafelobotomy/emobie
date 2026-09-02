@@ -7,16 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.14] - 2026-09-02
+
 ### Fixed
 
 - Wayland Expand inject prefers `/dev/uinput` (Plasma lacks virtual-keyboard); Enigo/XTest alone cannot reach native Wayland apps
 - `can_inject` on Wayland requires writable uinput; Grant/verify/UI re-run when inject is missing
+- AppShell category id typing after LOC extract (`number` vs `string`)
 
 ### Changed
 
 - Docs (`LINUX.md`, `MACROS.md`): inject needs uinput via Grant on every package channel
 - `verify-expand-setup.sh` fails on Wayland when uinput is missing/unwritable
 - Release CI asserts AppImage host tarball includes udev rules + setup/policy
+- Split oversized sources under the 400-line LOC budget (inject, listen, access, unix, App, Settings)
+- Smoke checklist (`docs/SMOKE.md`) plus `npm run smoke:gate` / `smoke:expand` Expand E2E harness
 
 ## [0.6.13] - 2026-09-02
 
@@ -310,7 +315,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Horizontal mouse-wheel scrolling in wide layouts
 - Tray icon temp path for Flatpak-friendly sandboxing
 
-[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.13...HEAD
+[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.14...HEAD
+[0.6.14]: https://github.com/asafelobotomy/emobie/compare/v0.6.13...v0.6.14
 [0.6.13]: https://github.com/asafelobotomy/emobie/compare/v0.6.12...v0.6.13
 [0.6.12]: https://github.com/asafelobotomy/emobie/compare/v0.6.11...v0.6.12
 [0.6.11]: https://github.com/asafelobotomy/emobie/compare/v0.6.10...v0.6.11

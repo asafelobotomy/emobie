@@ -1,7 +1,7 @@
 {
   "name": "emobie",
   "private": true,
-  "version": "0.6.13",
+  "version": "0.6.14",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,6 +10,8 @@
     "test": "node --experimental-strip-types --test src/lib/*.test.ts",
     "test:inputd": "cargo test --manifest-path crates/emobie-inputd/Cargo.toml",
     "verify:expand": "bash scripts/verify-expand-setup.sh",
+    "smoke:expand": "python3 scripts/smoke-expand-e2e.py",
+    "smoke:gate": "npm test && npm run test:inputd && npm run build && bash scripts/check-inputd-packaging.sh && bash scripts/check-loc.sh && npm run verify:expand",
     "stage:inputd": "bash scripts/stage-inputd.sh",
     "icons:user": "bash scripts/install-user-icons.sh",
     "icons:fix-bundle": "bash scripts/fix-linux-bundle-icons.sh",
