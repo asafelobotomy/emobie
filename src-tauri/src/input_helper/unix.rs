@@ -56,6 +56,9 @@ fn trusted_socket_path(path: &std::path::Path) -> bool {
     let Some(parent) = path.parent() else {
         return false;
     };
+    if !socket_parent_dir_safe(parent) {
+        return false;
+    }
     if parent == std::path::Path::new("/run/emobie") {
         return true;
     }
@@ -69,6 +72,22 @@ fn trusted_socket_path(path: &std::path::Path) -> bool {
         return true;
     }
     false
+}
+
+fn socket_parent_dir_safe(path: &std::path::Path) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    let Ok(meta) = std::fs::metadata(path) else {
+        return false;
+    };
+    if !meta.is_dir() {
+        return false;
+    }
+    let uid = current_uid();
+    if meta.uid() == uid {
+        return true;
+    }
+    let mode = meta.mode();
+    (mode & 0o002) == 0 || (mode & 0o1000) != 0
 }
 
 fn connect_with_timeout(timeout: Duration) -> Option<UnixStream> {

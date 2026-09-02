@@ -43,6 +43,14 @@ pub fn validate_matches(matches: &[MatchRule]) -> Result<(), String> {
         if m.expansion.is_empty() {
             return Err("expansion must not be empty".into());
         }
+        if m.trigger.contains('\0') || m.expansion.contains('\0') {
+            return Err("trigger/expansion must not contain NUL".into());
+        }
+        // Triggers are built from printable key events — reject control chars so
+        // a bad sync cannot install rules that can never fire (or confuse erase).
+        if m.trigger.chars().any(|c| c.is_control()) {
+            return Err("trigger must not contain control characters".into());
+        }
         if m.trigger.chars().count() > MAX_TRIGGER_LEN {
             return Err(format!(
                 "trigger longer than {MAX_TRIGGER_LEN} characters"
@@ -57,18 +65,37 @@ pub fn validate_matches(matches: &[MatchRule]) -> Result<(), String> {
     Ok(())
 }
 
+/// Keep the last rule for each trigger (trie insert would overwrite anyway).
+pub fn dedupe_matches(matches: Vec<MatchRule>) -> Vec<MatchRule> {
+    use std::collections::HashMap;
+    let mut last_at: HashMap<String, usize> = HashMap::new();
+    for (i, m) in matches.iter().enumerate() {
+        last_at.insert(m.trigger.clone(), i);
+    }
+    matches
+        .into_iter()
+        .enumerate()
+        .filter(|(i, m)| last_at.get(&m.trigger) == Some(i))
+        .map(|(_, m)| m)
+        .collect()
+}
+
 /// Drop matches that exceed caps so a corrupt/huge file cannot blow the trie.
 fn sanitize_matches(matches: Vec<MatchRule>) -> Vec<MatchRule> {
-    matches
+    let cleaned: Vec<MatchRule> = matches
         .into_iter()
         .filter(|m| {
             !m.trigger.is_empty()
                 && !m.expansion.is_empty()
+                && !m.trigger.contains('\0')
+                && !m.expansion.contains('\0')
+                && !m.trigger.chars().any(|c| c.is_control())
                 && m.trigger.chars().count() <= MAX_TRIGGER_LEN
                 && m.expansion.len() <= MAX_EXPANSION_LEN
         })
         .take(MAX_MATCHES)
-        .collect()
+        .collect();
+    dedupe_matches(cleaned)
 }
 
 /// Load persisted state. Second value is true when a state file was read from disk
@@ -116,7 +143,7 @@ pub fn save(enabled: bool, matches: &[MatchRule]) {
         enabled,
         matches: matches.to_vec(),
     };
-    let Ok(body) = serde_json::to_string_pretty(&state) else {
+    let Ok(body) = serde_json::to_string(&state) else {
         return;
     };
     let nonce = SystemTime::now()
@@ -133,6 +160,10 @@ pub fn save(enabled: bool, matches: &[MatchRule]) {
             .open(&tmp)?;
         file.write_all(body.as_bytes())?;
         file.sync_all()?;
+        // Ensure final mode even if umask was loose.
+        let mut perms = file.metadata()?.permissions();
+        perms.set_mode(0o600);
+        let _ = fs::set_permissions(&tmp, perms);
         fs::rename(&tmp, &path)?;
         Ok(())
     })();
@@ -174,5 +205,26 @@ mod tests {
         let kept = sanitize_matches(vec![rule("ok", "yes"), rule(&big, "no")]);
         assert_eq!(kept.len(), 1);
         assert_eq!(kept[0].trigger, "ok");
+    }
+
+    #[test]
+    fn validate_rejects_nul_and_controls() {
+        assert!(validate_matches(&[rule("a\0b", "x")]).is_err());
+        assert!(validate_matches(&[rule("ab", "x\0")]).is_err());
+        assert!(validate_matches(&[rule("a\nb", "x")]).is_err());
+    }
+
+    #[test]
+    fn dedupe_keeps_last_trigger() {
+        use super::dedupe_matches;
+        let out = dedupe_matches(vec![
+            rule(":a", "one"),
+            rule(":b", "bee"),
+            rule(":a", "two"),
+        ]);
+        assert_eq!(out.len(), 2);
+        assert_eq!(out[0].trigger, ":b");
+        assert_eq!(out[1].trigger, ":a");
+        assert_eq!(out[1].expansion, "two");
     }
 }

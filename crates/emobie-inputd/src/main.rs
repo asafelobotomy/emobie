@@ -44,8 +44,16 @@ fn chmod_path(path: &Path, mode: u32) -> std::io::Result<()> {
 fn peer_uid_allowed(stream: &UnixStream) -> bool {
     match getsockopt(stream, PeerCredentials) {
         Ok(cred) => cred.uid() == getuid().as_raw(),
+        // Fail closed — missing credentials must not look like the owner.
         Err(_) => false,
     }
+}
+
+fn configure_client_stream(stream: &UnixStream) {
+    // Free client slots if a peer stalls mid-request (same-UID DoS / hung app).
+    let timeout = Duration::from_secs(5);
+    let _ = stream.set_read_timeout(Some(timeout));
+    let _ = stream.set_write_timeout(Some(timeout));
 }
 
 fn read_request_line(
@@ -169,30 +177,39 @@ fn handle_client(
             }
             Ok(Request::SyncMatches { matches }) => match state::validate_matches(&matches) {
                 Ok(()) => {
+                    let matches = state::dedupe_matches(matches);
                     let pairs = state::pairs_from_matches(&matches);
                     let count = pairs.len();
-                    // Update stored + trie + disk under one critical section.
-                    let sync_result = (|| -> Result<(), String> {
+                    // Update trie under lock; persist outside so typing is not blocked on disk.
+                    let sync_result = (|| -> Result<(bool, Vec<MatchRule>), String> {
                         let mut stored_guard = stored
                             .lock()
                             .map_err(|_| "internal lock poisoned — try again".to_string())?;
                         let mut trie_guard = trie
                             .lock()
                             .map_err(|_| "internal lock poisoned — try again".to_string())?;
+                        let unchanged = *stored_guard == matches;
                         trie_guard.load(&pairs);
                         *stored_guard = matches;
-                        persist_locked(enabled, &stored_guard);
-                        Ok(())
+                        let snapshot = stored_guard.clone();
+                        Ok((unchanged, snapshot))
                     })();
                     match sync_result {
-                        Ok(()) => {
+                        Ok((unchanged, snapshot)) => {
+                            if !unchanged {
+                                state::save(enabled.load(Ordering::Relaxed), &snapshot);
+                            }
                             Response::status(
                                 can_inject,
                                 can_listen,
                                 enabled.load(Ordering::Relaxed),
-                                &format!("synced {count} matches"),
+                                &if unchanged {
+                                    format!("synced {count} matches (unchanged)")
+                                } else {
+                                    format!("synced {count} matches")
+                                },
                             )
-                        },
+                        }
                         Err(err) => Response::err(can_inject, can_listen, enabled_now, &err),
                     }
                 }
@@ -305,9 +322,10 @@ fn main() {
         match listener.accept() {
             Ok((stream, _)) => {
                 if !peer_uid_allowed(&stream) {
-                    eprintln!("rejected non-owner peer on socket");
+                    eprintln!("rejected non-owner peer on socket (uid mismatch)");
                     continue;
                 }
+                configure_client_stream(&stream);
                 let active = clients.fetch_add(1, Ordering::AcqRel);
                 if active >= MAX_CLIENT_THREADS {
                     clients.fetch_sub(1, Ordering::AcqRel);

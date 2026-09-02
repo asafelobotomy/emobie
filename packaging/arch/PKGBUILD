@@ -7,7 +7,7 @@
 # Prefer Flatpak/AppImage + packaging/install-inputd-user.sh for most users.
 
 pkgname=emobie
-pkgver=0.6.12
+pkgver=0.6.13
 pkgrel=1
 pkgdesc="Compact emoji palette with macros and optional text expansion"
 arch=('x86_64')

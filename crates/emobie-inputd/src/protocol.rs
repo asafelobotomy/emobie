@@ -8,7 +8,7 @@ pub enum TriggerMode {
     Space,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MatchRule {
     pub trigger: String,
     pub expansion: String,

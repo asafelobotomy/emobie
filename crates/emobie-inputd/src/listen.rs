@@ -22,9 +22,14 @@ struct PendingExpand {
     expansion: String,
     trigger: String,
     key_code: u16,
+    created_at: Instant,
 }
 
+/// Completing key held longer than this → cancel (lost release / stuck key).
+const PENDING_TIMEOUT: Duration = Duration::from_secs(3);
+
 static PENDING_HOLDER: OnceLock<Arc<Mutex<Option<PendingExpand>>>> = OnceLock::new();
+static BUFFER_HOLDER: OnceLock<Arc<Mutex<String>>> = OnceLock::new();
 
 /// Drop any pending expand (e.g. when expansion is disabled).
 pub fn clear_pending() {
@@ -35,9 +40,24 @@ pub fn clear_pending() {
     }
 }
 
+/// Push text back into the match buffer (e.g. when a queued expand is cancelled).
+pub fn restore_to_buffer(text: &str) {
+    if text.is_empty() {
+        return;
+    }
+    if let Some(buffer) = BUFFER_HOLDER.get() {
+        if let Ok(mut guard) = buffer.lock() {
+            guard.push_str(text);
+            trim_buffer(&mut guard, crate::state::MAX_TRIGGER_LEN);
+        }
+    }
+}
+
 /// Cached keyboard-path scan so Status spam does not open every event device.
 static LISTEN_CACHE: Mutex<Option<(Instant, bool)>> = Mutex::new(None);
 const LISTEN_CACHE_TTL: Duration = Duration::from_secs(2);
+/// Hotplug scan interval — avoid opening every event node more often than needed.
+const HOTPLUG_INTERVAL: Duration = Duration::from_secs(5);
 
 fn is_virtual_uinput(device: &Device) -> bool {
     let name = device.name().unwrap_or("").to_ascii_lowercase();
@@ -54,6 +74,43 @@ fn is_keyboard(device: &Device) -> bool {
     device.supported_keys().is_some_and(|keys| {
         keys.contains(Key::KEY_A) && keys.contains(Key::KEY_Z) && keys.contains(Key::KEY_ENTER)
     })
+}
+
+fn is_modifier(key: Key) -> bool {
+    matches!(
+        key,
+        Key::KEY_LEFTSHIFT
+            | Key::KEY_RIGHTSHIFT
+            | Key::KEY_LEFTCTRL
+            | Key::KEY_RIGHTCTRL
+            | Key::KEY_LEFTALT
+            | Key::KEY_RIGHTALT
+            | Key::KEY_LEFTMETA
+            | Key::KEY_RIGHTMETA
+            | Key::KEY_CAPSLOCK
+            | Key::KEY_NUMLOCK
+            | Key::KEY_SCROLLLOCK
+            | Key::KEY_FN
+    )
+}
+
+fn is_edit_or_nav(key: Key) -> bool {
+    matches!(
+        key,
+        Key::KEY_BACKSPACE
+            | Key::KEY_DELETE
+            | Key::KEY_ENTER
+            | Key::KEY_TAB
+            | Key::KEY_ESC
+            | Key::KEY_LEFT
+            | Key::KEY_RIGHT
+            | Key::KEY_UP
+            | Key::KEY_DOWN
+            | Key::KEY_HOME
+            | Key::KEY_END
+            | Key::KEY_PAGEUP
+            | Key::KEY_PAGEDOWN
+    )
 }
 
 fn list_keyboard_paths() -> Vec<PathBuf> {
@@ -92,6 +149,15 @@ pub fn can_listen() -> bool {
     ok
 }
 
+fn trim_buffer(guard: &mut String, max_buf: usize) {
+    let count = guard.chars().count();
+    if count <= max_buf {
+        return;
+    }
+    let skip = count - max_buf;
+    *guard = guard.chars().skip(skip).collect();
+}
+
 fn fire_expand(
     pending: PendingExpand,
     trigger_committed: bool,
@@ -99,6 +165,11 @@ fn fire_expand(
     buffer: &Mutex<String>,
 ) {
     if !enabled.load(Ordering::Relaxed) {
+        // Leave the trigger on screen; put it back in the buffer.
+        if let Ok(mut guard) = buffer.lock() {
+            guard.push_str(&pending.trigger);
+            trim_buffer(&mut guard, crate::state::MAX_TRIGGER_LEN);
+        }
         return;
     }
     // Queue onto the inject worker — never call enigo on the listen thread.
@@ -113,6 +184,46 @@ fn fire_expand(
         // with what the focused app still shows on screen.
         if let Ok(mut guard) = buffer.lock() {
             guard.push_str(&pending.trigger);
+            trim_buffer(&mut guard, crate::state::MAX_TRIGGER_LEN);
+        }
+    }
+}
+
+/// Cancel a pending expand and restore its trigger into the match buffer.
+fn cancel_pending(pending: &Mutex<Option<PendingExpand>>, buffer: &Mutex<String>) {
+    let cancelled = {
+        let Ok(mut guard) = pending.lock() else {
+            return;
+        };
+        guard.take()
+    };
+    if let Some(p) = cancelled {
+        if let Ok(mut guard) = buffer.lock() {
+            guard.push_str(&p.trigger);
+            trim_buffer(&mut guard, crate::state::MAX_TRIGGER_LEN);
+        }
+    }
+}
+
+/// Drop pending expands whose completing-key release never arrived.
+fn expire_stale_pending(pending: &Mutex<Option<PendingExpand>>, buffer: &Mutex<String>) {
+    let stale = {
+        let Ok(mut guard) = pending.lock() else {
+            return;
+        };
+        let is_stale = guard
+            .as_ref()
+            .is_some_and(|p| p.created_at.elapsed() >= PENDING_TIMEOUT);
+        if is_stale {
+            guard.take()
+        } else {
+            None
+        }
+    };
+    if let Some(p) = stale {
+        if let Ok(mut guard) = buffer.lock() {
+            guard.push_str(&p.trigger);
+            trim_buffer(&mut guard, crate::state::MAX_TRIGGER_LEN);
         }
     }
 }
@@ -129,12 +240,9 @@ fn handle_key(
     let pressed = value != 0;
     keymap.update_key(key.code(), pressed);
 
-    // Synthetic keys from our own inject — keep keymap in sync, ignore buffer.
-    if inject::should_suppress_keys() {
-        return;
-    }
-
-    // Key release: fire expansion for the key that completed the trigger.
+    // Completing-key release must fire even while inject suppress is active.
+    // Otherwise a concurrent emoji paste can swallow the release and leave
+    // pending stuck until another key (or timeout).
     if value == 0 {
         let to_fire = {
             let Ok(mut guard) = pending.lock() else {
@@ -147,9 +255,13 @@ fn handle_key(
             }
         };
         if let Some(p) = to_fire {
-            // Key already released — trigger text is committed; skip pre-delay.
             fire_expand(p, true, enabled, buffer);
         }
+        return;
+    }
+
+    // Synthetic keys from our own inject — keep keymap in sync, ignore buffer.
+    if inject::should_suppress_keys() {
         return;
     }
 
@@ -158,9 +270,19 @@ fn handle_key(
         return;
     }
 
-    // A new key while an expand is pending: flush the pending expand first so
-    // the next character cannot race ahead of the replacement.
-    {
+    // Modifiers while waiting for completing-key release must not flush expand.
+    if is_modifier(key) {
+        return;
+    }
+
+    // Edit/nav while pending: cancel expand (user is revising), restore trigger,
+    // then apply the edit to the buffer so it stays aligned with the app.
+    if is_edit_or_nav(key) {
+        cancel_pending(pending, buffer);
+    } else {
+        // Printable (or other) key while pending: flush expand first so the next
+        // character cannot race ahead of the replacement, then fall through and
+        // buffer this key so the match buffer stays aligned with the app.
         let to_fire = {
             let Ok(mut guard) = pending.lock() else {
                 return;
@@ -170,9 +292,6 @@ fn handle_key(
         if let Some(p) = to_fire {
             // Completing key still down — allow a short settle before erase.
             fire_expand(p, false, enabled, buffer);
-            // Do not also push this key into the match buffer: erase count is
-            // still the trigger length, and inject suppress arms after queue.
-            return;
         }
     }
 
@@ -188,7 +307,14 @@ fn handle_key(
         }
         return;
     }
-    if key == Key::KEY_ENTER || key == Key::KEY_TAB {
+    if key == Key::KEY_ENTER || key == Key::KEY_TAB || key == Key::KEY_ESC {
+        if let Ok(mut guard) = buffer.lock() {
+            guard.clear();
+        }
+        return;
+    }
+    if is_edit_or_nav(key) {
+        // Arrows / Home / End / Delete: buffer no longer matches caret — reset.
         if let Ok(mut guard) = buffer.lock() {
             guard.clear();
         }
@@ -198,10 +324,10 @@ fn handle_key(
     let Some(text) = keymap.key_utf8(key.code()) else {
         return;
     };
-    let Some(ch) = text.chars().next() else {
-        return;
-    };
-    if ch.is_control() {
+    // Dead-key first press yields empty (handled above). Compose may yield one
+    // or more non-control chars — push them all then match once.
+    let produced: Vec<char> = text.chars().filter(|c| !c.is_control()).collect();
+    if produced.is_empty() {
         return;
     }
 
@@ -209,20 +335,10 @@ fn handle_key(
         let Ok(mut guard) = buffer.lock() else {
             return;
         };
-        guard.push(ch);
-        // Keep at least MAX_TRIGGER_LEN so validated triggers can still match.
-        let max_buf = crate::state::MAX_TRIGGER_LEN;
-        if guard.chars().count() > max_buf {
-            let trim: String = guard
-                .chars()
-                .rev()
-                .take(max_buf)
-                .collect::<String>()
-                .chars()
-                .rev()
-                .collect();
-            *guard = trim;
+        for ch in produced {
+            guard.push(ch);
         }
+        trim_buffer(&mut guard, crate::state::MAX_TRIGGER_LEN);
         let matched = {
             let Ok(trie_guard) = trie.lock() else {
                 return;
@@ -249,6 +365,7 @@ fn handle_key(
                 expansion,
                 trigger,
                 key_code: key.code(),
+                created_at: Instant::now(),
             });
         }
     }
@@ -276,6 +393,7 @@ fn spawn_device_thread(
                     keymap.reload_from_session();
                     last_reload = Instant::now();
                 }
+                expire_stale_pending(&pending, &buffer);
                 let events = match device.fetch_events() {
                     Ok(events) => events,
                     Err(_) => {
@@ -314,6 +432,7 @@ pub fn spawn_listener(
         let buffer = Arc::new(Mutex::new(String::new()));
         let pending = Arc::new(Mutex::new(None));
         let _ = PENDING_HOLDER.set(pending.clone());
+        let _ = BUFFER_HOLDER.set(buffer.clone());
         let alive = Arc::new(Mutex::new(HashSet::<PathBuf>::new()));
         loop {
             if stop.load(Ordering::Relaxed) {
@@ -321,7 +440,7 @@ pub fn spawn_listener(
             }
             let paths = list_keyboard_paths();
             if paths.is_empty() {
-                thread::sleep(Duration::from_secs(2));
+                thread::sleep(HOTPLUG_INTERVAL);
                 continue;
             }
             for path in paths {
@@ -345,7 +464,7 @@ pub fn spawn_listener(
                     alive.clone(),
                 );
             }
-            thread::sleep(Duration::from_secs(2));
+            thread::sleep(HOTPLUG_INTERVAL);
         }
     });
 }

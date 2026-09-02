@@ -53,8 +53,7 @@ impl TriggerTrie {
             let without_space: String = chars[..chars.len() - 1].iter().collect();
             if let Some((len, expansion, mode)) = self.best_terminal(&without_space) {
                 if mode == TriggerMode::Space {
-                    let erase = len + 1;
-                    best = Some((erase, expansion));
+                    best = Some((len + 1, expansion));
                 }
             }
         }
@@ -77,8 +76,9 @@ impl TriggerTrie {
         if chars.is_empty() {
             return None;
         }
-        let mut best: Option<(usize, String, TriggerMode)> = None;
-        for start in 0..chars.len() {
+        // Longest suffix first so we can return on the first terminal hit.
+        for len in (1..=chars.len()).rev() {
+            let start = chars.len() - len;
             let mut node = &self.root;
             let mut matched = true;
             for ch in chars.iter().skip(start) {
@@ -92,16 +92,11 @@ impl TriggerTrie {
             }
             if matched {
                 if let Some((expansion, mode)) = &node.expansion {
-                    let len = chars.len() - start;
-                    let candidate = (len, expansion.clone(), *mode);
-                    best = match best {
-                        Some(prev) if prev.0 >= candidate.0 => Some(prev),
-                        _ => Some(candidate),
-                    };
+                    return Some((len, expansion.clone(), *mode));
                 }
             }
         }
-        best
+        None
     }
 }
 

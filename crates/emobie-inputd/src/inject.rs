@@ -2,10 +2,11 @@ use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, SyncSender};
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use crate::listen;
 use crate::session_env;
 
 /// Only used when expand fires before the completing key is released (overlap).
@@ -15,17 +16,22 @@ const POST_ERASE_DELAY: Duration = Duration::from_millis(8);
 const KEY_GAP: Duration = Duration::from_millis(1);
 const PASTE_SETTLE: Duration = Duration::from_millis(10);
 const CLIPBOARD_RESTORE_DELAY: Duration = Duration::from_millis(350);
-/// Ignore synthetic keys for a short window after inject keystrokes finish.
-const SUPPRESS_GRACE: Duration = Duration::from_millis(80);
+/// Ignore synthetic keys after inject finishes (Wayland can deliver late).
+const SUPPRESS_GRACE: Duration = Duration::from_millis(150);
 /// Short ASCII fallback typing only (paste is the primary path).
 const KEY_TYPE_MAX_CHARS: usize = 16;
+const INJECT_CACHE_TTL: Duration = Duration::from_secs(2);
 
 /// Expand jobs queued or in-flight (listen buffer should ignore keys).
 static LISTEN_SUPPRESS_JOBS: AtomicUsize = AtomicUsize::new(0);
 static EXPAND_ENABLED: AtomicBool = AtomicBool::new(true);
 /// Epoch millis until which listeners should keep suppressing after a job ends.
 static SUPPRESS_UNTIL_MS: AtomicU64 = AtomicU64::new(0);
+/// Clipboard restore generation — only the latest expand restores the original.
+static CLIPBOARD_EPOCH: AtomicU64 = AtomicU64::new(0);
+static CLIPBOARD_ORIGINAL: Mutex<Option<String>> = Mutex::new(None);
 static INJECT_TX: OnceLock<SyncSender<InjectJob>> = OnceLock::new();
+static INJECT_CACHE: Mutex<Option<(Instant, bool)>> = Mutex::new(None);
 
 enum InjectJob {
     Expand {
@@ -65,8 +71,26 @@ fn arm_suppress_grace() {
 }
 
 fn finish_listen_suppress() {
-    LISTEN_SUPPRESS_JOBS.fetch_sub(1, Ordering::AcqRel);
-    arm_suppress_grace();
+    // Saturating decrement — never underflow if a path double-finishes.
+    let mut prev = LISTEN_SUPPRESS_JOBS.load(Ordering::Acquire);
+    loop {
+        if prev == 0 {
+            arm_suppress_grace();
+            return;
+        }
+        match LISTEN_SUPPRESS_JOBS.compare_exchange(
+            prev,
+            prev - 1,
+            Ordering::AcqRel,
+            Ordering::Acquire,
+        ) {
+            Ok(_) => {
+                arm_suppress_grace();
+                return;
+            }
+            Err(v) => prev = v,
+        }
+    }
 }
 
 fn compositor_available() -> bool {
@@ -89,7 +113,18 @@ fn can_write_uinput() -> bool {
 
 /// True when paste/inject is plausible in this session (compositor and/or uinput).
 pub fn can_inject() -> bool {
-    compositor_available() || can_write_uinput()
+    if let Ok(cache) = INJECT_CACHE.lock() {
+        if let Some((at, ok)) = *cache {
+            if at.elapsed() < INJECT_CACHE_TTL {
+                return ok;
+            }
+        }
+    }
+    let ok = compositor_available() || can_write_uinput();
+    if let Ok(mut cache) = INJECT_CACHE.lock() {
+        *cache = Some((Instant::now(), ok));
+    }
+    ok
 }
 
 fn new_enigo() -> Result<Enigo, String> {
@@ -132,6 +167,7 @@ fn ctrl_v(enigo: &mut Enigo) -> Result<(), String> {
 }
 
 fn erase_chars(enigo: &mut Enigo, count: usize) -> Result<(), String> {
+    let count = count.min(crate::state::MAX_TRIGGER_LEN);
     for _ in 0..count {
         click_key(enigo, Key::Backspace)?;
     }
@@ -156,35 +192,62 @@ fn prefers_literal_insert(body: &str) -> bool {
     false
 }
 
-/// Restore clipboard after inject finishes — must not block listen suppress.
-fn schedule_clipboard_restore(previous: String, expected: String) {
+/// Restore the pre-burst clipboard only if this expand is still the latest.
+fn schedule_clipboard_restore(expected: String, epoch: u64) {
     thread::spawn(move || {
         thread::sleep(CLIPBOARD_RESTORE_DELAY);
+        if CLIPBOARD_EPOCH.load(Ordering::Acquire) != epoch {
+            return;
+        }
         if let Ok(mut clipboard) = arboard::Clipboard::new() {
             let current = clipboard.get_text().unwrap_or_default();
             if current == expected {
+                let previous = CLIPBOARD_ORIGINAL
+                    .lock()
+                    .ok()
+                    .and_then(|mut g| g.take())
+                    .unwrap_or_default();
                 let _ = clipboard.set_text(previous);
+            } else if let Ok(mut guard) = CLIPBOARD_ORIGINAL.lock() {
+                // User copied something else — drop our claim on the original.
+                *guard = None;
             }
         }
     });
 }
 
-fn set_clipboard_text(body: &str) -> Result<Option<String>, String> {
+fn set_clipboard_text(body: &str) -> Result<u64, String> {
+    let epoch = CLIPBOARD_EPOCH.fetch_add(1, Ordering::AcqRel) + 1;
     let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
-    let previous = clipboard.get_text().ok();
+    let current = clipboard.get_text().ok();
+    if let Ok(mut guard) = CLIPBOARD_ORIGINAL.lock() {
+        // First expand in a burst captures the user's clipboard; later expands
+        // in the same burst keep that original so restore does not chain.
+        if guard.is_none() {
+            *guard = current;
+        }
+    }
     clipboard
         .set_text(body)
         .map_err(|e| e.to_string())?;
     thread::sleep(PASTE_SETTLE);
-    Ok(previous)
+    Ok(epoch)
+}
+
+fn restore_clipboard_now() {
+    if let Ok(mut guard) = CLIPBOARD_ORIGINAL.lock() {
+        if let Some(prev) = guard.take() {
+            if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                let _ = clipboard.set_text(prev);
+            }
+        }
+    }
 }
 
 fn paste_with(enigo: &mut Enigo, body: &str) -> Result<(), String> {
-    let previous = set_clipboard_text(body)?;
+    let epoch = set_clipboard_text(body)?;
     ctrl_v(enigo)?;
-    if let Some(prev) = previous {
-        schedule_clipboard_restore(prev, body.to_string());
-    }
+    schedule_clipboard_restore(body.to_string(), epoch);
     Ok(())
 }
 
@@ -214,17 +277,15 @@ fn expand_with(
     if expansion.contains('\0') {
         return Err("expansion contains NUL".into());
     }
-    let previous = if expansion.is_empty() {
+    let epoch = if expansion.is_empty() {
         None
     } else {
-        set_clipboard_text(expansion)?
+        Some(set_clipboard_text(expansion)?)
     };
 
     if let Err(err) = erase_chars(enigo, trigger_chars) {
-        if let Some(prev) = previous {
-            if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                let _ = clipboard.set_text(prev);
-            }
+        if epoch.is_some() {
+            restore_clipboard_now();
         }
         return Err(err);
     }
@@ -235,18 +296,14 @@ fn expand_with(
 
     match ctrl_v(enigo) {
         Ok(()) => {
-            if let Some(prev) = previous {
-                schedule_clipboard_restore(prev, expansion.to_string());
+            if let Some(epoch) = epoch {
+                schedule_clipboard_restore(expansion.to_string(), epoch);
             }
             Ok(())
         }
         Err(paste_err) => {
             retype_trigger(enigo, trigger);
-            if let Some(prev) = previous {
-                if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                    let _ = clipboard.set_text(prev);
-                }
-            }
+            restore_clipboard_now();
             if !prefers_literal_insert(expansion) && enigo.text(expansion).is_ok() {
                 return Ok(());
             }
@@ -258,12 +315,14 @@ fn expand_with(
 fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
     let mut enigo: Option<Enigo> = None;
     while let Ok(job) = rx.recv() {
+        // Recreate Enigo when missing so compositor restarts recover mid-session.
         if enigo.is_none() {
             match new_enigo() {
                 Ok(backend) => enigo = Some(backend),
                 Err(err) => {
                     match job {
-                        InjectJob::Expand { .. } => {
+                        InjectJob::Expand { trigger, .. } => {
+                            listen::restore_to_buffer(&trigger);
                             finish_listen_suppress();
                             eprintln!("expand failed: {err}");
                         }
@@ -285,6 +344,7 @@ fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
                 trigger_committed,
             } => {
                 if !EXPAND_ENABLED.load(Ordering::Relaxed) {
+                    listen::restore_to_buffer(&trigger);
                     finish_listen_suppress();
                     continue;
                 }
@@ -301,16 +361,27 @@ fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
                     }))
                 };
 
-                // Release listen suppress before any delayed clipboard work returns.
                 finish_listen_suppress();
                 match expand_result {
                     Ok(Ok(())) => {}
                     Ok(Err(err)) => {
+                        // Backend may be wedged — drop it and best-effort retype
+                        // so the user does not lose the trigger on screen.
                         enigo = None;
+                        if let Ok(mut backend) = new_enigo() {
+                            retype_trigger(&mut backend, &trigger);
+                            enigo = Some(backend);
+                        }
+                        listen::restore_to_buffer(&trigger);
                         eprintln!("expand failed: {err}");
                     }
                     Err(_) => {
                         enigo = None;
+                        if let Ok(mut backend) = new_enigo() {
+                            retype_trigger(&mut backend, &trigger);
+                            enigo = Some(backend);
+                        }
+                        listen::restore_to_buffer(&trigger);
                         eprintln!("expand failed: input injection backend panicked");
                     }
                 }
@@ -356,16 +427,33 @@ pub fn expand_trigger(
     trigger: &str,
     trigger_committed: bool,
 ) -> Result<(), String> {
+    // Prefer the smaller of the caller erase count and the trigger string length,
+    // then clamp to the match-size cap so we never schedule runaway Backspaces.
+    let erase = trigger_chars
+        .min(trigger.chars().count())
+        .min(crate::state::MAX_TRIGGER_LEN);
     LISTEN_SUPPRESS_JOBS.fetch_add(1, Ordering::AcqRel);
     match inject_sender().try_send(InjectJob::Expand {
-        erase: trigger_chars,
+        erase,
         expansion: expansion.to_string(),
         trigger: trigger.to_string(),
         trigger_committed,
     }) {
         Ok(()) => Ok(()),
         Err(_) => {
-            LISTEN_SUPPRESS_JOBS.fetch_sub(1, Ordering::AcqRel);
+            // No job ran — drop the suppress count without arming inject grace.
+            let mut prev = LISTEN_SUPPRESS_JOBS.load(Ordering::Acquire);
+            while prev > 0 {
+                match LISTEN_SUPPRESS_JOBS.compare_exchange(
+                    prev,
+                    prev - 1,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                ) {
+                    Ok(_) => break,
+                    Err(v) => prev = v,
+                }
+            }
             Err("expand queue full — dropping job".to_string())
         }
     }

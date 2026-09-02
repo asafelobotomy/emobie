@@ -59,6 +59,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.13" date="2026-09-02">
+      <description>
+        <p>Text-expansion reliability: safer pending/release handling, inject-worker recovery, match/socket hardening, and layout-aware XKB reload.</p>
+      </description>
+    </release>
     <release version="0.6.12" date="2026-09-02">
       <description>
         <p>Harden Expand Grant across packages: permanent group/udev checks, full AppImage asset staging, and idempotent setup repair.</p>

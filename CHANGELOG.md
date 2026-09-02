@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.13] - 2026-09-02
+
+### Fixed
+
+- Expand: cancel pending on edit/nav; modifiers no longer flush; re-buffer overlap char; restore trigger on disable / queue drop / inject fail
+- Expand: completing-key release fires even under inject suppress; pending timeout; multi-char UTF-8 buffer push
+- Clipboard restore uses a single burst original + epoch (no chained restores)
+- Sync matches under lock then persist off the hot path; skip identical saves; sync before enable
+- Socket peer stall: 5s client r/w timeouts; flock lock file forced to 0600
+- Match caps reject NUL/control triggers; dedupe duplicate triggers on sync
+- Inject worker: saturating suppress counts; clamp erase; recreate Enigo after failure; best-effort retype
+
+### Changed
+
+- XKB reload only on fingerprint change when no keys held; layout from env → kxkbrc → `/etc/default/keyboard` (`uk`→`gb`)
+- Trusted socket parents must be uid-owned / not other-writable / sticky (Tauri client mirrored)
+- `can_inject` TTL cache; longer inject suppress grace; hotplug poll 5s; longest-suffix match first
+
 ## [0.6.12] - 2026-09-02
 
 ### Fixed
@@ -281,7 +299,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Horizontal mouse-wheel scrolling in wide layouts
 - Tray icon temp path for Flatpak-friendly sandboxing
 
-[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.12...HEAD
+[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.13...HEAD
+[0.6.13]: https://github.com/asafelobotomy/emobie/compare/v0.6.12...v0.6.13
 [0.6.12]: https://github.com/asafelobotomy/emobie/compare/v0.6.11...v0.6.12
 [0.6.11]: https://github.com/asafelobotomy/emobie/compare/v0.6.10...v0.6.11
 [0.6.10]: https://github.com/asafelobotomy/emobie/compare/v0.6.9...v0.6.10
