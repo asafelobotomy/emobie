@@ -61,7 +61,11 @@ Text expansion needs three layers on every distro:
 |-------|------|-----|
 | **Helper daemon** | `emobie-inputd` on the **host** (same user as the desktop session) | Bundled in `.deb`/`.rpm`; AppImage/Flatpak auto-install on first Expand |
 | **Keyboard read** | Open `/dev/input/event*` | udev group `emobie-input` + one-time **Grant** (Polkit); `setfacl` when `acl` package installed |
-| **Text inject** | Type expansions into the focused app | Compositor env (`WAYLAND_DISPLAY` / `DISPLAY`); daemon auto-detects `$XDG_RUNTIME_DIR/wayland-0` |
+| **Text inject** | Erase trigger + paste expansion into the focused app | **`/dev/uinput`** via the same Grant (required on Wayland/Plasma — Enigo virtual-keyboard is often unavailable); X11 can fall back to Enigo |
+
+Grant’s udev rule sets `GROUP=emobie-input MODE=0660` on `/dev/uinput` and applies a session
+`setfacl` so Expand works without logout. Deb/rpm/Arch/AppImage/Flatpak all ship the same
+rules template; only Grant installs it into `/etc/udev/rules.d/`.
 
 **Verify your setup** (from a desktop terminal):
 
@@ -87,7 +91,7 @@ bash scripts/verify-expand-setup.sh
 | Fallback | `pkexec /usr/local/share/emobie/setup-input-access.sh` |
 
 1. **systemd --user** runs `emobie-inputd` (same user as the session — never root)
-2. **udev** + group `emobie-input` (and optional **setfacl**) grant `/dev/input` read
+2. **udev** + group `emobie-input` (and optional **setfacl**) grant `/dev/input` read **and** `/dev/uinput` write
 3. **Polkit** prompts once for `setup-input-access.sh`
 
 Expand treats access as ready only when **both** are true:
@@ -95,6 +99,10 @@ Expand treats access as ready only when **both** are true:
 - the helper can open a keyboard now (`can_listen`, may use a session ACL), **and**
 - permanent config exists: group `emobie-input` in `/etc/group` **and**
   `/etc/udev/rules.d/99-emobie-input.rules`
+
+On Wayland, inject also needs a writable `/dev/uinput` (same Grant). Without it the helper
+reports `can_inject=false` even if a compositor socket exists — Enigo alone cannot reach
+native Wayland apps such as Cursor or many Plasma clients.
 
 If listen works but the group/udev files are missing (common after a partial Grant,
 orphaned GID, or ACL-only session), emobie re-runs Grant instead of skipping it.

@@ -31,7 +31,7 @@ function helperStatusLabel(status: InputHelperStatus | null): string {
     return `Helper running (listen + inject). ${status.detail}`;
   }
   if (status.daemon && status.canListen && !status.canInject) {
-    return `Helper can listen but text injection is unavailable. Restart emobie-inputd from your desktop session. ${status.detail}`;
+    return `Helper can listen but text injection is unavailable (need writable /dev/uinput on Wayland). Use Grant to repair. ${status.detail}`;
   }
   if (status.daemon && !status.canListen) {
     return `Helper running, but keyboard access is missing. ${status.detail}`;
@@ -53,10 +53,13 @@ export function TextExpansionSettings({
   const [message, setMessage] = useState<string | null>(null);
 
   const canListen = Boolean(inputStatus?.canListen);
+  const canInject = Boolean(inputStatus?.canInject);
   const accessConfigured = inputStatus?.accessConfigured !== false;
   const daemonReady = Boolean(inputStatus?.daemon);
   const isFlatpak = Boolean(inputStatus?.flatpak);
-  const needsGrant = daemonReady && (!canListen || !accessConfigured);
+  // Re-run Grant when listen/uinput/permanent config is incomplete (idempotent).
+  const needsGrant =
+    daemonReady && (!canListen || !canInject || !accessConfigured);
 
   /** Grant access if needed, then flip pref — useInputHelperSync owns set_enabled. */
   const setExpandEnabled = async (enabled: boolean) => {
@@ -163,9 +166,11 @@ export function TextExpansionSettings({
           >
             {busy
               ? "Working…"
-              : canListen && !accessConfigured
+              : canListen && canInject && !accessConfigured
                 ? "Repair keyboard access"
-                : "Grant keyboard access"}
+                : canListen && !canInject
+                  ? "Repair text injection"
+                  : "Grant keyboard access"}
           </button>
         </div>
       ) : null}

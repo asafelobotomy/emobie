@@ -7,6 +7,7 @@ mod session_env;
 mod socket_path;
 mod prefs_bootstrap;
 mod state;
+mod uinput_kbd;
 
 use matcher::TriggerTrie;
 use nix::sys::socket::{getsockopt, sockopt::PeerCredentials};

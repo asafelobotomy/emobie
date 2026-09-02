@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Wayland Expand inject prefers `/dev/uinput` (Plasma lacks virtual-keyboard); Enigo/XTest alone cannot reach native Wayland apps
+- `can_inject` on Wayland requires writable uinput; Grant/verify/UI re-run when inject is missing
+
+### Changed
+
+- Docs (`LINUX.md`, `MACROS.md`): inject needs uinput via Grant on every package channel
+- `verify-expand-setup.sh` fails on Wayland when uinput is missing/unwritable
+- Release CI asserts AppImage host tarball includes udev rules + setup/policy
+
 ## [0.6.13] - 2026-09-02
 
 ### Fixed

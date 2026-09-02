@@ -74,9 +74,13 @@ PY
     fail "Daemon cannot read keyboards — run Grant in emobie or: pkexec /usr/share/emobie/setup-input-access.sh"
   fi
   if echo "$RESP" | grep -q '"can_inject":true'; then
-    pass "Daemon reports can_inject (compositor/uinput)"
+    pass "Daemon reports can_inject (uinput on Wayland / compositor on X11)"
   elif echo "$RESP" | grep -q '"can_inject":false'; then
-    warn "Daemon cannot inject text — restart from a graphical session (Wayland/X11 env missing)"
+    if [[ -n "${WAYLAND_DISPLAY:-}" || -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/wayland-0" ]]; then
+      fail "Daemon cannot inject — on Wayland Expand needs writable /dev/uinput (run Grant)"
+    else
+      warn "Daemon cannot inject text — restart from a graphical session (Wayland/X11 env missing)"
+    fi
   fi
 fi
 
@@ -140,15 +144,23 @@ fi
 
 if [[ -e /dev/uinput ]]; then
   if [[ -w /dev/uinput ]] || getfacl /dev/uinput 2>/dev/null | grep -q "user:$(whoami):"; then
-    pass "/dev/uinput accessible"
+    pass "/dev/uinput accessible (Wayland inject)"
   else
-    warn "/dev/uinput exists but is not writable — paste fallback may fail on some sessions"
+    if [[ -n "${WAYLAND_DISPLAY:-}" || -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/wayland-0" ]]; then
+      fail "/dev/uinput exists but is not writable — Wayland Expand needs it (run Grant; install acl if setfacl is missing)"
+    else
+      warn "/dev/uinput exists but is not writable — paste may fail without Enigo/X11"
+    fi
   fi
 else
-  warn "/dev/uinput missing — modprobe uinput (setup script tries this)"
+  if [[ -n "${WAYLAND_DISPLAY:-}" || -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/wayland-0" ]]; then
+    fail "/dev/uinput missing — run Grant (modprobe uinput) for Wayland Expand"
+  else
+    warn "/dev/uinput missing — modprobe uinput (setup script tries this)"
+  fi
 fi
 
-# --- compositor env (for inject) ---
+# --- compositor env (for X11 Enigo fallback / session detection) ---
 if [[ -n "${WAYLAND_DISPLAY:-}" || -n "${DISPLAY:-}" ]]; then
   pass "Compositor env set (WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-} DISPLAY=${DISPLAY:-})"
 elif [[ -S "$RUNTIME/wayland-0" ]]; then

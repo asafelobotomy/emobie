@@ -292,6 +292,22 @@ else
   echo "Warning: no /dev/input/event* nodes found yet — replug a keyboard or reboot."
 fi
 
+# Native Wayland inject needs writable /dev/uinput (Enigo virtual-keyboard is often absent).
+UINPUT_NODE=""
+for candidate in /dev/uinput /dev/input/uinput; do
+  if [[ -e "$candidate" ]]; then
+    UINPUT_NODE="$candidate"
+    break
+  fi
+done
+if [[ -z "$UINPUT_NODE" ]]; then
+  echo "Warning: /dev/uinput missing after modprobe — Expand paste may fail on Wayland." >&2
+elif run_as_user test -w "$UINPUT_NODE"; then
+  echo "Verified: $TARGET_USER can write $UINPUT_NODE (Wayland inject)."
+else
+  echo "Warning: $TARGET_USER cannot write $UINPUT_NODE — log out/in or re-run Grant with the acl package." >&2
+fi
+
 RUNTIME="/run/user/${TARGET_UID}"
 try_load_selinux_module() {
   command -v getenforce >/dev/null 2>&1 || return 0

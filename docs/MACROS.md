@@ -70,13 +70,19 @@ systemctl --user enable --now emobie-inputd.service
 
 ## Keyboard access (expand as you type)
 
-Daemon auto-start alone does **not** grant `/dev/input` access. Enabling
+Daemon auto-start alone does **not** grant `/dev/input` or `/dev/uinput` access. Enabling
 **Expand as you type** (or first-run **Set up text expansion**) runs a one-time
 Polkit prompt that:
 
 1. Creates group `emobie-input`, installs udev rules, and adds your user
-2. Applies session ACLs with `setfacl` when available (no logout required)
-3. Restarts `emobie-inputd` so it can open keyboards immediately
+2. Loads `uinput` if needed and grants `/dev/uinput` write (Wayland inject path)
+3. Applies session ACLs with `setfacl` when available (no logout required)
+4. Restarts `emobie-inputd` so it can open keyboards and inject immediately
+
+On Wayland/Plasma, expansions paste through a kernel virtual keyboard (`/dev/uinput`).
+Compositor “virtual keyboard” protocols are often missing; X11/XTest alone does not reach
+native Wayland apps. Grant’s udev rule covers both listen (`event*`) and inject (`uinput`)
+for every package channel (`.deb` / `.rpm` / Arch / AppImage / Flatpak host helper).
 
 Grant is **idempotent** and re-runs when permanent config is missing even if the
 helper can already open keyboards via a temporary ACL or an orphaned group id

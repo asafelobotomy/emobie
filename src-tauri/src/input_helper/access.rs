@@ -427,12 +427,12 @@ pub fn run_access_setup() -> Result<InputHelperStatus, String> {
         status.detail =
             "Keyboard access ready — Expand as you type can watch keys and inject text.".into();
     } else if status.can_listen {
-        status.detail = "Keyboard access ready, but text injection needs a desktop session. \
-Restart emobie-inputd from your graphical session (or log out/in)."
+        status.detail = "Keyboard access ready, but text injection needs writable /dev/uinput \
+(run Grant again, install the acl package for setfacl, or log out/in so group emobie-input applies)."
             .into();
     } else if status.daemon && !status.can_inject {
-        status.detail = "Helper running but text injection is unavailable (no compositor env). \
-Log out/in or restart emobie-inputd from a graphical session."
+        status.detail = "Helper running but text injection is unavailable (need /dev/uinput on Wayland). \
+Run Grant or log out/in after setup-input-access.sh."
             .into();
     } else if status.daemon {
         status.detail = "Helper restarted but keyboard devices are still closed. \

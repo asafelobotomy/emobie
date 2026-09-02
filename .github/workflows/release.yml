@@ -138,6 +138,19 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN=1 "$APPIMAGE" --appimage-extract >/dev/null
           test -f squashfs-root/usr/share/emobie/inputd-host-bundle.tgz
           echo "AppImage contains inputd-host-bundle.tgz"
+          tar -tzf squashfs-root/usr/share/emobie/inputd-host-bundle.tgz > /tmp/inputd-tgz.list
+          for member in \
+            emobie-inputd \
+            bootstrap-inputd-host.sh \
+            setup-input-access.sh \
+            99-emobie-input.rules \
+            io.github.asafelobotomy.emobie.inputd.policy \
+            selinux/emobie-inputd.te
+          do
+            grep -qxF "$member" /tmp/inputd-tgz.list \
+              || { echo "missing tarball member: $member"; exit 1; }
+          done
+          echo "inputd-host-bundle.tgz members OK (includes uinput udev rules)"
 
       - name: Verify deb and rpm ship inputd assets
         run: |
