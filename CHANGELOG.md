@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.17] - 2026-09-03
+
+### Fixed
+
+- Release AppImage verify: host-bundle tarball members no longer use a `./` prefix (CI false failure)
+
 ## [0.6.16] - 2026-09-03
 
 ### Fixed
@@ -341,7 +347,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Horizontal mouse-wheel scrolling in wide layouts
 - Tray icon temp path for Flatpak-friendly sandboxing
 
-[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.16...HEAD
+[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.17...HEAD
+[0.6.17]: https://github.com/asafelobotomy/emobie/compare/v0.6.16...v0.6.17
 [0.6.16]: https://github.com/asafelobotomy/emobie/compare/v0.6.15...v0.6.16
 [0.6.15]: https://github.com/asafelobotomy/emobie/compare/v0.6.14...v0.6.15
 [0.6.14]: https://github.com/asafelobotomy/emobie/compare/v0.6.13...v0.6.14

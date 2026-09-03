@@ -18,12 +18,23 @@ install -m 755 "$ROOT/packaging/bootstrap-inputd-host.sh" "$STAGE/bootstrap-inpu
 mkdir -p "$STAGE/selinux"
 install -m 644 "$ROOT/packaging/selinux/emobie-inputd.te" "$STAGE/selinux/emobie-inputd.te"
 
-cp -a "$STAGE/emobie-inputd" "$STAGE/bootstrap-inputd-host.sh" \
-  "$STAGE/setup-input-access.sh" "$STAGE/99-emobie-input.rules" \
-  "$STAGE/io.github.asafelobotomy.emobie.inputd.policy" \
-  "$HOST_STAGE/"
+# Keep in sync with src-tauri/src/input_helper/bootstrap.rs TAR_MEMBERS.
+HOST_MEMBERS=(
+  emobie-inputd
+  bootstrap-inputd-host.sh
+  setup-input-access.sh
+  99-emobie-input.rules
+  io.github.asafelobotomy.emobie.inputd.policy
+  selinux/emobie-inputd.te
+)
+
+rm -rf "$HOST_STAGE"
 mkdir -p "$HOST_STAGE/selinux"
-cp "$STAGE/selinux/emobie-inputd.te" "$HOST_STAGE/selinux/"
-tar czf "$STAGE/inputd-host-bundle.tgz" -C "$HOST_STAGE" .
+for member in "${HOST_MEMBERS[@]}"; do
+  install -D -m "$(stat -c '%a' "$STAGE/$member")" "$STAGE/$member" "$HOST_STAGE/$member"
+done
+# Explicit member list (not ".") so tar -tzf lists paths without a "./" prefix —
+# release CI matches exact names.
+tar czf "$STAGE/inputd-host-bundle.tgz" -C "$HOST_STAGE" "${HOST_MEMBERS[@]}"
 
 echo "Staged input helper at $STAGE (host bundle: inputd-host-bundle.tgz)"
