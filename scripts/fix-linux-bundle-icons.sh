@@ -103,6 +103,27 @@ fix_appdir() {
   fi
   stage_inputd_in_appdir "$appdir"
   stage_webkit_helpers_in_appdir "$appdir"
+  strip_bundled_wayland_libs "$appdir"
+}
+
+# linuxdeploy's gtk plugin bundles libwayland-*, but these must stay in lockstep
+# with the host's Mesa driver. A copy built on an older CI host shadows the
+# system's (via LD_LIBRARY_PATH) and lacks symbols (e.g. wl_fixes_interface)
+# that the host's libEGL_mesa expects, so EGL init aborts with EGL_BAD_PARAMETER
+# and the window never appears (blank screen). Drop them so the app falls back
+# to the host's own libwayland-client/-cursor/-egl/-server at runtime.
+strip_bundled_wayland_libs() {
+  local appdir="$1"
+  local removed=0
+  for lib in libwayland-client.so.0 libwayland-cursor.so.0 libwayland-egl.so.1 libwayland-server.so.0; do
+    if [[ -f "$appdir/usr/lib/$lib" ]]; then
+      rm -f "$appdir/usr/lib/$lib"
+      removed=1
+    fi
+  done
+  if [[ "$removed" -eq 1 ]]; then
+    echo "Stripped bundled libwayland-* from AppImage (use host's to match its Mesa driver)"
+  fi
 }
 
 stage_inputd_in_appdir() {

@@ -1,6 +1,6 @@
 [package]
 name = "emobie-inputd"
-version = "0.6.17"
+version = "0.6.18"
 edition = "2021"
 description = "Privileged input helper for emobie text expansion"
 license = "MIT"
@@ -17,7 +17,7 @@ libei = ["dep:reis", "dep:ashpd", "dep:tokio"]
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-arboard = "3"
+arboard = { version = "3", features = ["wayland-data-control"] }
 # libei is intentionally omitted from enigo: 0.3 unwraps on missing RemoteDesktop portal
 # and panics/hangs on X11 (and some Wayland) sessions, killing the listen thread.
 enigo = { version = "0.3", default-features = false, features = ["x11rb", "wayland"] }

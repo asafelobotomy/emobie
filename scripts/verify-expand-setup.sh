@@ -117,6 +117,12 @@ if [[ -S "$SOCK" ]] && command -v python3 >/dev/null; then
 fi
 
 # --- keyboard device nodes (ignore mice/joysticks after keyboard-only udev) ---
+# /dev/input/event* globs lexicographically ("event10" < "event2"), and
+# emobie-inputd's own synthetic uinput keyboard ("emobie-inject") also reports
+# ID_INPUT_KEYBOARD=1 and is trivially readable (we own it) — so a plain
+# first-match loop can validate the app's own virtual device instead of real
+# hardware and report success even when the real keyboard node is unreadable.
+# Skip it explicitly, matching the daemon's own is_virtual_uinput() filter.
 READABLE_KB=0
 ANY_KB=0
 shopt -s nullglob
@@ -126,10 +132,18 @@ for node in /dev/input/event*; do
       continue
     fi
   fi
+  base="$(basename "$node")"
+  dev_name=""
+  if [[ -r "/sys/class/input/$base/device/name" ]]; then
+    dev_name="$(cat "/sys/class/input/$base/device/name" 2>/dev/null)"
+  fi
+  case "${dev_name,,}" in
+    *emobie*|*uinput*|*enigo*|*virtual*) continue ;;
+  esac
   ANY_KB=1
   if [[ -r "$node" ]]; then
     READABLE_KB=1
-    pass "Can read keyboard $node"
+    pass "Can read keyboard $node${dev_name:+ ($dev_name)}"
     break
   fi
 done
@@ -172,6 +186,17 @@ fi
 # --- setfacl ---
 if ! command -v setfacl >/dev/null; then
   warn "setfacl not installed — install acl package for instant access without logout"
+fi
+
+# --- wl-clipboard (Wayland paste reliability) ---
+if [[ -n "${WAYLAND_DISPLAY:-}" || -S "$RUNTIME/wayland-0" ]]; then
+  if command -v wl-copy >/dev/null && command -v wl-paste >/dev/null; then
+    pass "wl-clipboard installed (wl-copy/wl-paste) — externally-verified Wayland paste"
+  else
+    warn "wl-clipboard not installed — Expand falls back to arboard's built-in Wayland clipboard \
+(no external wl-paste round-trip to confirm the compositor has propagated the offer before Ctrl+V \
+fires). Install wl-clipboard for the most reliable path: pkexec <your package manager> install wl-clipboard"
+  fi
 fi
 
 # --- Flatpak note ---

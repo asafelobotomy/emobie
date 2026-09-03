@@ -59,6 +59,16 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.18" date="2026-09-03">
+      <description>
+        <p>Fix silent empty-paste Expand failures on Wayland: arboard now uses the native
+        Wayland clipboard instead of falling back through XWayland, plus a compositor
+        settle delay closes a paste-timing race. Fix AppImage blank-screen WebKit crash
+        from bundled Wayland libraries shadowing the host's Mesa driver. Recommend
+        wl-clipboard across deb/rpm/Arch packaging and fix a keyboard-detection bug in
+        the Expand setup verifier.</p>
+      </description>
+    </release>
     <release version="0.6.17" date="2026-09-03">
       <description>
         <p>Fix AppImage Expand host-bundle packaging so the release pipeline publishes artifacts again.</p>

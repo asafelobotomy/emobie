@@ -81,15 +81,18 @@ Polkit prompt that:
 
 On Wayland/Plasma, short ASCII expansions type via a kernel virtual keyboard
 (`/dev/uinput`). Longer text, newlines, and emoji use clipboard paste (`wl-copy`
-when available, else arboard) plus Ctrl+V / Shift+Insert. Compositor “virtual
-keyboard” protocols are often missing; X11/XTest alone does not reach native
-Wayland apps. Grant’s udev rule covers both listen (`event*`) and inject (`uinput`)
-for every package channel (`.deb` / `.rpm` / Arch / AppImage / Flatpak host helper).
+when available, else arboard's native Wayland clipboard) plus Ctrl+V / Shift+Insert.
+Compositor “virtual keyboard” protocols are often missing; X11/XTest alone does not
+reach native Wayland apps. Grant’s udev rule covers both listen (`event*`) and
+inject (`uinput`) for every package channel (`.deb` / `.rpm` / Arch / AppImage /
+Flatpak host helper).
 
 **Clipboard restore** after paste is **off by default** (Settings → Restore clipboard
 after paste). Leaving it off avoids a common Plasma race where a delayed restore
-wipes the next expansion. Install optional `wl-clipboard` for stabler Wayland
-clipboard offers.
+wipes the next expansion. `wl-clipboard` is **recommended** (deb/rpm `Recommends`,
+Arch `optdepends`) — when present, paste verifies readiness against a separate
+`wl-paste` process (a real compositor round trip) instead of only arboard's
+in-process self-check, so install it for the most reliable Wayland paste.
 
 Grant is **idempotent** and re-runs when permanent config is missing even if the
 helper can already open keyboards via a temporary ACL or an orphaned group id

@@ -12,6 +12,12 @@ const PASTE_SETTLE: Duration = Duration::from_millis(25);
 const CLIPBOARD_READY_TIMEOUT: Duration = Duration::from_millis(600);
 /// Extra beat after read-back matches — KDE can echo get_text before paste works.
 const POST_CLIPBOARD_SETTLE: Duration = Duration::from_millis(40);
+/// arboard's native Wayland path only proves *we* can read our own offer back —
+/// unlike wl-copy (verified externally via a separate wl-paste process), it gives
+/// no signal that the compositor has broadcast the new selection to the focused
+/// client yet. Ctrl+V fired inside that gap pastes nothing (silent empty paste).
+/// Give the compositor extra time to propagate before releasing the inject worker.
+const ARBOARD_WAYLAND_SETTLE: Duration = Duration::from_millis(220);
 /// Hard cap for any arboard / Wayland clipboard round-trip.
 const CLIPBOARD_OP_TIMEOUT: Duration = Duration::from_millis(1200);
 /// Must outlive slow first-paste reads; restoring early pastes empty/old text.
@@ -141,6 +147,20 @@ fn set_via_wl_copy(body: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// True when arboard picked its native Wayland data-control backend (same check
+/// arboard itself uses to choose Wayland over X11).
+fn arboard_on_wayland() -> bool {
+    std::env::var_os("WAYLAND_DISPLAY").is_some()
+}
+
+fn post_clipboard_settle() {
+    if arboard_on_wayland() {
+        thread::sleep(ARBOARD_WAYLAND_SETTLE);
+    } else {
+        thread::sleep(POST_CLIPBOARD_SETTLE);
+    }
+}
+
 fn offer_text_until_ready(
     clipboard: &mut arboard::Clipboard,
     body: &str,
@@ -172,12 +192,12 @@ fn offer_text_until_ready(
         }
         match clipboard.get_text() {
             Ok(got) if got == body => {
-                thread::sleep(POST_CLIPBOARD_SETTLE);
+                post_clipboard_settle();
                 return Ok(());
             }
             Ok(_) | Err(_) => {
                 if Instant::now() >= deadline {
-                    thread::sleep(POST_CLIPBOARD_SETTLE);
+                    post_clipboard_settle();
                     return Ok(());
                 }
                 thread::sleep(PASTE_SETTLE);

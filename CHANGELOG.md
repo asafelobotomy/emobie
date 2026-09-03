@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.18] - 2026-09-03
+
+### Fixed
+
+- AppImage: launched to a blank/aborting window on hosts with a newer Mesa than the
+  CI build image — the bundled `libwayland-client`/`-cursor`/`-egl`/`-server` shadowed
+  the host's via `LD_LIBRARY_PATH` and lacked symbols (`wl_fixes_interface`) the
+  host's `libEGL_mesa` requires. Strip the bundled copies from the AppImage so it
+  always uses the host's own, matching its Mesa driver
+- Expand: rich-text/multi-line/emoji expansions (clipboard path) silently pasted
+  empty on Wayland far more often than the trigger-detection logs suggested. Root
+  cause was two-fold — `arboard` was built without the `wayland-data-control`
+  feature, so on every Wayland session it silently fell back through XWayland's X11
+  clipboard bridge instead of using native Wayland clipboard; and even once native,
+  self-read-back "ready" checks don't prove the compositor has propagated the new
+  selection to the focused client before Ctrl+V fires. Enabled the feature and added
+  a settle delay on that path (measured ~17% silent-empty-paste rate before the fix,
+  0/20+ after in repeated E2E runs)
+- `verify-expand-setup.sh`: the keyboard-readability check could validate the app's
+  own synthetic uinput device (`emobie-inject`, which also reports
+  `ID_INPUT_KEYBOARD=1`) instead of real hardware, since `/dev/input/event*` globs
+  lexicographically and the loop stopped at the first readable match — masking a
+  genuinely broken real-keyboard permission with a false "all checks passed"
+
+### Changed
+
+- deb/rpm packages now `Recommends: wl-clipboard, acl`; Arch `PKGBUILD` lists them
+  as `optdepends` — `wl-clipboard` gives Expand an externally-verified Wayland paste
+  path (stronger than the in-process arboard check) when installed
+- `verify-expand-setup.sh` warns when `wl-clipboard` is missing on a Wayland session
+
 ## [0.6.17] - 2026-09-03
 
 ### Fixed
