@@ -14,10 +14,9 @@ use crate::uinput_kbd::UInputKeyboard;
 const PRE_ERASE_DELAY: Duration = Duration::from_millis(12);
 
 fn paste_chords(kbd: &mut UInputKeyboard) -> Result<(), String> {
+    // Ctrl+V only — Kate and most Qt/KDE apps bind both Ctrl+V and Shift+Insert,
+    // so sending both unconditionally double-pastes the expansion in them.
     kbd.ctrl_v()?;
-    thread::sleep(POST_PASTE_DELAY);
-    // Fallback chord used by many terminals / X11 clients.
-    let _ = kbd.shift_insert();
     thread::sleep(POST_PASTE_DELAY);
     Ok(())
 }

@@ -59,6 +59,13 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.19" date="2026-09-03">
+      <description>
+        <p>Fix Expand double-pasting its expansion in Kate and other apps that bind both
+        Ctrl+V and Shift+Insert — the uinput paste path fired both chords unconditionally
+        on every expansion instead of only the one the focused app needs.</p>
+      </description>
+    </release>
     <release version="0.6.18" date="2026-09-03">
       <description>
         <p>Fix silent empty-paste Expand failures on Wayland: arboard now uses the native

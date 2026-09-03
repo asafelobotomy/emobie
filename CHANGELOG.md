@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.19] - 2026-09-03
+
+### Fixed
+
+- Expand: the uinput paste path sent Ctrl+V *and* Shift+Insert unconditionally on
+  every expansion, intended as a fallback for terminals that don't bind Ctrl+V. Any
+  app that binds both (Kate, and most Qt/KDE apps do) pasted the expansion twice —
+  visible as the whole macro duplicated back-to-back. Send Ctrl+V only, matching the
+  X11/Enigo path, which never sent the second chord
+
 ## [0.6.18] - 2026-09-03
 
 ### Fixed

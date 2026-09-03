@@ -148,12 +148,4 @@ impl UInputKeyboard {
         let released = self.emit_key(Key::KEY_LEFTCTRL, 0);
         typed.and(released)
     }
-
-    /// Shift+Insert paste (common terminal / fallback chord).
-    pub fn shift_insert(&mut self) -> Result<(), String> {
-        self.emit_key(Key::KEY_LEFTSHIFT, 1)?;
-        let typed = self.click(Key::KEY_INSERT);
-        let released = self.emit_key(Key::KEY_LEFTSHIFT, 0);
-        typed.and(released)
-    }
 }
