@@ -59,6 +59,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.16" date="2026-09-03">
+      <description>
+        <p>CI LOC fix for emobie-inputd, AppImage WebKit blank-screen workaround on Wayland, and tagged Expand reliability release.</p>
+      </description>
+    </release>
     <release version="0.6.15" date="2026-09-02">
       <description>
         <p>More reliable Expand on Plasma Wayland: hybrid key/clipboard insert, no clipboard restore by default, and safer helper bootstrap.</p>

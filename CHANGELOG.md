@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.16] - 2026-09-03
+
+### Fixed
+
+- CI LOC gate: split `emobie-inputd` socket RPC out of `main.rs` (was over 400 lines)
+- AppImage launcher: prefer `GDK_BACKEND=x11` on Wayland to avoid blank/crashing WebKit (EGL_BAD_PARAMETER)
+
+### Changed
+
+- Ships the 0.6.15 Expand reliability work (hybrid key/clipboard insert) as a tagged release
+
 ## [0.6.15] - 2026-09-02
 
 ### Fixed
@@ -330,7 +341,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Horizontal mouse-wheel scrolling in wide layouts
 - Tray icon temp path for Flatpak-friendly sandboxing
 
-[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.15...HEAD
+[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.16...HEAD
+[0.6.16]: https://github.com/asafelobotomy/emobie/compare/v0.6.15...v0.6.16
 [0.6.15]: https://github.com/asafelobotomy/emobie/compare/v0.6.14...v0.6.15
 [0.6.14]: https://github.com/asafelobotomy/emobie/compare/v0.6.13...v0.6.14
 [0.6.13]: https://github.com/asafelobotomy/emobie/compare/v0.6.12...v0.6.13

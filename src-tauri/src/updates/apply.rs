@@ -236,7 +236,15 @@ fn install_appimage(path: &Path) -> Result<(), String> {
         .map(|p| p.join("emobie"))
         .ok_or_else(|| "invalid install path".to_string())?;
     let script = format!(
-        "#!/bin/sh\nexport WEBKIT_DISABLE_DMABUF_RENDERER=1\nexport WEBKIT_DISABLE_COMPOSITING_MODE=1\nexec \"{}\" \"$@\"\n",
+        "#!/bin/sh\n\
+         # WebKitGTK often blanks or crashes (EGL_BAD_PARAMETER) under Plasma Wayland.\n\
+         export WEBKIT_DISABLE_DMABUF_RENDERER=1\n\
+         export WEBKIT_DISABLE_COMPOSITING_MODE=1\n\
+         # Prefer XWayland for the WebView when Wayland EGL is broken.\n\
+         if [ \"${{XDG_SESSION_TYPE:-}}\" = wayland ] || [ -n \"${{WAYLAND_DISPLAY:-}}\" ]; then\n\
+           export GDK_BACKEND=\"${{EMOBIE_GDK_BACKEND:-x11}}\"\n\
+         fi\n\
+         exec \"{}\" \"$@\"\n",
         dest.display()
     );
     fs::write(&launcher, script).map_err(|e| e.to_string())?;
