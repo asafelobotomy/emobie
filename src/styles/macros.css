@@ -240,6 +240,27 @@
   box-shadow: 0 12px 40px color-mix(in srgb, #000 25%, transparent);
 }
 
+.macro-format-toolbar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.macro-format-btn {
+  border: 1px solid var(--border);
+  background: var(--bg-muted);
+  border-radius: 6px;
+  width: 1.9rem;
+  height: 1.9rem;
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.macro-format-btn:hover {
+  background: var(--bg);
+}
+
 .macro-dialog h3 {
   margin: 0 0 10px;
   font-size: 1rem;

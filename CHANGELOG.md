@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.20] - 2026-09-06
+
+### Added
+
+- Macro editor: a Bold/Italic/Strikethrough/Code/Quote toolbar that wraps the
+  selected expansion text in standard Markdown-style markers
+  (`**bold**`, `*italic*`, `~~strike~~`, `` `code` ``, `> quote`)
+
+### Fixed
+
+- Expand: text expansion could silently stop working after long idle periods
+  (observed: worked after boot, broke after several hours) and restarting the
+  app never fixed it — only `systemctl --user restart emobie-inputd` did.
+  Root cause: the persistent `/dev/uinput` virtual device is opened once and
+  reused for the daemon's whole life; a long-idle virtual device can go stale
+  on the compositor side (same class of bug already worked around for Enigo
+  via `ENIGO_MAX_IDLE`) while writes keep succeeding at the kernel level, so
+  no error ever fires the existing recovery path — and the app's own health
+  check only re-bootstraps the daemon when the socket stops responding at
+  all, which a wedged-but-alive daemon never does. Now mirrors the Enigo
+  idle-recreate policy for uinput (reopen after 5 minutes idle) and fixes a
+  second gap where a failed Ctrl+V paste job permanently dropped uinput with
+  no retry (unlike the equivalent Expand-job failure path, which already
+  retried). Both fixes are purely on-demand — checked only when a job
+  actually runs, no background polling or periodic restarts added
+- Expand: confirmed via live diagnosis (thread state + kernel suspend logs)
+  that a genuine suspend/resume cycle leaves the evdev keyboard-read thread
+  parked forever with zero events delivered and no I/O error — trigger
+  detection itself silently dies, distinct from the uinput-staleness fix
+  above. Added [sleep_watch.rs](crates/emobie-inputd/src/sleep_watch.rs):
+  an event-driven (not polled) subscription to logind's `PrepareForSleep`
+  D-Bus signal that restarts the process on resume, the same fix
+  `systemctl --user restart emobie-inputd` already provided manually, now
+  applied automatically at the exact moment it's needed
+
 ## [0.6.19] - 2026-09-03
 
 ### Fixed

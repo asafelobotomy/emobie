@@ -5,7 +5,7 @@ use super::enigo::{
     ctrl_v_enigo, expand_with_enigo, new_enigo, retype_trigger_enigo, warm_up_enigo, ENIGO_MAX_IDLE,
     POST_PASTE_DELAY,
 };
-use super::uinput::{expand_with_uinput, retype_trigger_uinput};
+use super::uinput::{expand_with_uinput, retype_trigger_uinput, UINPUT_MAX_IDLE};
 use super::{finish_listen_suppress, now_ms, EXPAND_ENABLED, SUPPRESS_STARTED_MS};
 
 use ::enigo::Enigo;
@@ -57,6 +57,18 @@ fn recover_after_expand_failure(
     finish_listen_suppress();
 }
 
+/// Mirror `recover_after_expand_failure`'s reopen — a failed uinput write must
+/// not permanently strand the backend on Enigo (which docs note cannot reach
+/// native Wayland apps on Plasma). Reopening is the same recovery the Expand
+/// path already relies on.
+fn recover_backend_after_paste_failure(uinput: &mut Option<UInputKeyboard>, enigo: &mut Option<Enigo>) {
+    if uinput.is_some() {
+        *uinput = UInputKeyboard::open().ok();
+    } else {
+        *enigo = None;
+    }
+}
+
 pub(super) fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
     // Prefer uinput: reaches native Wayland (Cursor, Plasma apps). Enigo is
     // fallback when /dev/uinput is unavailable (no Grant / missing udev).
@@ -74,6 +86,14 @@ pub(super) fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
     let mut last_inject = Instant::now();
 
     while let Ok(job) = rx.recv() {
+        if uinput.is_some() && last_inject.elapsed() >= UINPUT_MAX_IDLE {
+            let refreshed = UInputKeyboard::open().ok();
+            if refreshed.is_none() {
+                eprintln!("emobie-inputd: uinput idle-refresh failed; Enigo fallback");
+            }
+            uinput = refreshed;
+            last_inject = Instant::now();
+        }
         if uinput.is_none() {
             if enigo.is_some() && last_inject.elapsed() >= ENIGO_MAX_IDLE {
                 enigo = None;
@@ -188,19 +208,11 @@ pub(super) fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
                         Ok(())
                     }
                     Ok(Err(err)) => {
-                        if uinput.is_some() {
-                            uinput = None;
-                        } else {
-                            enigo = None;
-                        }
+                        recover_backend_after_paste_failure(&mut uinput, &mut enigo);
                         Err(err)
                     }
                     Err(_) => {
-                        if uinput.is_some() {
-                            uinput = None;
-                        } else {
-                            enigo = None;
-                        }
+                        recover_backend_after_paste_failure(&mut uinput, &mut enigo);
                         Err("input injection backend panicked".to_string())
                     }
                 };

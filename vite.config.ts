@@ -26,7 +26,10 @@ export default defineConfig(async () => ({
       : undefined,
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      // `flatpak/build-dir-local` is a flatpak-builder sandbox tree with a
+      // bind-mounted /run/udev that contains a symlink loop — watching it
+      // crashes the dev server with ELOOP.
+      ignored: ["**/src-tauri/**", "**/flatpak/build-dir-local/**"],
     },
   },
 }));

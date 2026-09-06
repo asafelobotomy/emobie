@@ -12,6 +12,12 @@ use crate::uinput_kbd::UInputKeyboard;
 
 /// Only used when expand fires before the completing key is released (overlap).
 const PRE_ERASE_DELAY: Duration = Duration::from_millis(12);
+/// Recreate the uinput device after idle — like Enigo's Wayland seats, a
+/// long-idle virtual device can go stale (compositor drops it from the seat)
+/// with writes still succeeding at the kernel level, so no error ever fires
+/// the existing failure-recovery path. Bound the staleness window instead of
+/// relying on an error that may never come.
+pub(super) const UINPUT_MAX_IDLE: Duration = Duration::from_secs(300);
 
 fn paste_chords(kbd: &mut UInputKeyboard) -> Result<(), String> {
     // Ctrl+V only — Kate and most Qt/KDE apps bind both Ctrl+V and Shift+Insert,

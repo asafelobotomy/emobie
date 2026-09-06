@@ -7,6 +7,7 @@ mod rpc;
 mod session_env;
 mod socket_path;
 mod prefs_bootstrap;
+mod sleep_watch;
 mod state;
 mod uinput_kbd;
 
@@ -114,6 +115,7 @@ fn main() {
     session_env::ensure_session_env();
 
     listen::spawn_listener(enabled.clone(), trie.clone(), stop.clone());
+    sleep_watch::spawn();
 
     // Restrict socket mode at creation time (avoid a brief wider window).
     let prev_umask = umask(Mode::from_bits_truncate(0o177));

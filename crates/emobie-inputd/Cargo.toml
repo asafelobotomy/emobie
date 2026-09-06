@@ -1,6 +1,6 @@
 [package]
 name = "emobie-inputd"
-version = "0.6.19"
+version = "0.6.20"
 edition = "2021"
 description = "Privileged input helper for emobie text expansion"
 license = "MIT"
@@ -28,3 +28,4 @@ ctrlc = "3"
 reis = { version = "0.7", optional = true }
 ashpd = { version = "0.11", optional = true, features = ["tokio"] }
 tokio = { version = "1", optional = true, features = ["rt", "macros"] }
+zbus = { version = "5.19.0", default-features = false, features = ["async-io", "blocking", "blocking-api"] }
