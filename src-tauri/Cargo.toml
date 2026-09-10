@@ -1,6 +1,6 @@
 [package]
 name = "emobie"
-version = "0.6.20"
+version = "0.6.21"
 description = "emobie — compact emoji palette for content creators"
 authors = ["aSafeLobotomy"]
 edition = "2021"
@@ -23,6 +23,10 @@ ureq = { version = "2", default-features = true, features = ["json"] }
 open = "5"
 
 [target.'cfg(target_os = "linux")'.dependencies]
+# Unify feature with emobie-inputd's arboard so tauri-plugin-clipboard-manager's
+# transitive arboard also uses native Wayland clipboard instead of the XWayland
+# bridge (Cargo feature-unifies same-version deps within one build graph).
+arboard = { version = "3", features = ["wayland-data-control"] }
 ksni = { version = "0.3", features = ["blocking"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 # Match emobie-inputd: skip libei (enigo 0.3 panics without RemoteDesktop portal).

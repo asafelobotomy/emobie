@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.21] - 2026-09-10
+
+### Fixed
+
+- Flatpak: copying (emoji picker, "Copy" button) could fail outright on
+  Wayland-native sessions (GNOME/Mutter, etc.) with a "Copy Failed" toast.
+  `finish-args` used `--socket=fallback-x11`, which only grants X11 access
+  when Wayland is *unavailable* — on a real Wayland session this left
+  `DISPLAY` unset inside the sandbox, and the direct copy path (via
+  `tauri-plugin-clipboard-manager`'s `arboard`, built without the
+  `wayland-data-control` feature) had no X11 to fall back to and no native
+  Wayland path either. Switched to `--socket=x11` (always available,
+  regardless of session type) across all three Flatpak manifests
+- Flatpak/Expand: the main app's direct clipboard-copy path used the
+  XWayland/X11 clipboard bridge unconditionally (arboard's default Linux
+  backend), unlike `emobie-inputd`'s paste path which already got the
+  0.6.18 native-Wayland-clipboard fix. Added `arboard`'s
+  `wayland-data-control` feature as a direct dependency of the main app too,
+  so Cargo's feature unification gives `tauri-plugin-clipboard-manager` the
+  same native Wayland clipboard behavior instead of relying on XWayland
+
 ## [0.6.20] - 2026-09-06
 
 ### Added

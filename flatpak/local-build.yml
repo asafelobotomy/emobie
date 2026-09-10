@@ -17,7 +17,7 @@ sdk-extensions:
 
 finish-args:
   - --socket=wayland
-  - --socket=fallback-x11
+  - --socket=x11
   - --device=dri
   - --share=ipc
   - --share=network
@@ -45,9 +45,11 @@ modules:
       build-args:
         - --share=network
     sources:
-      - type: git
-        url: file:///home/solon/GitHub/emobie
-        commit: b9e22dd5dd2316bf584bbb842234d014968df3fd
+      - type: dir
+        path: /home/solon/GitHub/emobie
+        skip:
+          - .flatpak-builder
+          - flatpak/build-dir-local
       - type: file
         path: io.github.asafelobotomy.emobie.metainfo.xml
       - type: file
