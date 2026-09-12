@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.23] - 2026-09-12
+
+### Added
+
+- Auto-paste now picks its paste chord based on the focused app instead of
+  always sending Ctrl+V. Detection is best-effort and layered: X11/XWayland
+  via `_NET_ACTIVE_WINDOW`+`WM_CLASS` (works on plain X11 sessions and
+  XWayland-backed apps under Wayland — verified live), or the optional,
+  community-maintained ["Focused Window D-Bus"](https://extensions.gnome.org/extension/5592/)
+  GNOME Shell extension for native-Wayland GNOME apps. Falls back to the
+  previous Ctrl+V default when neither is available. A curated list of known
+  terminal emulators gets Ctrl+Shift+V instead (Ctrl+V is claimed by the
+  shell there); apps like Kate that bind Ctrl+Shift+V to something else
+  (KDE's "Switch to Next Input Mode") are explicitly excluded from ever
+  receiving it. See `crates/emobie-inputd/src/paste_chord.rs` and
+  `focused_window/`.
+- New **Settings → Clipboard → Paste key** override (Auto-detect / always
+  Ctrl+V / always Shift+Insert / always Ctrl+Shift+V) for apps the built-in
+  detection doesn't recognize.
+
 ## [0.6.22] - 2026-09-12
 
 ### Changed

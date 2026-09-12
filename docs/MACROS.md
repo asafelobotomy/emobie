@@ -7,10 +7,12 @@ auto-paste after copy via a host helper.
 > **As-you-type text expansion is deferred for now.** Macros still work as a
 > browsable, copyable (and optionally auto-pasted) snippet library — the
 > keyboard-listening/trigger-matching half described in older versions of this
-> doc (Layer C below) is disabled pending a fix for the paste-chord bugs
-> described in "Known limitations". The daemon, its protocol, and the udev/
-> polkit/SELinux plumbing for keyboard listening are still in the tree and can
-> be re-enabled later; this doc describes the current (paste-only) behavior.
+> doc (Layer C below) is disabled. The paste-chord bug that motivated the
+> deferral now has a real (if incomplete — see "Known limitations") fix for
+> Auto-paste; re-enabling Layer C is a separate decision, not blocked on that
+> fix anymore. The daemon, its protocol, and the udev/polkit/SELinux plumbing
+> for keyboard listening are still in the tree and can be re-enabled later;
+> this doc describes the current (paste-only) behavior.
 
 ## Using macros
 
@@ -192,24 +194,33 @@ copies are staged to `/usr/local/share/emobie/` before elevation.
 - **As-you-type text expansion is deferred.** See the note at the top of this
   doc — Layer C (trigger listening) is disabled and has no Settings UI right
   now, pending a fix for the paste-chord issue below.
-- **Paste chord is Ctrl+V only, globally.** 0.6.19 fixed Kate (and other apps
-  that bind both Ctrl+V and Shift+Insert to paste) double-pasting by dropping
-  the Shift+Insert chord entirely. Some terminal emulators bind paste to
-  Shift+Insert or Ctrl+Shift+V specifically *because* Ctrl+V is claimed by the
-  shell/readline (`^V` = quoted-insert) — **Auto-paste on copy** may silently
-  do nothing when the previously focused window is one of these (confirmed
-  live against GNOME Console: Ctrl+V is a no-op there, Ctrl+Shift+V pastes).
-  There is no per-app-class detection (no window-class/WM_CLASS lookup exists
-  anywhere in this codebase), and no chord works everywhere: Ctrl+V-only
-  breaks these terminals, adding Shift+Insert reintroduces the Kate
-  double-paste, and adding Ctrl+Shift+V instead silently triggers Kate's
-  "Switch to Next Input Mode" shortcut. A real fix needs focused-window
-  detection — X11/XWayland via `_NET_ACTIVE_WINDOW`/`WM_CLASS` is cheap; KDE
-  Wayland is moderate effort via KWin's scripting D-Bus API (reusing the
-  already-granted `org.kde.KWin` talk-name); GNOME Wayland has no public API
-  for this today (Shell's `Eval` is locked outside dev mode) short of
-  maintaining a companion GNOME Shell extension. If you hit this, please
-  report the terminal emulator and compositor.
+- **Paste chord is now focused-window-aware, with real coverage gaps.**
+  0.6.19 fixed Kate (and other apps that bind both Ctrl+V and Shift+Insert to
+  paste) double-pasting by dropping Shift+Insert, which broke terminals that
+  need Ctrl+Shift+V instead (Ctrl+V is claimed by the shell there — confirmed
+  live: it's a no-op in GNOME Console). No single fixed chord works for every
+  app — adding Shift+Insert back reintroduces the Kate double-paste, and
+  adding Ctrl+Shift+V instead silently triggers Kate's own "Switch to Next
+  Input Mode" shortcut. [`paste_chord.rs`](../crates/emobie-inputd/src/paste_chord.rs)
+  now picks the chord from the focused app's WM_CLASS via
+  [`focused_window`](../crates/emobie-inputd/src/focused_window), matching
+  the same approach Espanso (the closest prior art) uses:
+  - **X11 / XWayland**: `_NET_ACTIVE_WINDOW` + `WM_CLASS`, works on plain X11
+    sessions and XWayland-backed apps under Wayland.
+  - **GNOME Wayland**: the optional, community-maintained
+    ["Focused Window D-Bus"](https://extensions.gnome.org/extension/5592/)
+    Shell extension, when installed. Not bundled — Espanso's own
+    app-detection is explicitly unsupported on Wayland without an equivalent,
+    and there is no built-in GNOME API for this (Shell's `Eval` is locked
+    outside dev mode).
+  - **Neither present** (native-Wayland toolkit apps with no extension
+    installed — e.g. plain GNOME/KDE Wayland without the extension): falls
+    back to the pre-existing Ctrl+V default, unchanged from before this file
+    existed.
+  - The known-terminal list in `paste_chord.rs` is a curated compatibility
+    table (same approach Espanso's hard-coded per-app patches use), not a
+    generic rule — if a terminal you use isn't recognized, add it there, or
+    use **Settings → Clipboard → Paste key** to force a chord manually.
 - **The daemon's trigger-listening code is dormant, not removed.** Now that
   as-you-type expansion is deferred, a compositor crash/restart affecting the
   (unused) listen thread is no longer user-visible — noted here only because

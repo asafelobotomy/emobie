@@ -59,6 +59,18 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.23" date="2026-09-12">
+      <description>
+        <p>Auto-paste now detects the focused app (best-effort: X11/XWayland
+        WM_CLASS, or the optional community "Focused Window D-Bus" GNOME Shell
+        extension) and sends Ctrl+Shift+V instead of Ctrl+V for known terminal
+        emulators, fixing paste into terminals where Ctrl+V is claimed by the
+        shell — confirmed live against GNOME Console. Falls back to the
+        previous Ctrl+V default when the focused app can't be identified. A
+        new Settings → Clipboard → Paste key override forces a specific chord
+        for apps the built-in detection doesn't recognize.</p>
+      </description>
+    </release>
     <release version="0.6.22" date="2026-09-12">
       <description>
         <p>As-you-type text expansion is deferred for now, pending a real fix for

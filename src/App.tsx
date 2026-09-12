@@ -58,6 +58,7 @@ function App() {
     setEmoticonStyle,
     setAutoPasteOnCopy,
     setExpandRestoreClipboard,
+    setPasteChordOverride,
     setCheckUpdatesOnStartup,
     setDismissedUpdateVersion,
     setInputHelperSetupSeen,
@@ -235,6 +236,7 @@ function App() {
   useInputHelperSync({
     ready,
     restoreClipboard: prefs.expandRestoreClipboard,
+    pasteChord: prefs.pasteChordOverride,
     reconcileNonce,
     onStatus: handleInputStatus,
     onSyncError: handleInputSyncError,
@@ -359,6 +361,7 @@ function App() {
       setEmoticonStyle={setEmoticonStyle}
       setAutoPasteOnCopy={setAutoPasteOnCopy}
       setExpandRestoreClipboard={setExpandRestoreClipboard}
+      setPasteChordOverride={setPasteChordOverride}
       onHelperReconcile={bumpHelperReconcile}
       setCheckUpdatesOnStartup={setCheckUpdatesOnStartup}
       setDismissedUpdateVersion={setDismissedUpdateVersion}

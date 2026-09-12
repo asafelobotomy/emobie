@@ -16,6 +16,9 @@ export type InputHelperStatus = {
   restoreClipboard?: boolean;
   /** Last expand insert backend: keys | ei | wl-copy | arboard. */
   lastInjectBackend?: string;
+  /** Paste chord: "auto" (default, focused-window detection), "ctrl_v",
+   * "shift_insert", or "ctrl_shift_v". */
+  pasteChord?: string;
 };
 
 export type InputMatch = {

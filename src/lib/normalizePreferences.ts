@@ -7,6 +7,7 @@ import {
   type ThemeMode,
   type EmojiSize,
   type SortBy,
+  type PasteChordOverride,
 } from "../types/preferences.ts";
 
 type SkinTone = 0 | 1 | 2 | 3 | 4 | 5;
@@ -81,6 +82,19 @@ function normalizeEmoticonStyle(raw: unknown): EmoticonStyle {
   return raw === "classic" ? "classic" : "minimal";
 }
 
+const PASTE_CHORD_VALUES = new Set<PasteChordOverride>([
+  "auto",
+  "ctrl_v",
+  "shift_insert",
+  "ctrl_shift_v",
+]);
+
+function normalizePasteChordOverride(raw: unknown): PasteChordOverride {
+  return PASTE_CHORD_VALUES.has(raw as PasteChordOverride)
+    ? (raw as PasteChordOverride)
+    : "auto";
+}
+
 export function normalizePreferences(
   saved: Partial<Preferences> | undefined,
 ): Preferences {
@@ -129,6 +143,7 @@ export function normalizePreferences(
     expandTriggerMode: normalizeTriggerMode(merged.expandTriggerMode),
     expandKeepTriggerSpace: Boolean(merged.expandKeepTriggerSpace),
     expandRestoreClipboard: Boolean(merged.expandRestoreClipboard),
+    pasteChordOverride: normalizePasteChordOverride(merged.pasteChordOverride),
     checkUpdatesOnStartup: merged.checkUpdatesOnStartup !== false,
     dismissedUpdateVersion:
       typeof merged.dismissedUpdateVersion === "string" &&

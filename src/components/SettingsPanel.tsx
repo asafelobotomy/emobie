@@ -12,6 +12,7 @@ import type {
   ThemeMode,
   EmojiSize,
   SortBy,
+  PasteChordOverride,
 } from "../types/preferences";
 import type { SkinTone } from "../data/loadEmojis";
 import { prepareInputHelperForPaste } from "../lib/inputHelperClient";
@@ -47,6 +48,7 @@ type SettingsPanelProps = {
   onEmoticonStyle: (style: EmoticonStyle) => void;
   onAutoPasteOnCopy: (value: boolean) => void;
   onExpandRestoreClipboard: (value: boolean) => void;
+  onPasteChordOverride: (value: PasteChordOverride) => void;
   onHelperReconcile?: () => void;
   onCheckUpdatesOnStartup: (value: boolean) => void;
   onDismissUpdate: (version: string) => void;
@@ -88,6 +90,7 @@ export function SettingsPanel({
   onEmoticonStyle,
   onAutoPasteOnCopy,
   onExpandRestoreClipboard,
+  onPasteChordOverride,
   onHelperReconcile,
   onCheckUpdatesOnStartup,
   onDismissUpdate,
@@ -241,8 +244,10 @@ export function SettingsPanel({
         <PasteAccessSettings
           autoPasteOnCopy={prefs.autoPasteOnCopy}
           restoreClipboard={prefs.expandRestoreClipboard}
+          pasteChordOverride={prefs.pasteChordOverride}
           inputStatus={inputStatus}
           onRestoreClipboard={onExpandRestoreClipboard}
+          onPasteChordOverride={onPasteChordOverride}
           onInputStatus={onInputStatus}
           onHelperReconcile={onHelperReconcile}
         />

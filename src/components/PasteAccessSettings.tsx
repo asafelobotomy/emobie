@@ -1,12 +1,15 @@
 import { useState } from "react";
 import type { InputHelperStatus } from "../lib/inputHelper";
+import type { PasteChordOverride } from "../types/preferences";
 import { runInputHelperAccessSetup } from "../lib/inputHelperClient";
 
 type PasteAccessSettingsProps = {
   autoPasteOnCopy: boolean;
   restoreClipboard: boolean;
+  pasteChordOverride: PasteChordOverride;
   inputStatus: InputHelperStatus | null;
   onRestoreClipboard: (value: boolean) => void;
+  onPasteChordOverride: (value: PasteChordOverride) => void;
   onInputStatus: (status: InputHelperStatus) => void;
   onHelperReconcile?: () => void;
 };
@@ -33,8 +36,10 @@ function helperStatusLabel(status: InputHelperStatus | null): string {
 export function PasteAccessSettings({
   autoPasteOnCopy,
   restoreClipboard,
+  pasteChordOverride,
   inputStatus,
   onRestoreClipboard,
+  onPasteChordOverride,
   onInputStatus,
   onHelperReconcile,
 }: PasteAccessSettingsProps) {
@@ -102,6 +107,31 @@ export function PasteAccessSettings({
       <p className="settings-hint settings-hint-block">
         Off by default (recommended on Plasma Wayland). Optional{" "}
         <code>wl-clipboard</code> improves paste reliability.
+      </p>
+
+      <div className="settings-row">
+        <label htmlFor="paste-chord">Paste key</label>
+        <select
+          id="paste-chord"
+          value={pasteChordOverride}
+          onChange={(event) =>
+            onPasteChordOverride(event.target.value as PasteChordOverride)
+          }
+        >
+          <option value="auto">Auto-detect (recommended)</option>
+          <option value="ctrl_v">Always Ctrl+V</option>
+          <option value="shift_insert">Always Shift+Insert</option>
+          <option value="ctrl_shift_v">Always Ctrl+Shift+V</option>
+        </select>
+      </div>
+      <p className="settings-hint settings-hint-block">
+        Auto-detect picks Ctrl+V for most apps and Ctrl+Shift+V for known
+        terminal emulators (Ctrl+V is usually claimed by the shell there). No
+        single fixed choice works everywhere, so override it here if a
+        specific app you use needs a different key —{" "}
+        {inputStatus?.pasteChord && inputStatus.pasteChord !== "auto"
+          ? `currently forced to ${inputStatus.pasteChord.replace(/_/g, " ")}.`
+          : "currently auto-detecting."}
       </p>
 
       {message ? <p className="settings-hint">{message}</p> : null}

@@ -26,6 +26,10 @@ pub enum Request {
     SetOptions {
         #[serde(default)]
         restore_clipboard: Option<bool>,
+        /// "auto" (default, focused-window detection), "ctrl_v",
+        /// "shift_insert", or "ctrl_shift_v". See crate::paste_chord.
+        #[serde(default)]
+        paste_chord: Option<String>,
     },
     InjectPaste,
 }
@@ -46,6 +50,8 @@ pub struct Response {
     pub restore_clipboard: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_inject_backend: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub paste_chord: Option<String>,
 }
 
 impl Response {
@@ -61,6 +67,7 @@ impl Response {
             suppress_jobs: Some(crate::inject::suppress_job_count()),
             restore_clipboard: Some(crate::inject::restore_clipboard_enabled()),
             last_inject_backend: crate::inject::last_inject_backend().map(|s| s.to_string()),
+            paste_chord: Some(crate::paste_chord::override_label().to_string()),
         }
     }
 
@@ -82,6 +89,7 @@ impl Response {
             suppress_jobs: Some(crate::inject::suppress_job_count()),
             restore_clipboard: Some(crate::inject::restore_clipboard_enabled()),
             last_inject_backend: crate::inject::last_inject_backend().map(|s| s.to_string()),
+            paste_chord: Some(crate::paste_chord::override_label().to_string()),
         }
     }
 }

@@ -79,6 +79,63 @@ pub(super) fn ctrl_v_enigo(enigo: &mut Enigo) -> Result<(), String> {
     typed.and(released)
 }
 
+fn shift_insert_enigo(enigo: &mut Enigo) -> Result<(), String> {
+    enigo
+        .key(Key::Shift, Direction::Press)
+        .map_err(|e| e.to_string())?;
+    let typed = (|| -> Result<(), String> {
+        thread::sleep(KEY_GAP);
+        enigo
+            .key(Key::Insert, Direction::Click)
+            .map_err(|e| e.to_string())?;
+        thread::sleep(KEY_GAP);
+        Ok(())
+    })();
+    let released = enigo
+        .key(Key::Shift, Direction::Release)
+        .map_err(|e| e.to_string());
+    typed.and(released)
+}
+
+fn ctrl_shift_v_enigo(enigo: &mut Enigo) -> Result<(), String> {
+    ensure_paste_key_mapped(enigo);
+    enigo
+        .key(Key::Control, Direction::Press)
+        .map_err(|e| e.to_string())?;
+    enigo
+        .key(Key::Shift, Direction::Press)
+        .map_err(|e| e.to_string())?;
+    let typed = (|| -> Result<(), String> {
+        thread::sleep(KEY_GAP);
+        enigo
+            .key(Key::Unicode('v'), Direction::Click)
+            .map_err(|e| e.to_string())?;
+        thread::sleep(KEY_GAP);
+        Ok(())
+    })();
+    let shift_released = enigo
+        .key(Key::Shift, Direction::Release)
+        .map_err(|e| e.to_string());
+    let ctrl_released = enigo
+        .key(Key::Control, Direction::Release)
+        .map_err(|e| e.to_string());
+    typed.and(shift_released).and(ctrl_released)
+}
+
+/// Send whichever chord `crate::paste_chord::decide` picked for the
+/// currently focused app.
+pub(super) fn paste_chord_enigo(
+    enigo: &mut Enigo,
+    chord: crate::paste_chord::PasteChord,
+) -> Result<(), String> {
+    use crate::paste_chord::PasteChord;
+    match chord {
+        PasteChord::CtrlV => ctrl_v_enigo(enigo),
+        PasteChord::ShiftInsert => shift_insert_enigo(enigo),
+        PasteChord::CtrlShiftV => ctrl_shift_v_enigo(enigo),
+    }
+}
+
 fn erase_chars(enigo: &mut Enigo, count: usize) -> Result<(), String> {
     let count = count.min(crate::state::MAX_TRIGGER_LEN);
     for _ in 0..count {
@@ -147,7 +204,8 @@ pub(super) fn expand_with_enigo(
         return Err(err);
     }
 
-    match ctrl_v_enigo(enigo) {
+    let chord = crate::paste_chord::decide(crate::focused_window::detect_class().as_deref());
+    match paste_chord_enigo(enigo, chord) {
         Ok(()) => {
             // Give the focused app time to handle paste before suppress ends.
             thread::sleep(POST_PASTE_DELAY);

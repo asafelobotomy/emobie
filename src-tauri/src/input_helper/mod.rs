@@ -33,6 +33,10 @@ pub struct InputHelperStatus {
     /// Last expand insert backend: keys | ei | wl-copy | arboard.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_inject_backend: Option<String>,
+    /// "auto" (default, focused-window detection), "ctrl_v", "shift_insert",
+    /// or "ctrl_shift_v" — see crate::paste_chord in emobie-inputd.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paste_chord: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -59,6 +63,7 @@ fn offline_linux_only() -> InputHelperStatus {
         suppress_jobs: None,
         restore_clipboard: None,
         last_inject_backend: None,
+        paste_chord: None,
     }
 }
 
@@ -115,14 +120,15 @@ pub fn input_helper_sync_matches(matches: Vec<InputMatch>) -> Result<InputHelper
 #[tauri::command]
 pub fn input_helper_set_options(
     restore_clipboard: Option<bool>,
+    paste_chord: Option<String>,
 ) -> Result<InputHelperStatus, String> {
     #[cfg(unix)]
     {
-        return unix::set_options(restore_clipboard).map(access::with_flatpak_flag);
+        return unix::set_options(restore_clipboard, paste_chord).map(access::with_flatpak_flag);
     }
     #[cfg(not(unix))]
     {
-        let _ = restore_clipboard;
+        let _ = (restore_clipboard, paste_chord);
         Err("Input helper is Linux-only.".into())
     }
 }

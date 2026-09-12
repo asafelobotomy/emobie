@@ -10,6 +10,19 @@ export type MacroTriggerMode = "immediate" | "space";
 /** ASCII emoticon nose style for macros and triggers. */
 export type EmoticonStyle = "minimal" | "classic";
 
+/**
+ * Which keychord Auto-paste sends. "auto" detects the focused app (best
+ * effort — X11/XWayland WM_CLASS, or the optional "Focused Window D-Bus"
+ * GNOME Shell extension) and picks Ctrl+V or Ctrl+Shift+V accordingly; the
+ * others force one chord regardless of detection. See docs/MACROS.md "Known
+ * limitations" for why no single fixed chord works for every app.
+ */
+export type PasteChordOverride =
+  | "auto"
+  | "ctrl_v"
+  | "shift_insert"
+  | "ctrl_shift_v";
+
 export type Macro = {
   id: string;
   trigger: string;
@@ -53,6 +66,8 @@ export type Preferences = {
    * are a common Expand failure on Plasma Wayland).
    */
   expandRestoreClipboard: boolean;
+  /** Which chord Auto-paste sends. Default "auto" (focused-window detection). */
+  pasteChordOverride: PasteChordOverride;
   checkUpdatesOnStartup: boolean;
   dismissedUpdateVersion: string | null;
   /** True after the user finishes or skips first-run input helper setup. */
@@ -83,6 +98,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   expandTriggerMode: "space",
   expandKeepTriggerSpace: false,
   expandRestoreClipboard: false,
+  pasteChordOverride: "auto",
   checkUpdatesOnStartup: true,
   dismissedUpdateVersion: null,
   inputHelperSetupSeen: false,

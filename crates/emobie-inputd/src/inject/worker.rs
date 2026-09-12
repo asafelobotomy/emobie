@@ -2,8 +2,8 @@
 
 use super::clipboard::last_backend;
 use super::enigo::{
-    ctrl_v_enigo, expand_with_enigo, new_enigo, retype_trigger_enigo, warm_up_enigo, ENIGO_MAX_IDLE,
-    POST_PASTE_DELAY,
+    expand_with_enigo, new_enigo, paste_chord_enigo, retype_trigger_enigo, warm_up_enigo,
+    ENIGO_MAX_IDLE, POST_PASTE_DELAY,
 };
 use super::uinput::{expand_with_uinput, retype_trigger_uinput, UINPUT_MAX_IDLE};
 use super::{finish_listen_suppress, now_ms, EXPAND_ENABLED, SUPPRESS_STARTED_MS};
@@ -184,9 +184,14 @@ pub(super) fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
                 }
             }
             InjectJob::Paste { reply } => {
+                // Best-effort: falls back to the default Ctrl+V chord when
+                // the focused app can't be identified (see paste_chord.rs).
+                let chord = crate::paste_chord::decide(
+                    crate::focused_window::detect_class().as_deref(),
+                );
                 let paste_result = if let Some(kbd) = uinput.as_mut() {
                     catch_unwind(AssertUnwindSafe(|| {
-                        let result = kbd.ctrl_v();
+                        let result = kbd.paste_chord(chord);
                         if result.is_ok() {
                             thread::sleep(POST_PASTE_DELAY);
                         }
@@ -195,7 +200,7 @@ pub(super) fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
                 } else {
                     let backend = enigo.as_mut().expect("enigo ensured");
                     catch_unwind(AssertUnwindSafe(|| {
-                        let result = ctrl_v_enigo(backend);
+                        let result = paste_chord_enigo(backend, chord);
                         if result.is_ok() {
                             thread::sleep(POST_PASTE_DELAY);
                         }

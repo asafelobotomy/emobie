@@ -8,6 +8,7 @@ import {
   type ThemeMode,
   type EmojiSize,
   type SortBy,
+  type PasteChordOverride,
 } from "../types/preferences";
 import { findEmojiByChar, type SkinTone } from "../data/loadEmojis";
 import { readPreferences, writePreferences } from "../lib/preferencesIo";
@@ -145,6 +146,10 @@ export function usePreferences() {
     (expandRestoreClipboard: boolean) => update({ expandRestoreClipboard }),
     [update],
   );
+  const setPasteChordOverride = useCallback(
+    (pasteChordOverride: PasteChordOverride) => update({ pasteChordOverride }),
+    [update],
+  );
   const setCheckUpdatesOnStartup = useCallback(
     (checkUpdatesOnStartup: boolean) => update({ checkUpdatesOnStartup }),
     [update],
@@ -273,6 +278,7 @@ export function usePreferences() {
     setExpandTriggerMode,
     setExpandKeepTriggerSpace,
     setExpandRestoreClipboard,
+    setPasteChordOverride,
     setCheckUpdatesOnStartup,
     setDismissedUpdateVersion,
     setInputHelperSetupSeen,

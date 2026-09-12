@@ -12,6 +12,7 @@ import type {
   EmojiSize,
   SortBy,
   ThemeMode,
+  PasteChordOverride,
 } from "../types/preferences";
 import { Toolbar } from "./Toolbar";
 import { CategoryNav } from "./CategoryNav";
@@ -72,6 +73,7 @@ export type AppShellProps = {
   setEmoticonStyle: (style: EmoticonStyle) => void;
   setAutoPasteOnCopy: (value: boolean) => void;
   setExpandRestoreClipboard: (value: boolean) => void;
+  setPasteChordOverride: (value: PasteChordOverride) => void;
   onHelperReconcile?: () => void;
   setCheckUpdatesOnStartup: (value: boolean) => void;
   setDismissedUpdateVersion: (version: string) => void;
@@ -133,6 +135,7 @@ export function AppShell(props: AppShellProps) {
     setEmoticonStyle,
     setAutoPasteOnCopy,
     setExpandRestoreClipboard,
+    setPasteChordOverride,
     onHelperReconcile,
     setCheckUpdatesOnStartup,
     setDismissedUpdateVersion,
@@ -229,6 +232,7 @@ export function AppShell(props: AppShellProps) {
           onEmoticonStyle={setEmoticonStyle}
           onAutoPasteOnCopy={setAutoPasteOnCopy}
           onExpandRestoreClipboard={setExpandRestoreClipboard}
+          onPasteChordOverride={setPasteChordOverride}
           onHelperReconcile={onHelperReconcile}
           onCheckUpdatesOnStartup={setCheckUpdatesOnStartup}
           onDismissUpdate={(version) => setDismissedUpdateVersion(version)}

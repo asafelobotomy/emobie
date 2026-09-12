@@ -180,17 +180,24 @@ pub(crate) fn handle_client(
                 }
                 Err(err) => Response::err(can_inject, can_listen, enabled_now, &err),
             },
-            Ok(Request::SetOptions { restore_clipboard }) => {
+            Ok(Request::SetOptions {
+                restore_clipboard,
+                paste_chord,
+            }) => {
                 if let Some(value) = restore_clipboard {
                     inject::set_restore_clipboard(value);
+                }
+                if let Some(value) = paste_chord {
+                    crate::paste_chord::set_override(&value);
                 }
                 Response::status(
                     can_inject,
                     can_listen,
                     enabled_now,
                     &format!(
-                        "options updated (restore_clipboard={})",
-                        inject::restore_clipboard_enabled()
+                        "options updated (restore_clipboard={}, paste_chord={})",
+                        inject::restore_clipboard_enabled(),
+                        crate::paste_chord::override_label()
                     ),
                 )
             }

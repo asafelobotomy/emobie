@@ -1,10 +1,12 @@
 import { useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { InputHelperStatus } from "../lib/inputHelper";
+import type { PasteChordOverride } from "../types/preferences";
 
 type Options = {
   ready: boolean;
   restoreClipboard: boolean;
+  pasteChord: PasteChordOverride;
   /** Bump after Grant restarts the daemon to re-apply options (in-memory state is lost). */
   reconcileNonce?: number;
   onStatus: (status: InputHelperStatus) => void;
@@ -40,6 +42,7 @@ function enqueueHelperSync(work: () => Promise<void>): Promise<void> {
 export function useInputHelperSync({
   ready,
   restoreClipboard,
+  pasteChord,
   reconcileNonce = 0,
   onStatus,
   onSyncError,
@@ -82,7 +85,7 @@ export function useInputHelperSync({
       try {
         const status = await invoke<InputHelperStatus>(
           "input_helper_set_options",
-          { restoreClipboard },
+          { restoreClipboard, pasteChord },
         );
         pushStatus(status);
       } catch (error) {
@@ -109,5 +112,5 @@ export function useInputHelperSync({
     return () => {
       cancelled = true;
     };
-  }, [ready, restoreClipboard, reconcileNonce]);
+  }, [ready, restoreClipboard, pasteChord, reconcileNonce]);
 }

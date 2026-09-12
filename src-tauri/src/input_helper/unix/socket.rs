@@ -20,6 +20,8 @@ pub struct DaemonResponse {
     pub restore_clipboard: Option<bool>,
     #[serde(default)]
     pub last_inject_backend: Option<String>,
+    #[serde(default)]
+    pub paste_chord: Option<String>,
 }
 
 pub(super) fn current_uid() -> u32 {

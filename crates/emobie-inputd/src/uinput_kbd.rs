@@ -148,4 +148,31 @@ impl UInputKeyboard {
         let released = self.emit_key(Key::KEY_LEFTCTRL, 0);
         typed.and(released)
     }
+
+    fn shift_insert(&mut self) -> Result<(), String> {
+        self.emit_key(Key::KEY_LEFTSHIFT, 1)?;
+        let typed = self.click(Key::KEY_INSERT);
+        let released = self.emit_key(Key::KEY_LEFTSHIFT, 0);
+        typed.and(released)
+    }
+
+    fn ctrl_shift_v(&mut self) -> Result<(), String> {
+        self.emit_key(Key::KEY_LEFTCTRL, 1)?;
+        self.emit_key(Key::KEY_LEFTSHIFT, 1)?;
+        let typed = self.click(Key::KEY_V);
+        let shift_released = self.emit_key(Key::KEY_LEFTSHIFT, 0);
+        let ctrl_released = self.emit_key(Key::KEY_LEFTCTRL, 0);
+        typed.and(shift_released).and(ctrl_released)
+    }
+
+    /// Send whichever chord `crate::paste_chord::decide` picked for the
+    /// currently focused app.
+    pub fn paste_chord(&mut self, chord: crate::paste_chord::PasteChord) -> Result<(), String> {
+        use crate::paste_chord::PasteChord;
+        match chord {
+            PasteChord::CtrlV => self.ctrl_v(),
+            PasteChord::ShiftInsert => self.shift_insert(),
+            PasteChord::CtrlShiftV => self.ctrl_shift_v(),
+        }
+    }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "emobie-inputd"
-version = "0.6.22"
+version = "0.6.23"
 edition = "2021"
 description = "Privileged input helper for emobie text expansion"
 license = "MIT"
@@ -21,6 +21,9 @@ arboard = { version = "3", features = ["wayland-data-control"] }
 # libei is intentionally omitted from enigo: 0.3 unwraps on missing RemoteDesktop portal
 # and panics/hangs on X11 (and some Wayland) sessions, killing the listen thread.
 enigo = { version = "0.3", default-features = false, features = ["x11rb", "wayland"] }
+# Also pulled in transitively by enigo's x11rb feature; declared directly
+# here for the focused-window WM_CLASS lookup in focused_window/x11.rs.
+x11rb = "0.13"
 evdev = "0.12"
 xkbcommon = "0.8"
 nix = { version = "0.29", features = ["fs", "uio", "socket", "user"] }

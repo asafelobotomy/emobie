@@ -1,7 +1,9 @@
+mod focused_window;
 mod inject;
 mod keymap;
 mod listen;
 mod matcher;
+mod paste_chord;
 mod protocol;
 mod rpc;
 mod session_env;
