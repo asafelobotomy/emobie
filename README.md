@@ -38,10 +38,10 @@ Grab the latest build from
 
 | Format | Best for | How |
 |--------|----------|-----|
-| **Flatpak** | Sandboxed desktop install | `flatpak install --user emobie-*-x86_64.flatpak` — Expand auto-installs the host helper |
+| **Flatpak** | Sandboxed desktop install | `flatpak install --user emobie-*-x86_64.flatpak` — Auto-paste auto-installs the host helper |
 | **`.deb`** | Debian / Ubuntu / Mint / Pop | `sudo apt install ./emobie_*_amd64.deb` |
 | **`.rpm`** | Fedora / RHEL / openSUSE | `sudo dnf install ./emobie-*-1.x86_64.rpm` (openSUSE: `zypper install …`) |
-| **AppImage** | Portable / Arch / CachyOS | `chmod +x emobie_*.AppImage && ./emobie_*.AppImage` — Expand auto-installs the host helper |
+| **AppImage** | Portable / Arch / CachyOS | `chmod +x emobie_*.AppImage && ./emobie_*.AppImage` — Auto-paste auto-installs the host helper |
 
 Arch / CachyOS / Manjaro: see [`docs/LINUX.md`](docs/LINUX.md) and optional [`packaging/arch/PKGBUILD`](packaging/arch/PKGBUILD).
 
@@ -66,7 +66,7 @@ Linux tray, pin, startup, and SELinux notes: [`docs/LINUX.md`](docs/LINUX.md).
 | **Macros** | Custom trigger → expansion cards (+ to add), optional favorited-emoji shortcodes/emoticons, per-macro hotkeys, YAML import/export |
 | **Updates** | Optional startup check; Settings can download and install the matching release asset (deb/rpm/AppImage/Flatpak) |
 | **Copy** | One-click clipboard copy; optional auto-paste when the host input helper is available |
-| **Expand** | Optional as-you-type via host `emobie-inputd` (systemd --user auto-start; off by default; see [docs/MACROS.md](docs/MACROS.md)) |
+| **Expand** | As-you-type text expansion is deferred for now — macros still copy and auto-paste manually (see [docs/MACROS.md](docs/MACROS.md)) |
 | **Summon** | Global hotkey (default `Ctrl+Shift+Space`; letters/numbers need a modifier) and system tray |
 | **Layout** | Resize freely — horizontal, square, or vertical; frameless by default (optional title bar in Settings) |
 | **Pin** | Always-on-top from the toolbar or tray (X11 + Plasma Wayland; other Wayland compositors may ignore) |
@@ -184,7 +184,7 @@ Or run the **Release** workflow from the Actions tab.
 ## Notes
 
 - Global shortcuts and tray icons can differ on Wayland vs X11 depending on your compositor. On **GNOME**, install an AppIndicator / KStatusNotifierItem extension for the tray ([details](docs/LINUX.md)).
-- Optional **auto-paste** and **as-you-type expansion** inject keystrokes via host `emobie-inputd` (see [docs/MACROS.md](docs/MACROS.md)). Clipboard copy always works without the helper. Diagnose setup with `npm run verify:expand`.
+- Optional **auto-paste** injects a Ctrl+V via host `emobie-inputd` (see [docs/MACROS.md](docs/MACROS.md)); as-you-type text expansion is deferred for now. Clipboard copy always works without the helper. Diagnose setup with `npm run verify:expand`.
 - Flatpak preferences live under
   `~/.var/app/io.github.asafelobotomy.emobie/…`; native under
   `~/.local/share/io.github.asafelobotomy.emobie/…` (older native builds used

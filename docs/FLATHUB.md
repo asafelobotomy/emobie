@@ -30,8 +30,17 @@ Then bump `tag` / `commit` in the source manifest to the release being packaged.
 1. **Autostart portal:** Source Flatpak finish-args omit `xdg-config/autostart` (linter rejects it). [`src-tauri/src/autostart.rs`](../src-tauri/src/autostart.rs) now prefers the XDG **Background** portal under Flatpak (with desktop-file fallback when the sandbox can write autostart). Re-verify portal UX on GNOME/KDE before submission.
 2. **Tray own-name:** Source Flatpak does not request `--own-name=org.kde.StatusNotifierItem.*` (Flathub rejects wildcards). emobie disables dbus name ownership inside Flatpak (`ksni::disable_dbus_name`) so Cinnamon/Mint `xapp-sn-watcher` can still host the icon. Confirm tray on Mint with System Tray applet enabled; on GNOME confirm an AppIndicator extension.
 3. **Screenshot refresh:** Re-capture without transient “tray unavailable” banners once tray is solid in the packaging under test.
-4. **Input helper:** Macros UI ships in Flatpak; as-you-type / auto-paste need host `emobie-inputd` via `--filesystem=xdg-run/emobie` (no `--device=input`). See [`docs/MACROS.md`](MACROS.md).
-5. **Sustained releases / human PR:** See checklist below.
+4. **Input helper:** Macros UI ships in Flatpak; auto-paste needs host `emobie-inputd` via `--filesystem=xdg-run/emobie` (no `--device=input`). As-you-type text expansion is deferred for now — see [`docs/MACROS.md`](MACROS.md).
+5. **`--talk-name=org.freedesktop.Flatpak`:** grants `flatpak-spawn --host`, which Flathub
+   reviewers scrutinize closely since it can run arbitrary host commands. Every call site
+   (`src-tauri/src/input_helper/bootstrap.rs`, `access/permanent.rs`, `access/stage.rs`,
+   `unix/lifecycle.rs`, `src-tauri/src/pin.rs`, `src-tauri/src/updates/apply.rs`) passes a
+   hardcoded argv (no shell interpolation of untrusted data) and is used only to: install/
+   restart the host `emobie-inputd` helper, check/repair the udev+group permanent-access
+   setup, call `qdbus` for the optional KWin pin-on-top, and apply self-updates. Be ready to
+   explain this scope to reviewers; do not broaden usage to accept dynamic/user-controlled
+   arguments.
+6. **Sustained releases / human PR:** See checklist below.
 
 ## Local validation
 

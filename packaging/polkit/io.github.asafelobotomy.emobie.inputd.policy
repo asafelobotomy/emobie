@@ -5,7 +5,7 @@
 <policyconfig>
   <action id="io.github.asafelobotomy.emobie.inputd.setup">
     <description>Allow configuring emobie input helper device access</description>
-    <message>Authentication is required to set up emobie text expansion keyboard access</message>
+    <message>Authentication is required to set up emobie paste-injection access</message>
     <defaults>
       <allow_any>auth_admin</allow_any>
       <allow_inactive>auth_admin</allow_inactive>
@@ -16,7 +16,7 @@
   </action>
   <action id="io.github.asafelobotomy.emobie.inputd.setup-local">
     <description>Allow configuring emobie input helper device access (local install)</description>
-    <message>Authentication is required to set up emobie text expansion keyboard access</message>
+    <message>Authentication is required to set up emobie paste-injection access</message>
     <defaults>
       <allow_any>auth_admin</allow_any>
       <allow_inactive>auth_admin</allow_inactive>

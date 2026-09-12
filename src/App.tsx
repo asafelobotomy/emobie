@@ -57,9 +57,6 @@ function App() {
     setFavoriteEmojiMacros,
     setEmoticonStyle,
     setAutoPasteOnCopy,
-    setExpandAsYouType,
-    setExpandTriggerMode,
-    setExpandKeepTriggerSpace,
     setExpandRestoreClipboard,
     setCheckUpdatesOnStartup,
     setDismissedUpdateVersion,
@@ -237,12 +234,8 @@ function App() {
 
   useInputHelperSync({
     ready,
-    expandAsYouType: prefs.expandAsYouType,
-    expandTriggerMode: prefs.expandTriggerMode,
-    expandKeepTriggerSpace: prefs.expandKeepTriggerSpace,
-    expandRestoreClipboard: prefs.expandRestoreClipboard,
+    restoreClipboard: prefs.expandRestoreClipboard,
     reconcileNonce,
-    expansionMacros: mergedMacros,
     onStatus: handleInputStatus,
     onSyncError: handleInputSyncError,
   });
@@ -365,9 +358,6 @@ function App() {
       setFavoriteEmojiMacros={setFavoriteEmojiMacros}
       setEmoticonStyle={setEmoticonStyle}
       setAutoPasteOnCopy={setAutoPasteOnCopy}
-      setExpandAsYouType={setExpandAsYouType}
-      setExpandTriggerMode={setExpandTriggerMode}
-      setExpandKeepTriggerSpace={setExpandKeepTriggerSpace}
       setExpandRestoreClipboard={setExpandRestoreClipboard}
       onHelperReconcile={bumpHelperReconcile}
       setCheckUpdatesOnStartup={setCheckUpdatesOnStartup}

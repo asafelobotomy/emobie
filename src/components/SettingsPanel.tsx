@@ -1,13 +1,12 @@
 import { useEffect, useId, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { MacrosSettings } from "./MacrosSettings";
-import { TextExpansionSettings } from "./TextExpansionSettings";
+import { PasteAccessSettings } from "./PasteAccessSettings";
 import { SettingsLifecycleHints } from "./SettingsLifecycleHints";
 import { SettingsGeneralSection } from "./SettingsGeneralSection";
 import { UpdateBanner } from "./UpdateBanner";
 import type {
   Macro,
-  MacroTriggerMode,
   EmoticonStyle,
   Preferences,
   ThemeMode,
@@ -15,7 +14,7 @@ import type {
   SortBy,
 } from "../types/preferences";
 import type { SkinTone } from "../data/loadEmojis";
-import { ensureInputHelperStarted } from "../lib/inputHelperClient";
+import { prepareInputHelperForPaste } from "../lib/inputHelperClient";
 import type { InputHelperStatus } from "../lib/inputHelper";
 import type { PinCapability } from "../hooks/useAlwaysOnTop";
 import type { UpdateCheckResult } from "../hooks/useUpdateCheck";
@@ -47,9 +46,6 @@ type SettingsPanelProps = {
   onFavoriteEmojiMacros: (value: boolean) => void;
   onEmoticonStyle: (style: EmoticonStyle) => void;
   onAutoPasteOnCopy: (value: boolean) => void;
-  onExpandAsYouType: (value: boolean) => void;
-  onExpandTriggerMode: (value: MacroTriggerMode) => void;
-  onExpandKeepTriggerSpace: (value: boolean) => void;
   onExpandRestoreClipboard: (value: boolean) => void;
   onHelperReconcile?: () => void;
   onCheckUpdatesOnStartup: (value: boolean) => void;
@@ -91,9 +87,6 @@ export function SettingsPanel({
   onFavoriteEmojiMacros,
   onEmoticonStyle,
   onAutoPasteOnCopy,
-  onExpandAsYouType,
-  onExpandTriggerMode,
-  onExpandKeepTriggerSpace,
   onExpandRestoreClipboard,
   onHelperReconcile,
   onCheckUpdatesOnStartup,
@@ -232,7 +225,7 @@ export function SettingsPanel({
               const enabled = event.target.checked;
               onAutoPasteOnCopy(enabled);
               if (enabled) {
-                void ensureInputHelperStarted()
+                void prepareInputHelperForPaste()
                   .then(onInputStatus)
                   .catch(() => undefined);
               }
@@ -245,16 +238,11 @@ export function SettingsPanel({
           pinned or if the system tray is unavailable.
         </p>
 
-        <TextExpansionSettings
-          expandAsYouType={prefs.expandAsYouType}
-          expandTriggerMode={prefs.expandTriggerMode}
-          expandKeepTriggerSpace={prefs.expandKeepTriggerSpace}
-          expandRestoreClipboard={prefs.expandRestoreClipboard}
+        <PasteAccessSettings
+          autoPasteOnCopy={prefs.autoPasteOnCopy}
+          restoreClipboard={prefs.expandRestoreClipboard}
           inputStatus={inputStatus}
-          onExpandAsYouType={onExpandAsYouType}
-          onExpandTriggerMode={onExpandTriggerMode}
-          onExpandKeepTriggerSpace={onExpandKeepTriggerSpace}
-          onExpandRestoreClipboard={onExpandRestoreClipboard}
+          onRestoreClipboard={onExpandRestoreClipboard}
           onInputStatus={onInputStatus}
           onHelperReconcile={onHelperReconcile}
         />

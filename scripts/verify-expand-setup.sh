@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Diagnose text expansion prerequisites on Linux (native or Flatpak host).
+# Diagnose paste-injection prerequisites on Linux (native or Flatpak host),
+# used by "Auto-paste on copy". As-you-type text expansion is deferred for
+# now (see docs/MACROS.md "Known limitations"), so keyboard-read checks below
+# are informational only, not failures.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -10,8 +13,9 @@ WARN=0
 pass() { echo "OK   $*"; }
 warn() { echo "WARN $*"; WARN=$((WARN + 1)); }
 fail() { echo "FAIL $*"; FAIL=$((FAIL + 1)); }
+info() { echo "INFO $*"; }
 
-echo "emobie text expansion setup check"
+echo "emobie paste-access setup check"
 echo "================================"
 
 if [[ "$(uname -s)" != "Linux" ]]; then
@@ -69,15 +73,15 @@ except Exception as e:
 PY
 )"
   if echo "$RESP" | grep -q '"can_listen":true'; then
-    pass "Daemon reports can_listen (keyboard access)"
+    info "Daemon reports can_listen (keyboard access) — unused while as-you-type expansion is deferred"
   elif echo "$RESP" | grep -q '"can_listen":false'; then
-    fail "Daemon cannot read keyboards — run Grant in emobie or: pkexec /usr/share/emobie/setup-input-access.sh"
+    info "Daemon cannot read keyboards — expected: as-you-type expansion is deferred, no keyboard-read grant is installed"
   fi
   if echo "$RESP" | grep -q '"can_inject":true'; then
     pass "Daemon reports can_inject (uinput on Wayland / compositor on X11)"
   elif echo "$RESP" | grep -q '"can_inject":false'; then
     if [[ -n "${WAYLAND_DISPLAY:-}" || -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/wayland-0" ]]; then
-      fail "Daemon cannot inject — on Wayland Expand needs writable /dev/uinput (run Grant)"
+      fail "Daemon cannot inject — on Wayland Auto-paste needs writable /dev/uinput (run Grant)"
     else
       warn "Daemon cannot inject text — restart from a graphical session (Wayland/X11 env missing)"
     fi
@@ -116,7 +120,9 @@ if [[ -S "$SOCK" ]] && command -v python3 >/dev/null; then
   fi
 fi
 
-# --- keyboard device nodes (ignore mice/joysticks after keyboard-only udev) ---
+# --- keyboard device nodes (informational only — as-you-type expansion is
+# deferred, so no keyboard-read grant is installed and these are expected to
+# be unreadable; ignore mice/joysticks after keyboard-only udev) ---
 # /dev/input/event* globs lexicographically ("event10" < "event2"), and
 # emobie-inputd's own synthetic uinput keyboard ("emobie-inject") also reports
 # ID_INPUT_KEYBOARD=1 and is trivially readable (we own it) — so a plain
@@ -150,9 +156,9 @@ done
 shopt -u nullglob
 if [[ "$READABLE_KB" -eq 0 ]]; then
   if [[ "$ANY_KB" -eq 1 ]]; then
-    fail "Cannot read keyboard event nodes — run Grant (Polkit + setfacl) or log out/in"
+    info "Cannot read keyboard event nodes — expected: as-you-type expansion is deferred, this isn't needed for Auto-paste"
   else
-    warn "No keyboard event nodes identified — plug in a keyboard or check udev"
+    info "No keyboard event nodes identified — not needed for Auto-paste"
   fi
 fi
 
@@ -161,14 +167,14 @@ if [[ -e /dev/uinput ]]; then
     pass "/dev/uinput accessible (Wayland inject)"
   else
     if [[ -n "${WAYLAND_DISPLAY:-}" || -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/wayland-0" ]]; then
-      fail "/dev/uinput exists but is not writable — Wayland Expand needs it (run Grant; install acl if setfacl is missing)"
+      fail "/dev/uinput exists but is not writable — Wayland Auto-paste needs it (run Grant; install acl if setfacl is missing)"
     else
       warn "/dev/uinput exists but is not writable — paste may fail without Enigo/X11"
     fi
   fi
 else
   if [[ -n "${WAYLAND_DISPLAY:-}" || -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/wayland-0" ]]; then
-    fail "/dev/uinput missing — run Grant (modprobe uinput) for Wayland Expand"
+    fail "/dev/uinput missing — run Grant (modprobe uinput) for Wayland Auto-paste"
   else
     warn "/dev/uinput missing — modprobe uinput (setup script tries this)"
   fi
@@ -193,7 +199,7 @@ if [[ -n "${WAYLAND_DISPLAY:-}" || -S "$RUNTIME/wayland-0" ]]; then
   if command -v wl-copy >/dev/null && command -v wl-paste >/dev/null; then
     pass "wl-clipboard installed (wl-copy/wl-paste) — externally-verified Wayland paste"
   else
-    warn "wl-clipboard not installed — Expand falls back to arboard's built-in Wayland clipboard \
+    warn "wl-clipboard not installed — Auto-paste falls back to arboard's built-in Wayland clipboard \
 (no external wl-paste round-trip to confirm the compositor has propagated the offer before Ctrl+V \
 fires). Install wl-clipboard for the most reliable path: pkexec <your package manager> install wl-clipboard"
   fi
@@ -201,7 +207,7 @@ fi
 
 # --- Flatpak note ---
 if [[ -n "${FLATPAK_ID:-}" ]]; then
-  warn "Running inside Flatpak — expansion requires host emobie-inputd + host Grant"
+  warn "Running inside Flatpak — Auto-paste requires host emobie-inputd + host Grant"
 fi
 
 # --- SELinux ---
@@ -214,7 +220,7 @@ fi
 
 echo "================================"
 if [[ "$FAIL" -gt 0 ]]; then
-  echo "$FAIL failure(s), $WARN warning(s). Fix FAIL items then retry Expand in emobie."
+  echo "$FAIL failure(s), $WARN warning(s). Fix FAIL items then retry Auto-paste in emobie."
   exit 1
 fi
 if [[ "$WARN" -gt 0 ]]; then

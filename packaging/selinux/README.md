@@ -5,6 +5,11 @@ module. Most installs work without it when session `setfacl` grants device acces
 On typical Workstation installs the daemon runs as `unconfined_t`, so this module
 is often a no-op — check denials first.
 
+As-you-type text expansion is deferred for now (see `docs/MACROS.md` "Known
+limitations"), so this module only grants `uinput_device_t` for paste
+injection ("Auto-paste on copy") — no `input_device_t` (keyboard event) grant
+is needed while listening stays disabled.
+
 ```bash
 cd packaging/selinux
 checkmodule -M -m -o emobie-inputd.mod emobie-inputd.te

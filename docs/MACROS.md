@@ -1,8 +1,16 @@
-# Macros and text expansion
+# Macros
 
 emobie macros let you store trigger → expansion snippets, browse them like
 emoji, bind per-macro hotkeys, import/export Espanso-ish YAML, and optionally
-expand as you type via a host helper.
+auto-paste after copy via a host helper.
+
+> **As-you-type text expansion is deferred for now.** Macros still work as a
+> browsable, copyable (and optionally auto-pasted) snippet library — the
+> keyboard-listening/trigger-matching half described in older versions of this
+> doc (Layer C below) is disabled pending a fix for the paste-chord bugs
+> described in "Known limitations". The daemon, its protocol, and the udev/
+> polkit/SELinux plumbing for keyboard listening are still in the tree and can
+> be re-enabled later; this doc describes the current (paste-only) behavior.
 
 ## Using macros
 
@@ -21,7 +29,12 @@ YAML import/export remains in Settings.
 |-------|------|---------|
 | A | Macros UI, favorite emoji macros, YAML, hotkeys, clipboard copy | Fully supported |
 | B | Auto-paste after copy (Ctrl+V + clipboard restore) | Needs host `emobie-inputd` |
-| C | As-you-type trigger expansion | Needs host `emobie-inputd` with input access |
+| C | As-you-type trigger expansion | **Deferred** — see note above |
+
+Only Layers A and B are active. Layer C's daemon-side code (keyboard listening,
+trigger matching) still exists but the app never enables it, and the packaged
+udev rule / SELinux module / Polkit setup no longer request keyboard **read**
+access — only `/dev/uinput` **write** access for Layer B's paste injection.
 
 Flathub builds do **not** request `--device=input`. The UI talks to a socket at
 `$XDG_RUNTIME_DIR/emobie/emobie-inputd.sock` when the helper is installed on the
@@ -30,14 +43,14 @@ host.
 ## Auto-start (recommended)
 
 On first launch emobie opens a short setup dialog to start the input helper
-and optionally grant keyboard access (Skip is fine). The helper runs as a
+and optionally grant paste access (Skip is fine). The helper runs as a
 **systemd --user** service (same user as your desktop session — never root).
 
 ### User-local install (fallback)
 
 AppImage and Flatpak install the host helper automatically when you enable
-**Expand** (or finish first-run setup). Use the script only for from-source
-builds or when auto-bootstrap fails:
+**Auto-paste on copy** (or finish first-run setup). Use the script only for
+from-source builds or when auto-bootstrap fails:
 
 ```bash
 bash packaging/install-inputd-user.sh
@@ -45,8 +58,8 @@ bash packaging/install-inputd-user.sh
 
 This builds `emobie-inputd` into `~/.local/bin` and installs a user unit.
 emobie also calls `input_helper_ensure_started` on every launch so the helper
-is up for paste. Enabling **Expand as you type** grants keyboard access with
-one Polkit prompt when missing, restarts the helper, and turns on listening.
+is up for paste. Enabling **Auto-paste on copy** grants paste-injection access
+with one Polkit prompt when missing and restarts the helper.
 
 ### Distro / .deb package
 
@@ -68,37 +81,38 @@ systemctl --user enable --now emobie-inputd.service
 - Socket: `emobie-inputd.sock` mode `0600`
 - Clients whose Unix peer UID ≠ daemon UID are rejected
 
-## Keyboard access (expand as you type)
+## Paste access (Auto-paste on copy)
 
-Daemon auto-start alone does **not** grant `/dev/input` or `/dev/uinput` access. Enabling
-**Expand as you type** (or first-run **Set up text expansion**) runs a one-time
+Daemon auto-start alone does **not** grant `/dev/uinput` access. Enabling
+**Auto-paste on copy** (or first-run **Set up auto-paste**) runs a one-time
 Polkit prompt that:
 
 1. Creates group `emobie-input`, installs udev rules, and adds your user
 2. Loads `uinput` if needed and grants `/dev/uinput` write (Wayland inject path)
 3. Applies session ACLs with `setfacl` when available (no logout required)
-4. Restarts `emobie-inputd` so it can open keyboards and inject immediately
+4. Restarts `emobie-inputd` so it can inject immediately
 
-On Wayland/Plasma, short ASCII expansions type via a kernel virtual keyboard
-(`/dev/uinput`). Longer text, newlines, and emoji use clipboard paste (`wl-copy`
-when available, else arboard's native Wayland clipboard) plus Ctrl+V / Shift+Insert.
-Compositor “virtual keyboard” protocols are often missing; X11/XTest alone does not
-reach native Wayland apps. Grant’s udev rule covers both listen (`event*`) and
-inject (`uinput`) for every package channel (`.deb` / `.rpm` / Arch / AppImage /
-Flatpak host helper).
+No keyboard-**read** access is requested — as-you-type text expansion is
+deferred (see "Known limitations"), so Grant only needs the write-only uinput
+half, a meaningfully smaller permission than reading every keystroke.
+
+On Wayland/Plasma, a synthetic Ctrl+V (kernel virtual keyboard via
+`/dev/uinput`) pastes after copy. Clipboard content comes from `wl-copy` when
+available, else arboard's native Wayland clipboard. Compositor “virtual
+keyboard” protocols are often missing; X11/XTest alone does not reach native
+Wayland apps. Grant's udev rule covers `uinput` for every package channel
+(`.deb` / `.rpm` / Arch / AppImage / Flatpak host helper).
 
 **Clipboard restore** after paste is **off by default** (Settings → Restore clipboard
 after paste). Leaving it off avoids a common Plasma race where a delayed restore
-wipes the next expansion. `wl-clipboard` is **recommended** (deb/rpm `Recommends`,
+wipes the next copy. `wl-clipboard` is **recommended** (deb/rpm `Recommends`,
 Arch `optdepends`) — when present, paste verifies readiness against a separate
 `wl-paste` process (a real compositor round trip) instead of only arboard's
 in-process self-check, so install it for the most reliable Wayland paste.
 
 Grant is **idempotent** and re-runs when permanent config is missing even if the
-helper can already open keyboards via a temporary ACL or an orphaned group id
-(session `groups` shows a bare number instead of `emobie-input`). After Grant,
-emobie re-syncs matches (disable → sync → enable) so Expand does not keep a
-stale trie from before the restart.
+helper can already inject via a temporary ACL or an orphaned group id
+(session `groups` shows a bare number instead of `emobie-input`).
 
 Manual host setup (same script):
 
@@ -109,7 +123,7 @@ pkexec env SUDO_USER="$USER" bash packaging/setup-input-access.sh
 ```
 
 Log out/in only if ACLs are unavailable, so new sessions inherit the group.
-Group membership is sensitive (keyboard event read access).
+Group membership grants `/dev/uinput` write access (paste injection).
 
 **Verify setup** from a desktop terminal:
 
@@ -117,7 +131,7 @@ Group membership is sensitive (keyboard event read access).
 bash scripts/verify-expand-setup.sh
 ```
 
-Under Flatpak or AppImage, enabling Expand stages the host helper
+Under Flatpak or AppImage, enabling Auto-paste stages the host helper
 (`~/.local/bin/emobie-inputd`) and Grant runs host Polkit against
 `setup-input-access.sh`. If Grant still fails, run on the host:
 
@@ -128,19 +142,8 @@ pkexec /usr/local/share/emobie/setup-input-access.sh
 Only use `bash packaging/install-inputd-user.sh` as a fallback when auto-bootstrap
 cannot find the bundled host tarball.
 
-**Layout note:** trigger matching follows your active XKB layout
-(`XKB_DEFAULT_*` / session keyboard settings). Each keyboard listener reloads
-the layout from session env every ~30 seconds. Modifier state is per device;
-IME compose sequences are not supported.
-
 **Pin:** always-on-top uses GTK keep-above (works on X11) and, on Plasma
 Wayland, KWin `keepAbove`. Other Wayland compositors may ignore pin.
-
-Expand-as-you-type stays **off by default**. Enable it under
-**Settings → Text expansion**, and choose **After Space** to expand only when
-you finish a trigger with Space (for example type `.hi` then Space). Optionally
-enable **Keep Space after expansion** so `.hi` + Space becomes `hiya `
-(with a trailing space) instead of `hiya`.
 
 Favorite emoji macros (when enabled) stay in **collapsed** sections on the Macros page.
 
@@ -177,12 +180,42 @@ devices. Do not run `emobie-inputd` as root or expose a world-writable socket.
 | Webview → helper | emobie talks to inputd via Tauri IPC; daemon enforces match/trigger caps | XSS in emobie could sync macros or request paste — treat the webview as trusted UI |
 
 **Same-UID trust:** inputd is a session helper, not a privilege boundary against other
-processes owned by your user. Do not run untrusted binaries alongside Expand when
-you rely on as-you-type expansion.
+processes owned by your user. Do not run untrusted binaries alongside emobie
+when relying on Auto-paste.
 
-**Polkit / root:** keyboard access setup runs once via `pkexec` on annotated script
+**Polkit / root:** paste access setup runs once via `pkexec` on annotated script
 paths only (`/usr/share/emobie/…` or `/usr/local/share/emobie/…`). User-writable
 copies are staged to `/usr/local/share/emobie/` before elevation.
+
+## Known limitations
+
+- **As-you-type text expansion is deferred.** See the note at the top of this
+  doc — Layer C (trigger listening) is disabled and has no Settings UI right
+  now, pending a fix for the paste-chord issue below.
+- **Paste chord is Ctrl+V only, globally.** 0.6.19 fixed Kate (and other apps
+  that bind both Ctrl+V and Shift+Insert to paste) double-pasting by dropping
+  the Shift+Insert chord entirely. Some terminal emulators bind paste to
+  Shift+Insert or Ctrl+Shift+V specifically *because* Ctrl+V is claimed by the
+  shell/readline (`^V` = quoted-insert) — **Auto-paste on copy** may silently
+  do nothing when the previously focused window is one of these (confirmed
+  live against GNOME Console: Ctrl+V is a no-op there, Ctrl+Shift+V pastes).
+  There is no per-app-class detection (no window-class/WM_CLASS lookup exists
+  anywhere in this codebase), and no chord works everywhere: Ctrl+V-only
+  breaks these terminals, adding Shift+Insert reintroduces the Kate
+  double-paste, and adding Ctrl+Shift+V instead silently triggers Kate's
+  "Switch to Next Input Mode" shortcut. A real fix needs focused-window
+  detection — X11/XWayland via `_NET_ACTIVE_WINDOW`/`WM_CLASS` is cheap; KDE
+  Wayland is moderate effort via KWin's scripting D-Bus API (reusing the
+  already-granted `org.kde.KWin` talk-name); GNOME Wayland has no public API
+  for this today (Shell's `Eval` is locked outside dev mode) short of
+  maintaining a companion GNOME Shell extension. If you hit this, please
+  report the terminal emulator and compositor.
+- **The daemon's trigger-listening code is dormant, not removed.** Now that
+  as-you-type expansion is deferred, a compositor crash/restart affecting the
+  (unused) listen thread is no longer user-visible — noted here only because
+  [`sleep_watch.rs`](../crates/emobie-inputd/src/sleep_watch.rs) and the
+  listen/matcher code paths still exist in the tree for when expansion
+  returns, and this class of bug will need re-checking then.
 
 ## YAML format
 

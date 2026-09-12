@@ -35,6 +35,12 @@ finish-args:
   - --talk-name=org.x.StatusNotifierWatcher
   # Plasma Wayland pin (KWin keepAbove); ignored on other compositors.
   - --talk-name=org.kde.KWin
+  # Enables `flatpak-spawn --host`: bootstraps/restarts the host emobie-inputd
+  # helper, checks/repairs the udev+group permanent-access setup, the optional
+  # KWin pin-on-top qdbus call, and self-update. Every call site uses a
+  # hardcoded argv, never shell-interpolated user input. See "Remaining before
+  # Flathub" in docs/FLATHUB.md for the full audit of this permission.
+  - --talk-name=org.freedesktop.Flatpak
   # Optional host emobie-inputd socket (as-you-type / auto-paste). No --device=input.
   - --filesystem=xdg-run/emobie
   # Host-staged setup script + durable user prefs (~/.local/share/emobie).
@@ -59,8 +65,11 @@ modules:
     sources:
       - type: git
         url: https://github.com/asafelobotomy/emobie.git
-        tag: v0.6.17
-        commit: e5c400d3e5577d87f522444e7003feef0d56cab4
+        # v0.6.18-v0.6.21 haven't been tagged yet (only committed to main), so
+        # this pins the commit directly. Switch back to `tag:` once v0.6.21
+        # is tagged and pushed — flatpak-builder fails if `tag:` names a ref
+        # that doesn't exist on the remote.
+        commit: 6ee922756b4cd1518251c1db0ac9171210c1aeb1
         x-checker-data:
           type: git
           tag-pattern: ^v([0-9]+(\.[0-9]+)*)$

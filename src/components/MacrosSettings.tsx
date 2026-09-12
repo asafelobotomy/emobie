@@ -55,8 +55,8 @@ export function MacrosSettings({
     <div className="macros-settings">
       <h3 className="settings-section-title">Macros</h3>
       <p className="settings-hint settings-hint-block">
-        Add and edit macros from the Macros category (+). Text expansion
-        options live in the section above.
+        Add and edit macros from the Macros category (+). Click a macro to
+        copy it; auto-paste options live in the Clipboard section above.
       </p>
 
       <div className="settings-row settings-toggle-row">

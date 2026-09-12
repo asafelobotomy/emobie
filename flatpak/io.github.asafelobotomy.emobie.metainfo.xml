@@ -59,6 +59,37 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.22" date="2026-09-12">
+      <description>
+        <p>As-you-type text expansion is deferred for now, pending a real fix for
+        the paste-chord bugs it hit (Ctrl+V does nothing in some terminals; every
+        alternative chord either double-pastes in Kate or triggers an unrelated
+        Kate shortcut). Macros still work fully for browsing, copying, and
+        optional auto-paste after copy. Paste-injection permissions (udev,
+        Polkit, SELinux) were narrowed accordingly: no more keyboard-read
+        access is requested, only the write-only /dev/uinput access auto-paste
+        needs.</p>
+      </description>
+    </release>
+    <release version="0.6.21" date="2026-09-10">
+      <description>
+        <p>Fix Flatpak clipboard copy failing outright on Wayland-native sessions
+        (GNOME/Mutter, etc.) with a "Copy Failed" toast: switched from
+        `--socket=fallback-x11` to `--socket=x11` and added arboard's
+        wayland-data-control feature to the main app so the direct copy path gets
+        native Wayland clipboard support instead of relying on an X11 fallback
+        that was never available.</p>
+      </description>
+    </release>
+    <release version="0.6.20" date="2026-09-06">
+      <description>
+        <p>Fix Expand silently dying after long idle periods or a suspend/resume
+        cycle: the uinput virtual device and the evdev trigger-read thread could
+        both go stale in ways that produced no error, so nothing ever restarted
+        them automatically. Also adds a Bold/Italic/Strikethrough/Code/Quote
+        formatting toolbar to the macro editor.</p>
+      </description>
+    </release>
     <release version="0.6.19" date="2026-09-03">
       <description>
         <p>Fix Expand double-pasting its expansion in Kate and other apps that bind both

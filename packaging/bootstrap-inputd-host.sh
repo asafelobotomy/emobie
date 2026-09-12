@@ -38,6 +38,8 @@ if [[ -x "$PKG_BIN" ]] && [[ ! "$BIN_DIR/emobie-inputd" -nt "$PKG_BIN" ]]; then
   # Drop the user override so /usr/lib/systemd/user/emobie-inputd.service wins.
   rm -f "$USER_UNIT"
 else
+  # [Service] hardening below must match packaging/systemd/emobie-inputd.service
+  # (the canonical copy) and install-inputd-user.sh.
   cat >"$USER_UNIT" <<EOF
 [Unit]
 Description=emobie input helper (text expansion / paste)

@@ -5,7 +5,7 @@
 #   or: packaging/setup-input-access.sh (self-elevates via pkexec)
 #
 # Idempotent: safe to re-run when the group was deleted, udev rules were removed,
-# or listen still works via a temporary ACL / orphaned GID.
+# or paste inject still works via a temporary ACL / orphaned GID.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,7 +28,7 @@ acl_package_hint() {
   elif command -v pacman >/dev/null 2>&1; then
     echo "Install setfacl: pkexec pacman -S acl"
   else
-    echo "Install the acl package so setfacl can grant immediate keyboard access."
+    echo "Install the acl package so setfacl can grant immediate paste-inject access."
   fi
 }
 
@@ -229,14 +229,6 @@ ACL_TRIED=0
 if command -v setfacl >/dev/null; then
   ACL_TRIED=1
   shopt -s nullglob
-  events=(/dev/input/event*)
-  if ((${#events[@]})); then
-    if setfacl -m "u:${TARGET_USER}:r" "${events[@]}"; then
-      ACL_OK=1
-    else
-      echo "Warning: setfacl failed for /dev/input/event* — logout may be required." >&2
-    fi
-  fi
   for uinput in /dev/uinput /dev/input/uinput; do
     if [[ -e "$uinput" ]]; then
       if setfacl -m "u:${TARGET_USER}:rw" "$uinput"; then
@@ -254,15 +246,15 @@ fi
 
 echo "Added $TARGET_USER to $GROUP and installed udev rules."
 if [[ "$ACL_TRIED" -eq 1 && "$ACL_OK" -eq 1 ]]; then
-  echo "Session ACLs applied — restart emobie-inputd (or toggle Expand) without logging out."
+  echo "Session ACLs applied — restart emobie-inputd without logging out."
 elif [[ "$ACL_TRIED" -eq 1 ]]; then
   echo "Session ACLs were not fully applied — log out/in so group $GROUP takes effect."
 else
   echo "setfacl unavailable — log out/in so new sessions inherit $GROUP."
 fi
-echo "Membership in $GROUP is sensitive — it grants keyboard event access."
+echo "Membership in $GROUP grants /dev/uinput access for paste injection (Auto-paste on copy)."
 
-# Permanent configuration checks (not just ephemeral ACL listen).
+# Permanent configuration checks (not just ephemeral ACL access).
 if ! getent group "$GROUP" >/dev/null; then
   echo "FAIL: group $GROUP missing after setup." >&2
   exit 1
@@ -272,24 +264,7 @@ if [[ ! -f "$RULES_DST" ]]; then
   exit 1
 fi
 if ! id -nG "$TARGET_USER" | tr ' ' '\n' | grep -qx "$GROUP"; then
-  echo "Warning: $TARGET_USER not listed in $GROUP yet — log out/in if listen still fails." >&2
-fi
-
-EVENT=""
-shopt -s nullglob
-for node in /dev/input/event*; do
-  EVENT="$node"
-  break
-done
-shopt -u nullglob
-if [[ -n "$EVENT" ]]; then
-  if run_as_user test -r "$EVENT"; then
-    echo "Verified: $TARGET_USER can read keyboard devices."
-  else
-    echo "Warning: $TARGET_USER still cannot read $EVENT — log out/in and retry Expand."
-  fi
-else
-  echo "Warning: no /dev/input/event* nodes found yet — replug a keyboard or reboot."
+  echo "Warning: $TARGET_USER not listed in $GROUP yet — log out/in if paste still fails." >&2
 fi
 
 # Native Wayland inject needs writable /dev/uinput (Enigo virtual-keyboard is often absent).
@@ -301,7 +276,7 @@ for candidate in /dev/uinput /dev/input/uinput; do
   fi
 done
 if [[ -z "$UINPUT_NODE" ]]; then
-  echo "Warning: /dev/uinput missing after modprobe — Expand paste may fail on Wayland." >&2
+  echo "Warning: /dev/uinput missing after modprobe — auto-paste may fail on Wayland." >&2
 elif run_as_user test -w "$UINPUT_NODE"; then
   echo "Verified: $TARGET_USER can write $UINPUT_NODE (Wayland inject)."
 else

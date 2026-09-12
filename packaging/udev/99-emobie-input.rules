@@ -1,4 +1,6 @@
-# Allow members of emobie-input to use uinput for paste/expansion inject.
+# Allow members of emobie-input to use uinput for paste inject
+# ("Auto-paste on copy"). As-you-type text expansion is deferred for now, so
+# no keyboard event-read rule is installed here — see docs/MACROS.md "Known
+# limitations". Re-add a `KERNEL=="event*", ENV{ID_INPUT_KEYBOARD}=="1"` rule
+# (keyboards only, not mice/joysticks) if/when Expand as-you-type returns.
 KERNEL=="uinput", GROUP="emobie-input", MODE="0660", OPTIONS+="static_node=uinput"
-# Keyboards only — do not steal mice/joysticks from the input group.
-KERNEL=="event*", SUBSYSTEM=="input", ENV{ID_INPUT_KEYBOARD}=="1", GROUP="emobie-input", MODE="0640"

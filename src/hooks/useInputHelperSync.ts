@@ -1,19 +1,12 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { customExpansionMatches, type MacroEntry } from "../lib/macros";
 import type { InputHelperStatus } from "../lib/inputHelper";
-import type { MacroTriggerMode } from "../types/preferences";
 
 type Options = {
   ready: boolean;
-  expandAsYouType: boolean;
-  expandTriggerMode: MacroTriggerMode;
-  expandKeepTriggerSpace: boolean;
-  expandRestoreClipboard: boolean;
-  /** Bump after Grant/restart to force disable→sync→enable once. */
+  restoreClipboard: boolean;
+  /** Bump after Grant restarts the daemon to re-apply options (in-memory state is lost). */
   reconcileNonce?: number;
-  /** Custom macros plus optional favorited-emoji macros (subset, not full catalog). */
-  expansionMacros: MacroEntry[];
   onStatus: (status: InputHelperStatus) => void;
   /** Called when sync/enable fails so settings can show a hard error. */
   onSyncError?: (message: string) => void;
@@ -36,21 +29,18 @@ function enqueueHelperSync(work: () => Promise<void>): Promise<void> {
 }
 
 /**
- * Starts emobie-inputd on app ready, enables listening when expand-as-you-type
- * is on, and syncs custom + favorited-emoji macro matches.
+ * Starts emobie-inputd on app ready and applies paste-related options.
  *
- * When enabling: disable → sync matches → enable, so a daemon that was already
- * enabled at login cannot expand stale rules, and in-flight toggles cannot
- * reorder across overlapping effect runs.
+ * As-you-type text expansion (trigger listening + macro sync) is deferred
+ * for now — see docs/MACROS.md "Known limitations". This hook only keeps
+ * the daemon available for the "Auto-paste on copy" preference, and makes
+ * sure listening stays off regardless of any stale saved preference from a
+ * version where expansion was enabled.
  */
 export function useInputHelperSync({
   ready,
-  expandAsYouType,
-  expandTriggerMode,
-  expandKeepTriggerSpace,
-  expandRestoreClipboard,
+  restoreClipboard,
   reconcileNonce = 0,
-  expansionMacros,
   onStatus,
   onSyncError,
 }: Options) {
@@ -59,27 +49,11 @@ export function useInputHelperSync({
   onStatusRef.current = onStatus;
   onSyncErrorRef.current = onSyncError;
 
-  const expansionMacrosKey = useMemo(
-    () =>
-      JSON.stringify(
-        expansionMacros.map((m) => [
-          m.trigger,
-          m.expansion,
-          m.enabled,
-          m.source,
-        ]),
-      ),
-    [expansionMacros],
-  );
-  const syncGeneration = useRef(0);
-
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
-    const generation = ++syncGeneration.current;
 
-    const isCurrent = () =>
-      !cancelled && generation === syncGeneration.current;
+    const isCurrent = () => !cancelled;
 
     const pushStatus = (status: InputHelperStatus) => {
       if (!isCurrent()) return;
@@ -90,13 +64,6 @@ export function useInputHelperSync({
       if (!isCurrent()) return;
       onSyncErrorRef.current?.(errMessage(error, fallback));
     };
-
-    const matches = () =>
-      customExpansionMatches(
-        expansionMacros,
-        expandTriggerMode,
-        expandKeepTriggerSpace,
-      );
 
     void enqueueHelperSync(async () => {
       if (!isCurrent()) return;
@@ -115,7 +82,7 @@ export function useInputHelperSync({
       try {
         const status = await invoke<InputHelperStatus>(
           "input_helper_set_options",
-          { restoreClipboard: expandRestoreClipboard },
+          { restoreClipboard },
         );
         pushStatus(status);
       } catch (error) {
@@ -126,93 +93,21 @@ export function useInputHelperSync({
       }
       if (!isCurrent()) return;
 
-      if (expandAsYouType) {
-        // Pause matching before swapping the trie when the daemon may already
-        // be enabled from a prior session / login unit.
-        try {
-          const status = await invoke<InputHelperStatus>(
-            "input_helper_set_enabled",
-            { enabled: false },
-          );
-          pushStatus(status);
-        } catch (error) {
-          fail(error, "Could not pause text expansion before syncing macros.");
-          return;
-        }
-        if (!isCurrent()) return;
-
-        try {
-          const status = await invoke<InputHelperStatus>(
-            "input_helper_sync_matches",
-            { matches: matches() },
-          );
-          pushStatus(status);
-        } catch (error) {
-          fail(
-            error,
-            "Could not sync expansion matches — Expand may be using stale macros.",
-          );
-          return;
-        }
-        if (!isCurrent()) return;
-
-        try {
-          const status = await invoke<InputHelperStatus>(
-            "input_helper_set_enabled",
-            { enabled: true },
-          );
-          pushStatus(status);
-        } catch (error) {
-          fail(error, "Could not enable text expansion on the helper.");
-        }
-      } else {
-        try {
-          const status = await invoke<InputHelperStatus>(
-            "input_helper_set_enabled",
-            { enabled: false },
-          );
-          pushStatus(status);
-        } catch (error) {
-          fail(error, "Could not disable text expansion on the helper.");
-        }
+      // Text expansion is deferred — always keep listening off, even if a
+      // preference file saved from an older version still says otherwise.
+      try {
+        const status = await invoke<InputHelperStatus>(
+          "input_helper_set_enabled",
+          { enabled: false },
+        );
+        pushStatus(status);
+      } catch (error) {
+        fail(error, "Could not disable text expansion on the helper.");
       }
     });
 
-    // Re-push matches if inputd restarted while emobie stayed open (tray/minimized).
-    // Daemon no-ops identical syncs without rewriting disk.
-    let resync: ReturnType<typeof setInterval> | undefined;
-    if (expandAsYouType) {
-      resync = setInterval(() => {
-        if (!isCurrent()) return;
-        void enqueueHelperSync(async () => {
-          if (!isCurrent()) return;
-          try {
-            const status = await invoke<InputHelperStatus>(
-              "input_helper_sync_matches",
-              { matches: matches() },
-            );
-            pushStatus(status);
-          } catch (error) {
-            fail(
-              error,
-              "Could not sync expansion matches — Expand may be using stale macros.",
-            );
-          }
-        });
-      }, 20_000);
-    }
-
     return () => {
       cancelled = true;
-      if (resync) clearInterval(resync);
     };
-  }, [
-    ready,
-    expandAsYouType,
-    expandTriggerMode,
-    expandKeepTriggerSpace,
-    expandRestoreClipboard,
-    reconcileNonce,
-    expansionMacrosKey,
-  ]);
+  }, [ready, restoreClipboard, reconcileNonce]);
 }

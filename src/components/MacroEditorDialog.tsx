@@ -143,7 +143,8 @@ export function MacroEditorDialog({
       trigger: draft.trigger.trim(),
       expansion: draft.expansion,
       hotkey: draft.hotkey,
-      // Expansion on/off is global (Settings → Text expansion).
+      // Only meaningful once as-you-type expansion returns (deferred, see
+      // docs/MACROS.md); harmless to keep set while it's inert.
       enabled: initial?.enabled ?? true,
     });
   };
@@ -204,8 +205,9 @@ export function MacroEditorDialog({
           />
         </div>
         <p className="settings-hint settings-hint-block">
-          With Text expansion → After Space, type the trigger then Space to
-          expand (e.g. <code>.hi</code> then Space).
+          Shown under the expansion on the Macros page. As-you-type expansion
+          (typing the trigger to expand it automatically) is deferred for now
+          — click the macro card to copy it instead.
         </p>
         <HotkeyCapture
           value={draft.hotkey ?? ""}

@@ -22,6 +22,12 @@ pub(super) const UINPUT_MAX_IDLE: Duration = Duration::from_secs(300);
 fn paste_chords(kbd: &mut UInputKeyboard) -> Result<(), String> {
     // Ctrl+V only — Kate and most Qt/KDE apps bind both Ctrl+V and Shift+Insert,
     // so sending both unconditionally double-pastes the expansion in them.
+    // Known trade-off: some terminal emulators bind paste to Shift+Insert (or
+    // Ctrl+Shift+V) specifically because Ctrl+V is claimed by the shell, so
+    // Expand can silently no-op there. Fixing that without reintroducing the
+    // double-paste needs focused-window/WM_CLASS detection, which doesn't
+    // exist in this codebase yet — don't just add Shift+Insert back. See
+    // "Known limitations" in docs/MACROS.md.
     kbd.ctrl_v()?;
     thread::sleep(POST_PASTE_DELAY);
     Ok(())

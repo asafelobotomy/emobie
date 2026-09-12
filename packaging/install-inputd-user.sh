@@ -40,6 +40,8 @@ install -m 644 "$ROOT/packaging/polkit/io.github.asafelobotomy.emobie.inputd.pol
 # User unit pointing at ~/.local/bin (dev / from-source install).
 # Distro packages use /usr/lib/systemd/user + /usr/bin; bootstrap prefers the
 # packaged binary when it is present and not older than the host helper.
+# [Service] hardening below must match packaging/systemd/emobie-inputd.service
+# (the canonical copy) and bootstrap-inputd-host.sh.
 cat >"$UNIT_DIR/$UNIT_NAME" <<EOF
 [Unit]
 Description=emobie input helper (text expansion / paste)

@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from "react";
 import type { InputHelperStatus } from "../lib/inputHelper";
-import { prepareInputHelperForExpand } from "../lib/inputHelperClient";
+import { prepareInputHelperForPaste } from "../lib/inputHelperClient";
 
 type FirstRunSetupProps = {
   open: boolean;
@@ -39,23 +39,19 @@ export function FirstRunSetup({
 
   if (!open) return null;
 
-  const setupTextExpansion = async () => {
+  const setupPasteAccess = async () => {
     setBusy(true);
     setMessage(null);
     try {
-      let next = await prepareInputHelperForExpand();
+      let next = await prepareInputHelperForPaste();
       onStatus(next);
 
-      if (next.daemon && next.canListen && next.canInject && next.accessConfigured !== false) {
-        setMessage("Text expansion is ready — enable it anytime in Settings.");
-      } else if (next.daemon && next.canListen && next.accessConfigured === false) {
+      if (next.daemon && next.canInject && next.accessConfigured !== false) {
+        setMessage("Auto-paste is ready — enable it anytime in Settings.");
+      } else if (next.daemon && next.canInject && next.accessConfigured === false) {
         setMessage(
           next.detail ||
-            "Helper can listen temporarily, but permanent keyboard access (group/udev) still needs Grant.",
-        );
-      } else if (next.daemon && next.canListen && !next.canInject) {
-        setMessage(
-          "Keyboard access OK, but text injection needs a desktop session. Restart emobie-inputd or log out/in, then enable Expand in Settings.",
+            "Helper can inject temporarily, but permanent access (group/udev) still needs Grant.",
         );
       } else {
         setMessage(next.detail || "Could not finish setup.");
@@ -68,10 +64,7 @@ export function FirstRunSetup({
   };
 
   const ready = Boolean(
-    status?.daemon &&
-      status.canListen &&
-      status.canInject &&
-      status.accessConfigured !== false,
+    status?.daemon && status.canInject && status.accessConfigured !== false,
   );
   const isFlatpak = Boolean(status?.flatpak);
 
@@ -86,14 +79,15 @@ export function FirstRunSetup({
         <h3 id={titleId}>Welcome to emobie</h3>
         <div className="first-run-body">
           <p className="first-run-copy">
-            Optional setup for paste and text expansion. The helper runs as your
-            user and only watches keys after you enable Expand as you type.
+            Optional setup for auto-paste. The helper runs as your user and
+            only pastes when you copy an emoji or macro with "Auto-paste on
+            copy" enabled in Settings — it does not watch your keyboard.
           </p>
 
           {isFlatpak ? (
             <p className="first-run-copy">
               Flatpak installs the host input helper automatically when you
-              continue — one admin Grant prompt for keyboard access.
+              continue — one admin Grant prompt for paste access.
             </p>
           ) : null}
 
@@ -101,13 +95,13 @@ export function FirstRunSetup({
             type="button"
             className="btn primary first-run-cta"
             disabled={busy || ready}
-            onClick={() => void setupTextExpansion()}
+            onClick={() => void setupPasteAccess()}
           >
             {ready
-              ? "Text expansion ready"
+              ? "Auto-paste ready"
               : busy
                 ? "Working…"
-                : "Set up text expansion"}
+                : "Set up auto-paste"}
           </button>
 
           <p className="first-run-copy">

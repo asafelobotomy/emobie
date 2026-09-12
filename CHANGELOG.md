@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.22] - 2026-09-12
+
+### Changed
+
+- **As-you-type text expansion is deferred.** The "Expand as you type" toggle
+  and its trigger-listening code are no longer reachable from the UI, pending
+  a real fix for the paste-chord bugs affecting it (Ctrl+V is a no-op in some
+  terminals; the alternatives reintroduce the Kate double-paste bug or
+  trigger an unrelated Kate shortcut — see docs/MACROS.md "Known
+  limitations"). Macros still work fully for browsing, copying, and
+  optional auto-paste-on-copy. The daemon-side listen/matcher code and
+  protocol are unchanged in the tree for a future re-enable.
+- Packaged udev rules, the Polkit action, and the optional SELinux module no
+  longer request keyboard **read** access (`/dev/input/event*`) — only
+  `/dev/uinput` **write** access for paste injection, a meaningfully smaller
+  permission grant. Existing installs with the old rule still work; new
+  installs no longer prompt for or receive keyboard-read access.
+
 ## [0.6.21] - 2026-09-10
 
 ### Fixed

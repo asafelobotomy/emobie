@@ -1,3 +1,8 @@
+# Canonical [Service] hardening block for emobie-inputd. Used verbatim for
+# deb/rpm/Arch packages (see scripts/stage-inputd.sh, packaging/arch/PKGBUILD).
+# packaging/install-inputd-user.sh and packaging/bootstrap-inputd-host.sh
+# generate their own unit (they need a dynamic ExecStart path) and hand-copy
+# these same options — keep all three in sync if you change this block.
 [Unit]
 Description=emobie input helper (text expansion / paste)
 Documentation=https://github.com/asafelobotomy/emobie/blob/main/docs/MACROS.md

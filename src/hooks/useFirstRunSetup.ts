@@ -9,12 +9,12 @@ type Options = {
   onMarkSeen: () => void;
 };
 
-function expandReady(status: InputHelperStatus): boolean {
+// As-you-type text expansion is deferred (see docs/MACROS.md "Known
+// limitations"), so first-run only needs paste-injection access, not
+// keyboard-listen access (canListen is never granted).
+function pasteReady(status: InputHelperStatus): boolean {
   return Boolean(
-    status.daemon &&
-      status.canListen &&
-      status.canInject &&
-      status.accessConfigured !== false,
+    status.daemon && status.canInject && status.accessConfigured !== false,
   );
 }
 
@@ -41,7 +41,7 @@ export function useFirstRunSetup({
           if (cancelled) return;
           onStatusRef.current(status);
           if (setupSeen) return;
-          if (expandReady(status)) {
+          if (pasteReady(status)) {
             onMarkSeenRef.current();
             return;
           }

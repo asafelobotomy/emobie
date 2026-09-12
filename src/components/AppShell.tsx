@@ -10,7 +10,6 @@ import { openReleasePage } from "../hooks/useUpdateCheck";
 import type {
   EmoticonStyle,
   EmojiSize,
-  MacroTriggerMode,
   SortBy,
   ThemeMode,
 } from "../types/preferences";
@@ -72,9 +71,6 @@ export type AppShellProps = {
   setFavoriteEmojiMacros: (value: boolean) => void;
   setEmoticonStyle: (style: EmoticonStyle) => void;
   setAutoPasteOnCopy: (value: boolean) => void;
-  setExpandAsYouType: (value: boolean) => void;
-  setExpandTriggerMode: (value: MacroTriggerMode) => void;
-  setExpandKeepTriggerSpace: (value: boolean) => void;
   setExpandRestoreClipboard: (value: boolean) => void;
   onHelperReconcile?: () => void;
   setCheckUpdatesOnStartup: (value: boolean) => void;
@@ -136,9 +132,6 @@ export function AppShell(props: AppShellProps) {
     setFavoriteEmojiMacros,
     setEmoticonStyle,
     setAutoPasteOnCopy,
-    setExpandAsYouType,
-    setExpandTriggerMode,
-    setExpandKeepTriggerSpace,
     setExpandRestoreClipboard,
     onHelperReconcile,
     setCheckUpdatesOnStartup,
@@ -235,9 +228,6 @@ export function AppShell(props: AppShellProps) {
           onFavoriteEmojiMacros={setFavoriteEmojiMacros}
           onEmoticonStyle={setEmoticonStyle}
           onAutoPasteOnCopy={setAutoPasteOnCopy}
-          onExpandAsYouType={setExpandAsYouType}
-          onExpandTriggerMode={setExpandTriggerMode}
-          onExpandKeepTriggerSpace={setExpandKeepTriggerSpace}
           onExpandRestoreClipboard={setExpandRestoreClipboard}
           onHelperReconcile={onHelperReconcile}
           onCheckUpdatesOnStartup={setCheckUpdatesOnStartup}
