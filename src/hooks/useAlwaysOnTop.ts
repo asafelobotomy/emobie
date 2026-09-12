@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
@@ -7,6 +7,8 @@ export type PinCapability = {
   plasma: boolean;
   reliable: boolean;
   detail: string;
+  /** True on GNOME Wayland when the toggle-above shortcut isn't set up yet. */
+  gnomeSetupNeeded?: boolean;
 };
 
 export type PinApplyResult = {
@@ -80,9 +82,21 @@ export function useAlwaysOnTop(
   }, [pinned, enabled, onResult]);
 }
 
-/** One-shot compositor pin capability for Settings hints. */
+/** Compositor pin capability for Settings hints, with a manual refresh. */
 export function usePinCapability(enabled: boolean) {
   const [capability, setCapability] = useState<PinCapability | null>(null);
+
+  const refresh = useCallback(() => {
+    return invoke<PinCapability>("pin_capability")
+      .then((value) => {
+        setCapability(value);
+        return value;
+      })
+      .catch(() => {
+        setCapability(null);
+        return null;
+      });
+  }, []);
 
   useEffect(() => {
     if (!enabled) return;
@@ -99,5 +113,5 @@ export function usePinCapability(enabled: boolean) {
     };
   }, [enabled]);
 
-  return capability;
+  return { capability, refresh };
 }

@@ -2,8 +2,8 @@
 
 use super::clipboard::last_backend;
 use super::enigo::{
-    expand_with_enigo, new_enigo, paste_chord_enigo, retype_trigger_enigo, warm_up_enigo,
-    ENIGO_MAX_IDLE, POST_PASTE_DELAY,
+    expand_with_enigo, new_enigo, paste_chord_enigo, retype_trigger_enigo,
+    toggle_above_gnome_enigo, warm_up_enigo, ENIGO_MAX_IDLE, POST_PASTE_DELAY,
 };
 use super::uinput::{expand_with_uinput, retype_trigger_uinput, UINPUT_MAX_IDLE};
 use super::{finish_listen_suppress, now_ms, EXPAND_ENABLED, SUPPRESS_STARTED_MS};
@@ -26,6 +26,9 @@ pub(super) enum InjectJob {
         trigger_committed: bool,
     },
     Paste {
+        reply: mpsc::SyncSender<Result<(), String>>,
+    },
+    PinToggle {
         reply: mpsc::SyncSender<Result<(), String>>,
     },
 }
@@ -111,7 +114,7 @@ pub(super) fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
                                 finish_listen_suppress();
                                 eprintln!("expand failed: {err}");
                             }
-                            InjectJob::Paste { reply } => {
+                            InjectJob::Paste { reply } | InjectJob::PinToggle { reply } => {
                                 let _ = reply.send(Err(err.clone()));
                                 finish_listen_suppress();
                             }
@@ -208,6 +211,30 @@ pub(super) fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
                     }))
                 };
                 let result = match paste_result {
+                    Ok(Ok(())) => {
+                        last_inject = Instant::now();
+                        Ok(())
+                    }
+                    Ok(Err(err)) => {
+                        recover_backend_after_paste_failure(&mut uinput, &mut enigo);
+                        Err(err)
+                    }
+                    Err(_) => {
+                        recover_backend_after_paste_failure(&mut uinput, &mut enigo);
+                        Err("input injection backend panicked".to_string())
+                    }
+                };
+                let _ = reply.send(result);
+                finish_listen_suppress();
+            }
+            InjectJob::PinToggle { reply } => {
+                let toggle_result = if let Some(kbd) = uinput.as_mut() {
+                    catch_unwind(AssertUnwindSafe(|| kbd.toggle_above_gnome()))
+                } else {
+                    let backend = enigo.as_mut().expect("enigo ensured");
+                    catch_unwind(AssertUnwindSafe(|| toggle_above_gnome_enigo(backend)))
+                };
+                let result = match toggle_result {
                     Ok(Ok(())) => {
                         last_inject = Instant::now();
                         Ok(())

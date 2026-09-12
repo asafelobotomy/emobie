@@ -244,3 +244,26 @@ pub fn inject_ctrl_v() -> Result<(), String> {
         }
     }
 }
+
+/// Queue the GNOME `toggle-above` chord on the inject worker and wait for
+/// completion. The caller must ensure the emobie window has focus first —
+/// this fires at whatever window is currently focused, same as any other
+/// synthetic keychord here.
+pub fn inject_pin_toggle() -> Result<(), String> {
+    let (reply_tx, reply_rx) = mpsc::sync_channel(1);
+    let prev_jobs = LISTEN_SUPPRESS_JOBS.fetch_add(1, Ordering::AcqRel);
+    if prev_jobs == 0 {
+        SUPPRESS_STARTED_MS.store(now_ms(), Ordering::Release);
+    }
+    match inject_sender().try_send(InjectJob::PinToggle { reply: reply_tx }) {
+        Ok(()) => {}
+        Err(_) => {
+            finish_listen_suppress();
+            return Err("inject queue full".to_string());
+        }
+    }
+    match reply_rx.recv_timeout(Duration::from_secs(2)) {
+        Ok(result) => result,
+        Err(_) => Err("pin toggle inject timed out".to_string()),
+    }
+}

@@ -120,7 +120,8 @@ function App() {
 
   useTheme(prefs.theme);
   useAlwaysOnTop(prefs.pinned, ready);
-  const pinCapability = usePinCapability(ready);
+  const { capability: pinCapability, refresh: refreshPinCapability } =
+    usePinCapability(ready);
   useWindowDecorations(prefs.showTitleBar, ready);
   const autostartError = useAutostart(prefs.launchOnStartup, ready);
   useAllowMultipleInstances(prefs.allowMultipleInstances, ready);
@@ -336,6 +337,7 @@ function App() {
       autostartError={autostartError}
       prefsError={prefsError}
       pinCapability={pinCapability}
+      onRefreshPinCapability={refreshPinCapability}
       updateInfo={updateInfo}
       inputStatus={inputStatus}
       firstRunOpen={firstRunOpen}

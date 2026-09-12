@@ -31,6 +31,7 @@ type SettingsPanelProps = {
   trayUnavailable?: boolean;
   trayDetail?: string | null;
   pinCapability?: PinCapability | null;
+  onRefreshPinCapability?: () => void;
   updateInfo?: UpdateCheckResult | null;
   inputStatus: InputHelperStatus | null;
   onClose: () => void;
@@ -73,6 +74,7 @@ export function SettingsPanel({
   trayUnavailable,
   trayDetail,
   pinCapability,
+  onRefreshPinCapability,
   updateInfo,
   inputStatus,
   onClose,
@@ -178,6 +180,8 @@ export function SettingsPanel({
             prefs.pinned && pinCapability && !pinCapability.reliable,
           )}
           pinDetail={pinCapability?.detail ?? null}
+          pinGnomeSetupNeeded={Boolean(pinCapability?.gnomeSetupNeeded)}
+          onRefreshPinCapability={onRefreshPinCapability}
           prefsError={prefsError}
           autostartError={autostartError}
           multiInstanceEnabled={prefs.allowMultipleInstances}

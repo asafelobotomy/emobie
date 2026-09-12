@@ -72,6 +72,31 @@ pub fn native_inject_paste() -> Result<(), String> {
     Err("paste injection is only supported on Linux".into())
 }
 
+/// Ctrl+Alt+Super+F12 — must match `crate::pin::linux::gnome::TOGGLE_ABOVE_BINDING`
+/// and emobie-inputd's `UInputKeyboard::toggle_above_gnome`.
+#[cfg(target_os = "linux")]
+pub fn native_inject_pin_toggle() -> Result<(), String> {
+    match catch_unwind(AssertUnwindSafe(|| {
+        let mut enigo = Enigo::new(&Settings::default()).map_err(|e| e.to_string())?;
+        for key in [Key::Control, Key::Alt, Key::Meta] {
+            enigo.key(key, Direction::Press).map_err(|e| e.to_string())?;
+        }
+        let typed = enigo.key(Key::F12, Direction::Click).map_err(|e| e.to_string());
+        for key in [Key::Meta, Key::Alt, Key::Control] {
+            let _ = enigo.key(key, Direction::Release);
+        }
+        typed
+    })) {
+        Ok(inner) => inner,
+        Err(_) => Err("input injection backend panicked".into()),
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn native_inject_pin_toggle() -> Result<(), String> {
+    Err("pin toggle injection is only supported on Linux".into())
+}
+
 pub fn set_enabled(enabled: bool) -> Result<InputHelperStatus, String> {
     if enabled {
         let _ = ensure_started();
@@ -139,6 +164,25 @@ pub fn inject_paste() -> Result<(), String> {
                 return Err("emobie-inputd required inside Flatpak".into());
             }
             native_inject_paste()
+        }
+    }
+}
+
+/// See `crate::pin::linux::gnome::toggle_pin` — the caller is responsible
+/// for the emobie window having focus before this fires.
+pub fn inject_pin_toggle() -> Result<(), String> {
+    let _ = ensure_started();
+    match socket::request_with_timeout(
+        serde_json::json!({ "cmd": "inject_pin_toggle" }),
+        Duration::from_secs(3),
+    ) {
+        Ok(resp) if resp.ok => Ok(()),
+        Ok(resp) => Err(resp.error.unwrap_or(resp.detail)),
+        Err(_) => {
+            if std::env::var_os("FLATPAK_ID").is_some() {
+                return Err("emobie-inputd required inside Flatpak".into());
+            }
+            native_inject_pin_toggle()
         }
     }
 }

@@ -48,6 +48,7 @@ export type AppShellProps = {
   autostartError: string | null;
   prefsError: string | null;
   pinCapability: PinCapability | null;
+  onRefreshPinCapability?: () => void;
   updateInfo: UpdateCheckResult | null | undefined;
   inputStatus: InputHelperStatus | null;
   firstRunOpen: boolean;
@@ -110,6 +111,7 @@ export function AppShell(props: AppShellProps) {
     autostartError,
     prefsError,
     pinCapability,
+    onRefreshPinCapability,
     updateInfo,
     inputStatus,
     firstRunOpen,
@@ -215,6 +217,7 @@ export function AppShell(props: AppShellProps) {
           trayUnavailable={trayUnavailable}
           trayDetail={trayDetail}
           pinCapability={pinCapability}
+          onRefreshPinCapability={onRefreshPinCapability}
           updateInfo={updateInfo}
           inputStatus={inputStatus}
           onClose={onCloseSettings}

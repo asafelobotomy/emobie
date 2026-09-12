@@ -17,15 +17,19 @@ pub fn show_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
         let _ = window.show();
+        // Focus before re-applying pin: the GNOME toggle-above path
+        // synthesizes a keypress that lands on whatever window has focus —
+        // it must be this one, not focused after the fact.
+        let _ = window.set_focus();
         // Re-apply pin after show — WMs often clear keep-above on hide.
         crate::pin::apply_from_prefs(&window);
-        let _ = window.set_focus();
     }
 }
 
 pub fn hide_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.hide();
+        crate::pin::note_window_hidden();
     }
 }
 

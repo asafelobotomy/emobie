@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.24] - 2026-09-12
+
+### Added
+
+- Pin now works on GNOME Wayland. Mutter has no external always-on-top API
+  (`make_above`/`unmake_above` are only callable from inside the Shell
+  process), but it does ship an unbound-by-default `toggle-above`
+  keybinding. Settings → "Set up GNOME pin shortcut" claims that binding
+  for a fixed chord (Ctrl+Alt+Super+F12, never overwriting an existing
+  shortcut), and `emobie-inputd` synthesizes that exact keypress via
+  `/dev/uinput` when you toggle Pin — no custom GNOME Shell extension
+  required. Verified live: the exact synthetic chord correctly dispatches
+  GNOME keybinding actions (confirmed via `OverviewActive` flipping on a
+  temporary rebind test).
+- Since `toggle-above` toggles rather than sets state, `src-tauri/src/pin/linux/gnome.rs`
+  tracks emobie's own last-known above/below state and only sends a
+  keypress on a real transition, resetting to "unknown" on hide so a
+  stale tracked state can never suppress a needed re-assertion after
+  show. Window focus is now grabbed *before* re-applying pin on show
+  (previously focus was requested after — harmless for the existing X11/
+  KWin paths, but would have misdirected the new synthetic keypress).
+
 ## [0.6.23] - 2026-09-12
 
 ### Added

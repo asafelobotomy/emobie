@@ -32,6 +32,11 @@ pub enum Request {
         paste_chord: Option<String>,
     },
     InjectPaste,
+    /// Sends the fixed Ctrl+Alt+Super+F12 chord bound to GNOME's
+    /// `toggle-above` window keybinding — see src-tauri/src/pin.rs and
+    /// crate::inject::inject_pin_toggle. The caller (the app itself) is
+    /// responsible for the emobie window having focus when this fires.
+    InjectPinToggle,
 }
 
 #[derive(Debug, Serialize)]

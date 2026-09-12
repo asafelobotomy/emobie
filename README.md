@@ -69,7 +69,7 @@ Linux tray, pin, startup, and SELinux notes: [`docs/LINUX.md`](docs/LINUX.md).
 | **Expand** | As-you-type text expansion is deferred for now — macros still copy and auto-paste manually (see [docs/MACROS.md](docs/MACROS.md)) |
 | **Summon** | Global hotkey (default `Ctrl+Shift+Space`; letters/numbers need a modifier) and system tray |
 | **Layout** | Resize freely — horizontal, square, or vertical; frameless by default (optional title bar in Settings) |
-| **Pin** | Always-on-top from the toolbar or tray (X11 + Plasma Wayland; other Wayland compositors may ignore) |
+| **Pin** | Always-on-top from the toolbar or tray (X11, Plasma Wayland, and GNOME Wayland after a one-time shortcut setup in Settings; other Wayland compositors may ignore) |
 | **Look** | Light / dark / system theme, emoji size, and skin tone defaults |
 | **Sort** | Default order, name, type, first used, or number of uses |
 
@@ -190,7 +190,10 @@ Or run the **Release** workflow from the Actions tab.
   `~/.local/share/io.github.asafelobotomy.emobie/…` (older native builds used
   `com.emobie.app`). A durable mirror at
   `~/.local/share/emobie/preferences.json` keeps favorites/macros across both.
-- Pin is reliable on X11 and Plasma Wayland; other Wayland compositors may ignore it.
+- Pin is reliable on X11 and Plasma Wayland. On GNOME Wayland it needs a one-time shortcut
+  setup (Settings → "Set up GNOME pin shortcut") since Mutter has no external always-on-top
+  API — emobie binds GNOME's own unused `toggle-above` keybinding instead. Other Wayland
+  compositors may still ignore pin.
 
 ---
 

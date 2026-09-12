@@ -29,6 +29,7 @@ impl UInputKeyboard {
             Key::KEY_LEFTALT,
             Key::KEY_RIGHTALT,
             Key::KEY_LEFTMETA,
+            Key::KEY_F12,
             Key::KEY_V,
             Key::KEY_C,
             Key::KEY_INSERT,
@@ -174,5 +175,22 @@ impl UInputKeyboard {
             PasteChord::ShiftInsert => self.shift_insert(),
             PasteChord::CtrlShiftV => self.ctrl_shift_v(),
         }
+    }
+
+    /// Ctrl+Alt+Super+F12 — must match the accelerator string
+    /// `src-tauri/src/pin.rs` writes to GNOME's `toggle-above` keybinding
+    /// (`org.gnome.desktop.wm.keybindings`). Toggles whichever window
+    /// currently has focus between "always above" and normal — see
+    /// `crate::inject::inject_pin_toggle` for why this must only be sent
+    /// while the emobie window itself is known to be focused.
+    pub fn toggle_above_gnome(&mut self) -> Result<(), String> {
+        self.emit_key(Key::KEY_LEFTCTRL, 1)?;
+        self.emit_key(Key::KEY_LEFTALT, 1)?;
+        self.emit_key(Key::KEY_LEFTMETA, 1)?;
+        let typed = self.click(Key::KEY_F12);
+        let meta_released = self.emit_key(Key::KEY_LEFTMETA, 0);
+        let alt_released = self.emit_key(Key::KEY_LEFTALT, 0);
+        let ctrl_released = self.emit_key(Key::KEY_LEFTCTRL, 0);
+        typed.and(meta_released).and(alt_released).and(ctrl_released)
     }
 }

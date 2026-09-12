@@ -210,6 +210,15 @@ pub(crate) fn handle_client(
                 ),
                 Err(err) => Response::err(can_inject, can_listen, enabled_now, &err),
             },
+            Ok(Request::InjectPinToggle) => match inject::inject_pin_toggle() {
+                Ok(()) => Response::status(
+                    can_inject,
+                    can_listen,
+                    enabled.load(Ordering::Relaxed),
+                    "pin toggle injected",
+                ),
+                Err(err) => Response::err(can_inject, can_listen, enabled_now, &err),
+            },
             Err(err) => Response::err(
                 can_inject,
                 can_listen,

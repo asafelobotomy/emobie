@@ -40,8 +40,9 @@ fn apply_startup_visibility(app: &tauri::App, tray_ok: bool) {
         let _ = window.hide();
     } else {
         let _ = window.show();
-        pin::apply_from_prefs(&window);
+        // Focus before pin — see the matching comment in tray.rs.
         let _ = window.set_focus();
+        pin::apply_from_prefs(&window);
     }
 }
 
@@ -94,6 +95,7 @@ pub fn run() {
                 if tray_ok {
                     api.prevent_close();
                     let _ = window.hide();
+                    pin::note_window_hidden();
                 } else {
                     window.app_handle().exit(0);
                 }
@@ -108,6 +110,7 @@ pub fn run() {
             quit_app,
             pin::apply_window_pin,
             pin::pin_capability,
+            pin::pin_gnome_setup,
             input_helper::input_helper_status,
             input_helper::input_helper_ensure_started,
             input_helper::input_helper_set_enabled,

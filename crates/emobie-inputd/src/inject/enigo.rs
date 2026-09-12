@@ -136,6 +136,32 @@ pub(super) fn paste_chord_enigo(
     }
 }
 
+/// Enigo fallback for `UInputKeyboard::toggle_above_gnome` — see its doc
+/// comment for what this chord is and why it must match exactly.
+pub(super) fn toggle_above_gnome_enigo(enigo: &mut Enigo) -> Result<(), String> {
+    enigo
+        .key(Key::Control, Direction::Press)
+        .map_err(|e| e.to_string())?;
+    enigo
+        .key(Key::Alt, Direction::Press)
+        .map_err(|e| e.to_string())?;
+    enigo
+        .key(Key::Meta, Direction::Press)
+        .map_err(|e| e.to_string())?;
+    let typed = (|| -> Result<(), String> {
+        thread::sleep(KEY_GAP);
+        enigo.key(Key::F12, Direction::Click).map_err(|e| e.to_string())?;
+        thread::sleep(KEY_GAP);
+        Ok(())
+    })();
+    let meta_released = enigo.key(Key::Meta, Direction::Release).map_err(|e| e.to_string());
+    let alt_released = enigo.key(Key::Alt, Direction::Release).map_err(|e| e.to_string());
+    let ctrl_released = enigo
+        .key(Key::Control, Direction::Release)
+        .map_err(|e| e.to_string());
+    typed.and(meta_released).and(alt_released).and(ctrl_released)
+}
+
 fn erase_chars(enigo: &mut Enigo, count: usize) -> Result<(), String> {
     let count = count.min(crate::state::MAX_TRIGGER_LEN);
     for _ in 0..count {

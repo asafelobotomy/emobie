@@ -59,6 +59,15 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.24" date="2026-09-12">
+      <description>
+        <p>Pin now works on GNOME Wayland: a one-time Settings setup claims
+        Mutter's unused "toggle above" keybinding (never overwriting an
+        existing shortcut), which emobie then triggers via a synthetic
+        keypress to toggle always-on-top — no custom Shell extension
+        required.</p>
+      </description>
+    </release>
     <release version="0.6.23" date="2026-09-12">
       <description>
         <p>Auto-paste now detects the focused app (best-effort: X11/XWayland
