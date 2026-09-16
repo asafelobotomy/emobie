@@ -59,6 +59,16 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.25" date="2026-09-16">
+      <description>
+        <p>Fixed a startup freeze on GNOME Wayland with Pin enabled: applying
+        the saved pin state could shell out to bootstrap/start the input
+        helper and poll for up to ten seconds on the main thread before the
+        window became interactive. Pin application now happens in the
+        background, and the helper start sequence is capped at twelve
+        seconds so a stuck host command can no longer hang it.</p>
+      </description>
+    </release>
     <release version="0.6.24" date="2026-09-12">
       <description>
         <p>Pin now works on GNOME Wayland: a one-time Settings setup claims

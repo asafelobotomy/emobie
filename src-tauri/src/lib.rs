@@ -42,7 +42,14 @@ fn apply_startup_visibility(app: &tauri::App, tray_ok: bool) {
         let _ = window.show();
         // Focus before pin — see the matching comment in tray.rs.
         let _ = window.set_focus();
-        pin::apply_from_prefs(&window);
+        // Off the setup/main thread: on GNOME Wayland this can shell out to
+        // gsettings/systemctl and bootstrap emobie-inputd, which can take
+        // several seconds and must not block the window from becoming
+        // interactive (see src-tauri/src/input_helper/unix/lifecycle.rs).
+        let window_for_pin = window.clone();
+        std::thread::spawn(move || {
+            pin::apply_from_prefs(&window_for_pin);
+        });
     }
 }
 

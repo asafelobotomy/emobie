@@ -115,7 +115,28 @@ fn stop_all_helpers() {
     }
 }
 
+/// Cap on the whole bootstrap/start chain below. It shells out to
+/// tar/bash/systemctl (and `flatpak-spawn --host` for those under Flatpak)
+/// with no per-call timeout of their own, so a wedged host command (e.g. a
+/// stuck portal prompt) must not be able to hang callers indefinitely —
+/// callers already run this off the UI thread, but should still get an
+/// answer in bounded time.
+const ENSURE_STARTED_BUDGET: Duration = Duration::from_secs(12);
+
 pub fn ensure_started() -> InputHelperStatus {
+    let (tx, rx) = std::sync::mpsc::channel();
+    // Detached: if this outruns the budget it keeps trying in the background
+    // (harmless — the daemon may still end up running for the next call) and
+    // is simply dropped once it eventually finishes.
+    thread::spawn(move || {
+        let _ = tx.send(ensure_started_inner());
+    });
+    rx.recv_timeout(ENSURE_STARTED_BUDGET).unwrap_or_else(|_| {
+        offline_status("emobie-inputd start timed out — a host command may be stuck")
+    })
+}
+
+fn ensure_started_inner() -> InputHelperStatus {
     if let Ok(resp) = request(serde_json::json!({ "cmd": "status" })) {
         // Enigo re-detects Wayland each inject — do not restart solely because
         // can_inject is false (burns heal and thrash on headless/early boot).

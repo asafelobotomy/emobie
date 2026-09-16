@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.25] - 2026-09-16
+
+### Fixed
+
+- **Fixed startup freeze on GNOME Wayland with Pin enabled.** Applying the
+  saved Pin state ran synchronously inside Tauri's `setup()` callback — the
+  main thread, before the window's event loop was pumping. On GNOME Wayland
+  this call chain (`pin::apply_from_prefs` → `ensure_started()`) can shell
+  out to bootstrap/install `emobie-inputd`, run `systemctl --user`, and
+  poll every 150ms for up to ~10 seconds total, which froze the whole
+  window on every launch whenever the daemon wasn't already running. Pin
+  application now runs on a background thread so the window shows and
+  becomes interactive immediately (`src-tauri/src/lib.rs`).
+- Capped `ensure_started()`'s bootstrap/start chain at 12 seconds
+  (`src-tauri/src/input_helper/unix/lifecycle.rs`). The chain shells out to
+  tar/bash/systemctl (and `flatpak-spawn --host` under Flatpak) with no
+  per-call timeout of their own, so a wedged host command (e.g. a stuck
+  portal prompt) could otherwise hang callers indefinitely even off the UI
+  thread.
+
 ## [0.6.24] - 2026-09-12
 
 ### Added
