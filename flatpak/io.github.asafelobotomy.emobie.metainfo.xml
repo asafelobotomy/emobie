@@ -59,6 +59,16 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.26" date="2026-09-21">
+      <description>
+        <p>Security and reliability release. Setting up paste access no longer
+        installs files from user-writable folders as root; in-app updates are
+        verified against a published checksum; and the input helper only reads
+        the keyboard while text expansion is enabled. Also fixes the helper
+        install and native update, the GNOME pin setup button, and preferences
+        that came back after deleting them.</p>
+      </description>
+    </release>
     <release version="0.6.25" date="2026-09-16">
       <description>
         <p>Fixed a startup freeze on GNOME Wayland with Pin enabled: applying

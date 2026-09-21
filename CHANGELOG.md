@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.26] - 2026-09-21
+
 ### Security
 
 - **Privileged setup no longer trusts user-writable files.** Grant used to copy
