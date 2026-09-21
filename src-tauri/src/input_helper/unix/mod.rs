@@ -195,7 +195,11 @@ mod tests {
     #[test]
     fn trusts_tmp_emobie_fallback() {
         let uid = current_uid();
-        let path = format!("/tmp/emobie-{uid}/emobie-inputd.sock");
+        // The trust check inspects the directory, so the fixture must exist
+        // (CI runners start without it).
+        let dir = format!("/tmp/emobie-{uid}");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = format!("{dir}/emobie-inputd.sock");
         assert!(trusted_socket_path(Path::new(&path)));
     }
 
