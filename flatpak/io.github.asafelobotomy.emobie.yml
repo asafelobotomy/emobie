@@ -65,11 +65,11 @@ modules:
     sources:
       - type: git
         url: https://github.com/asafelobotomy/emobie.git
-        # v0.6.18-v0.6.24 haven't been tagged yet (only committed to main), so
-        # this pins the commit directly. Switch back to `tag:` once v0.6.24
-        # is tagged and pushed — flatpak-builder fails if `tag:` names a ref
-        # that doesn't exist on the remote.
-        commit: 7279b1af186575475ebd547b30551eca33ed82c9
+        # Pinned to the v0.6.26 release commit. flatpak-builder checks that the
+        # tag and commit agree and fails if the tag has not been pushed to the
+        # remote, so push v0.6.26 before building this manifest.
+        tag: v0.6.26
+        commit: 98cee2df002b8da550a610dbea038d142eda9427
         x-checker-data:
           type: git
           tag-pattern: ^v([0-9]+(\.[0-9]+)*)$
