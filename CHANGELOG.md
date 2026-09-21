@@ -53,13 +53,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Paste no longer fires late after the app already reported a timeout, and the
   focused-window lookup is bounded (300 ms) instead of able to stall every paste.
 - Rust command errors (plain strings) are now shown instead of a generic message.
+- Input helper commands (`input_helper_*`) run on the blocking pool instead of the
+  UI thread (the first-run hook polls status every 15 s, and each poll can spawn
+  host processes), and helper start/restart are serialized so concurrent callers
+  cannot double-bootstrap.
+- Held keys are tracked as a set, so autorepeat no longer leaves the keymap
+  reload permanently blocked; a panicking keyboard-device thread now frees its
+  slot for retry; `/etc/default/keyboard` parsing no longer aborts on a line
+  without `=`.
+- `.deb` icon repack regenerates `md5sums`; `verify-expand-setup.sh` warns about an
+  installed udev rule that still grants keyboard read; the hotkey capture control
+  no longer reuses one DOM id across instances.
 - Macro import skips triggers/expansions the helper would reject (control
   characters, NUL) instead of failing the whole sync; autostart `Exec=` is quoted
   per the Desktop Entry spec; the suspend/resume restart only happens under systemd.
 
 ### Changed
 
-- Flatpak offline sources now cover both lockfiles (`scripts/flatpak-cargo-sources.py`).
+- Flatpak offline sources now cover both lockfiles (`scripts/flatpak-cargo-sources.py`, plain Python 3 — no `tomllib`, so it runs on the CI runner's 3.10).
 - CI: actions pinned to commit SHAs, least-privilege workflow permissions,
   `appimagetool` pinned to 1.9.1 with a checksum, clippy (`-D warnings`), app
   crate tests, production `npm audit`, Flatpak-sources freshness and ACL checks.

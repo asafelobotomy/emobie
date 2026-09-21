@@ -114,10 +114,7 @@ fn cancel_pending(pending: &Mutex<Option<PendingExpand>>, buffer: &Mutex<String>
 }
 
 /// Drop pending expands whose completing-key release never arrived.
-pub(super) fn expire_stale_pending(
-    pending: &Mutex<Option<PendingExpand>>,
-    buffer: &Mutex<String>,
-) {
+pub(super) fn expire_stale_pending(pending: &Mutex<Option<PendingExpand>>, buffer: &Mutex<String>) {
     let stale = {
         let Ok(mut guard) = pending.lock() else {
             return;

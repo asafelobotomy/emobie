@@ -212,6 +212,12 @@ repack_deb() {
       ln -sfn "${ICON_ID}.desktop" \
         "$tmp/data/usr/share/applications/emobie.desktop"
     fi
+    # Icons/desktop files were renamed above, so the control tarball's md5sums
+    # would list paths that no longer exist (dpkg --verify / debsums noise).
+    if [[ -f control/md5sums ]]; then
+      (cd data && find . -type f -print0 | sort -z | xargs -0 md5sum | sed 's|  \./|  |') \
+        >control/md5sums
+    fi
     tar -C data -cJf data.tar.xz --owner=root --group=root .
     tar -C control -czf control.tar.gz .
     local out="$tmp/fixed.deb"

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { formatHotkey } from "../lib/formatHotkey";
 
 type HotkeyCaptureProps = {
@@ -20,6 +20,9 @@ export function HotkeyCapture({
   hint,
   allowClear = false,
 }: HotkeyCaptureProps) {
+  // Unique per instance: this control is rendered in Settings and in the macro
+  // editor, and duplicate ids break aria-labelledby.
+  const labelId = useId();
   const [capturing, setCapturing] = useState(false);
   const [draftHotkey, setDraftHotkey] = useState(value);
   const [hotkeyHint, setHotkeyHint] = useState<string | null>(null);
@@ -74,7 +77,7 @@ export function HotkeyCapture({
 
   return (
     <div className="settings-row">
-      <label className="settings-label" id="hotkey-label">
+      <label className="settings-label" id={labelId}>
         {label}
       </label>
       <div className="hotkey-capture-row">
@@ -83,7 +86,7 @@ export function HotkeyCapture({
           className={`hotkey-capture${capturing ? " active" : ""}`}
           onClick={startCapture}
           aria-pressed={capturing}
-          aria-labelledby="hotkey-label"
+          aria-labelledby={labelId}
         >
           {capturing
             ? "Press a shortcut…"

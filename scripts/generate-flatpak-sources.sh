@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Regenerate Flatpak offline dependency manifests from lockfiles.
-# Requires: Python 3.11+ (cargo sources, no extra deps) and flatpak-node-generator
+# Requires: any Python 3 (cargo sources, no extra deps) and flatpak-node-generator
 #   on PATH (from flatpak/flatpak-builder-tools) for the npm sources.
 set -euo pipefail
 

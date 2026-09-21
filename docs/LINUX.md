@@ -60,7 +60,7 @@ Text expansion needs three layers on every distro:
 | Layer | What | How |
 |-------|------|-----|
 | **Helper daemon** | `emobie-inputd` on the **host** (same user as the desktop session) | Bundled in `.deb`/`.rpm`; AppImage/Flatpak auto-install on first Expand |
-| **Keyboard read** | Open `/dev/input/event*` | udev group `emobie-input` + one-time **Grant** (Polkit); `setfacl` when `acl` package installed |
+| **Keyboard read** | Open `/dev/input/event*` — **only for the deferred as-you-type Expand**; current releases neither request nor use it, and the helper opens no keyboard device unless expansion is enabled | (previously) udev group `emobie-input` via **Grant**. If you granted with an older release, re-run **Grant** to drop the old keyboard-read rule |
 | **Text inject** | Erase trigger + insert expansion into the focused app | **`/dev/uinput`** via the same Grant (required on Wayland/Plasma — Enigo virtual-keyboard is often unavailable); short ASCII types as keys; rich text uses clipboard (`wl-copy` / arboard) + paste chords; X11 can fall back to Enigo |
 
 Grant’s udev rule sets `GROUP=emobie-input MODE=0660` on `/dev/uinput` and applies a session
@@ -108,8 +108,11 @@ restore after paste is **off by default** in Settings (avoids Plasma restore rac
 
 If listen works but the group/udev files are missing (common after a partial Grant,
 orphaned GID, or ACL-only session), emobie re-runs Grant instead of skipping it.
-AppImage/Flatpak Grant stages the setup script **and** udev/policy siblings under
-`/usr/local/share/emobie/` so Polkit always has the assets it needs.
+AppImage/Flatpak Grant stages the setup script **and** the udev/polkit/SELinux siblings under
+`/usr/local/share/emobie/` so Polkit always has the assets it needs. The staged files
+are the exact bytes embedded in the emobie binary — never copies taken from
+`~/.local/share/emobie` or the AppImage mount — and the root script refuses to run
+unless it and its directory are root-owned.
 
 ### SELinux (Fedora / RHEL)
 
@@ -174,12 +177,17 @@ newer [GitHub Release](https://github.com/asafelobotomy/emobie/releases) exists.
 | Native / other | `.deb` | Extracts `usr/bin/emobie` → `~/.local/bin/emobie-bin` |
 
 Quit and relaunch after a successful update. Download URLs are limited to this
-repo’s `releases/download/` assets.
+repo’s `releases/download/` assets. One-click update requires the release to
+publish a `SHA256SUMS` asset: the download is verified against it (and, for
+`.deb`/`.rpm`, verified again on a root-owned copy right before the installer
+runs). Versions that are not newer than the running one are refused. Releases
+without `SHA256SUMS` only offer **Open release**.
 
 Favorites, recents, and custom macros are stored in the app preference file and
 mirrored to `~/.local/share/emobie/preferences.json` so they survive updates and
-install-channel switches (native ↔ Flatpak). On startup emobie merges those
-sources if one side is missing user data.
+install-channel switches (native ↔ Flatpak). On startup the active store is
+authoritative for every list it already has (so deletions stick); the other
+copies only fill in what it lacks, e.g. on a fresh install.
 
 ## Building AppImage locally
 

@@ -9,9 +9,9 @@
 //! Reload only when the layout fingerprint changes, and never while keys are
 //! held — rebuilding `xkb_state` mid-chord drops Shift/Caps and mis-maps.
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
 use xkbcommon::xkb::{self, KeyDirection, KEYMAP_COMPILE_NO_FLAGS};
 
@@ -22,7 +22,9 @@ pub struct KeymapState {
     /// Fingerprint of the RMLVO used to build `state`.
     fingerprint: Mutex<String>,
     /// Keys currently down (evdev codes). Reload is deferred while non-empty.
-    pressed: AtomicU32,
+    /// A set, not a counter: autorepeat re-reports a held key as pressed, and a
+    /// counter would then never return to zero (blocking layout reloads).
+    pressed: Mutex<HashSet<u16>>,
 }
 
 impl KeymapState {
@@ -31,14 +33,18 @@ impl KeymapState {
         Self {
             state: Mutex::new(xkb::State::new(&keymap)),
             fingerprint: Mutex::new(fingerprint),
-            pressed: AtomicU32::new(0),
+            pressed: Mutex::new(HashSet::new()),
         }
+    }
+
+    fn any_key_held(&self) -> bool {
+        self.pressed.lock().map(|set| !set.is_empty()).unwrap_or(true)
     }
 
     /// Reload layout when session config changed and no keys are held.
     /// Returns true if the keymap was replaced.
     pub fn reload_from_session_if_idle(&self) -> bool {
-        if self.pressed.load(Ordering::Relaxed) > 0 {
+        if self.any_key_held() {
             return false;
         }
         let (keymap, fingerprint) = load_session_keymap();
@@ -52,7 +58,7 @@ impl KeymapState {
             return false;
         };
         // Re-check pressed after taking locks — a key may have gone down.
-        if self.pressed.load(Ordering::Relaxed) > 0 {
+        if self.any_key_held() {
             return false;
         }
         *guard = xkb::State::new(&keymap);
@@ -72,19 +78,13 @@ impl KeymapState {
         } else {
             KeyDirection::Up
         };
-        if pressed {
-            self.pressed.fetch_add(1, Ordering::Relaxed);
-        } else {
-            // Saturating — never underflow if we missed a press (device reset).
-            let mut prev = self.pressed.load(Ordering::Relaxed);
-            while prev > 0 {
-                match self
-                    .pressed
-                    .compare_exchange(prev, prev - 1, Ordering::Relaxed, Ordering::Relaxed)
-                {
-                    Ok(_) => break,
-                    Err(v) => prev = v,
-                }
+        // Take and drop the `pressed` lock before `state`: the reload path holds
+        // `state` while checking `pressed`.
+        if let Ok(mut set) = self.pressed.lock() {
+            if pressed {
+                set.insert(evdev_code);
+            } else {
+                set.remove(&evdev_code);
             }
         }
         if let Ok(mut guard) = self.state.lock() {
@@ -262,7 +262,10 @@ fn parse_keyboard_file(path: &str) -> Option<Rmlvo> {
         if line.starts_with('#') || line.is_empty() {
             continue;
         }
-        let (key, value) = line.split_once('=')?;
+        // Skip lines that are not `KEY=value` instead of abandoning the file.
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
         let value = value.trim().trim_matches('"').trim_matches('\'');
         match key.trim() {
             "XKBLAYOUT" | "KEYMAP" => {
@@ -318,6 +321,18 @@ mod tests {
         km.update_key(30, true);
         assert!(!km.reload_from_session_if_idle());
         km.update_key(30, false);
+    }
+
+    #[test]
+    fn autorepeat_does_not_wedge_reload() {
+        let km = KeymapState::new();
+        // Held key re-reported as pressed several times (autorepeat), then released.
+        for _ in 0..5 {
+            km.update_key(30, true);
+        }
+        assert!(km.any_key_held());
+        km.update_key(30, false);
+        assert!(!km.any_key_held(), "one release must clear a repeated press");
     }
 
     #[test]

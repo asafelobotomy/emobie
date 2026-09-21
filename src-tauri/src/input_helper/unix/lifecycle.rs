@@ -121,6 +121,13 @@ fn stop_all_helpers() {
 /// stuck portal prompt) must not be able to hang callers indefinitely —
 /// callers already run this off the UI thread, but should still get an
 /// answer in bounded time.
+/// Serializes start/restart. `ensure_started` is reachable from several
+/// commands at once (status polling, sync, options, Grant); without this two
+/// callers can both bootstrap/`systemctl start`, or one can start the daemon
+/// while another is stopping it. Waiters re-probe status once they get the
+/// lock, so a helper started meanwhile is simply reused.
+static START_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 const ENSURE_STARTED_BUDGET: Duration = Duration::from_secs(12);
 
 pub fn ensure_started() -> InputHelperStatus {
@@ -137,6 +144,7 @@ pub fn ensure_started() -> InputHelperStatus {
 }
 
 fn ensure_started_inner() -> InputHelperStatus {
+    let _guard = START_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     if let Ok(resp) = request(serde_json::json!({ "cmd": "status" })) {
         // Enigo re-detects Wayland each inject — do not restart solely because
         // can_inject is false (burns heal and thrash on headless/early boot).
@@ -171,6 +179,7 @@ fn ensure_started_inner() -> InputHelperStatus {
 
 /// Restart so can_listen re-opens devices after ACL/udev changes.
 pub fn restart_helper() -> InputHelperStatus {
+    let _guard = START_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     stop_all_helpers();
     if try_systemctl_start() {
         if let Some(status) = wait_until_running(34) {

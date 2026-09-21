@@ -11,10 +11,10 @@ pub use devices::can_listen;
 
 use evdev::{Device, InputEventKind};
 use keys::{expire_stale_pending, handle_key, trim_buffer, PendingExpand};
-use std::collections::HashSet;
-use std::path::PathBuf;
 use nix::poll::{poll, PollFd, PollFlags, PollTimeout};
+use std::collections::HashSet;
 use std::os::fd::{AsRawFd, BorrowedFd};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
@@ -42,12 +42,12 @@ static SHARED: OnceLock<Shared> = OnceLock::new();
 static STARTED: AtomicBool = AtomicBool::new(false);
 
 /// Register the state the listener needs. Does not start listening.
-pub fn configure(
-    enabled: Arc<AtomicBool>,
-    trie: Arc<Mutex<TriggerTrie>>,
-    stop: Arc<AtomicBool>,
-) {
-    let _ = SHARED.set(Shared { enabled, trie, stop });
+pub fn configure(enabled: Arc<AtomicBool>, trie: Arc<Mutex<TriggerTrie>>, stop: Arc<AtomicBool>) {
+    let _ = SHARED.set(Shared {
+        enabled,
+        trie,
+        stop,
+    });
 }
 
 /// Start the keyboard listener (once). Called only when expansion is enabled,
@@ -133,65 +133,67 @@ fn spawn_device_thread(
     alive: Arc<Mutex<HashSet<PathBuf>>>,
 ) {
     thread::spawn(move || {
-        let keymap = KeymapState::new();
-        let mut last_reload = Instant::now();
-        let result = (|| -> Result<(), ()> {
-            let mut device = Device::open(&path).map_err(|_| ())?;
-            loop {
-                if stop.load(Ordering::Relaxed) {
-                    return Ok(());
-                }
-                // Expansion switched off: close the device promptly instead of
-                // continuing to read the keyboard.
-                if !enabled.load(Ordering::Relaxed) {
-                    if let Ok(mut guard) = buffer.lock() {
-                        guard.clear();
+        // Whatever happens below (including a panic, e.g. no xkb data on the
+        // host), the path must leave `alive` so the hotplug scan can retry it.
+        let cleanup_path = path.clone();
+        let cleanup_alive = alive.clone();
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+            let keymap = KeymapState::new();
+            let mut last_reload = Instant::now();
+            let result = (|| -> Result<(), ()> {
+                let mut device = Device::open(&path).map_err(|_| ())?;
+                loop {
+                    if stop.load(Ordering::Relaxed) {
+                        return Ok(());
                     }
-                    return Ok(());
-                }
-                if last_reload.elapsed() >= Duration::from_secs(30) {
-                    keymap.reload_from_session();
-                    last_reload = Instant::now();
-                }
-                expire_stale_pending(&pending, &buffer);
-                if !wait_readable(&device) {
-                    continue;
-                }
-                let events = match device.fetch_events() {
-                    Ok(events) => events,
-                    Err(_) => {
-                        thread::sleep(Duration::from_millis(50));
-                        return Err(());
+                    // Expansion switched off: close the device promptly instead of
+                    // continuing to read the keyboard.
+                    if !enabled.load(Ordering::Relaxed) {
+                        if let Ok(mut guard) = buffer.lock() {
+                            guard.clear();
+                        }
+                        return Ok(());
                     }
-                };
-                for event in events {
-                    if let InputEventKind::Key(key) = event.kind() {
-                        let _gate = KEY_HANDLER.lock().unwrap_or_else(|e| e.into_inner());
-                        handle_key(
-                            key,
-                            event.value(),
-                            &keymap,
-                            &enabled,
-                            &buffer,
-                            &trie,
-                            &pending,
-                        );
+                    if last_reload.elapsed() >= Duration::from_secs(30) {
+                        keymap.reload_from_session();
+                        last_reload = Instant::now();
+                    }
+                    expire_stale_pending(&pending, &buffer);
+                    if !wait_readable(&device) {
+                        continue;
+                    }
+                    let events = match device.fetch_events() {
+                        Ok(events) => events,
+                        Err(_) => {
+                            thread::sleep(Duration::from_millis(50));
+                            return Err(());
+                        }
+                    };
+                    for event in events {
+                        if let InputEventKind::Key(key) = event.kind() {
+                            let _gate = KEY_HANDLER.lock().unwrap_or_else(|e| e.into_inner());
+                            handle_key(
+                                key,
+                                event.value(),
+                                &keymap,
+                                &enabled,
+                                &buffer,
+                                &trie,
+                                &pending,
+                            );
+                        }
                     }
                 }
-            }
-        })();
-        let _ = result;
-        if let Ok(mut guard) = alive.lock() {
-            guard.remove(&path);
-        }
+            })();
+            let _ = result;
+        }));
+        let _ = cleanup_alive
+            .lock()
+            .map(|mut guard| guard.remove(&cleanup_path));
     });
 }
 
-fn spawn_listener(
-    enabled: Arc<AtomicBool>,
-    trie: Arc<Mutex<TriggerTrie>>,
-    stop: Arc<AtomicBool>,
-) {
+fn spawn_listener(enabled: Arc<AtomicBool>, trie: Arc<Mutex<TriggerTrie>>, stop: Arc<AtomicBool>) {
     thread::spawn(move || {
         let buffer = Arc::new(Mutex::new(String::new()));
         let pending = Arc::new(Mutex::new(None));
@@ -212,10 +214,7 @@ fn spawn_listener(
                 continue;
             }
             for path in paths {
-                let already = alive
-                    .lock()
-                    .map(|g| g.contains(&path))
-                    .unwrap_or(true);
+                let already = alive.lock().map(|g| g.contains(&path)).unwrap_or(true);
                 if already {
                     continue;
                 }

@@ -107,6 +107,11 @@ fi
 # --- udev rules ---
 if [[ -f /etc/udev/rules.d/99-emobie-input.rules ]]; then
   pass "udev rules installed"
+  # Releases before the paste-only rule also granted the emobie-input group read
+  # access to keyboard event devices. Existence alone hides that.
+  if grep -Ev '^[[:space:]]*(#|$)' /etc/udev/rules.d/99-emobie-input.rules | grep -q 'event\*'; then
+    warn "Installed udev rule still grants keyboard READ access (old rule) — re-run Grant to replace it with the current paste-only rule"
+  fi
 else
   fail "Missing /etc/udev/rules.d/99-emobie-input.rules — run setup-input-access.sh"
 fi

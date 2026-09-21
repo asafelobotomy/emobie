@@ -6,12 +6,12 @@ crates/emobie-inputd), so the vendored set must cover both lockfiles; the stock
 flatpak-cargo-generator only takes one. Output format matches that tool for
 registry crates (archive + .cargo-checksum.json + a source-replacement config).
 
-Usage: flatpak-cargo-sources.py [-o OUT] LOCK [LOCK...]
+Works on any Python 3.\n\nUsage: flatpak-cargo-sources.py [-o OUT] LOCK [LOCK...]
        flatpak-cargo-sources.py --check OUT LOCK [LOCK...]   # exit 1 if stale
 """
 import json
+import re
 import sys
-import tomllib
 
 CRATES_IO = "registry+https://github.com/rust-lang/crates.io-index"
 CONFIG = (
@@ -20,12 +20,36 @@ CONFIG = (
 )
 
 
+_KV = re.compile(r'^(name|version|source|checksum) = "([^"]*)"$')
+
+
+def read_packages(path):
+    """Parse `[[package]]` tables from a Cargo.lock.
+
+    Cargo.lock is machine-written with one `key = "value"` per line, so a tiny
+    parser is enough and keeps this script dependency-free (the CI runner's
+    Python 3.10 has no `tomllib`).
+    """
+    packages, current = [], None
+    with open(path, encoding="utf-8") as fh:
+        for raw in fh:
+            line = raw.rstrip("\n")
+            if line == "[[package]]":
+                current = {}
+                packages.append(current)
+            elif line.startswith("["):
+                current = None  # [metadata] etc.
+            elif current is not None:
+                m = _KV.match(line)
+                if m:
+                    current[m.group(1)] = m.group(2)
+    return packages
+
+
 def crates_from(lock_paths):
     found = {}
     for path in lock_paths:
-        with open(path, "rb") as fh:
-            lock = tomllib.load(fh)
-        for pkg in lock.get("package", []):
+        for pkg in read_packages(path):
             source = pkg.get("source")
             if source is None:
                 continue  # workspace member / the crate itself

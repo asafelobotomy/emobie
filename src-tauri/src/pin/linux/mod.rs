@@ -110,7 +110,8 @@ pub fn apply_compositor_pin(window: &WebviewWindow, pinned: bool) -> PinApplyRes
         && !desktop_is_plasma()
         && matches!(gnome::binding_status(), gnome::BindingStatus::Ready)
     {
-        if !wait_for_focus(window) {
+        // Already in the requested state: nothing will be sent, so no focus needed.
+        if !gnome::is_noop(pinned) && !wait_for_focus(window) {
             return PinApplyResult {
                 applied: false,
                 limited: false,

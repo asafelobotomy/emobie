@@ -93,6 +93,13 @@ pub fn note_hidden() {
     LAST_ABOVE.store(STATE_UNKNOWN, Ordering::Relaxed);
 }
 
+/// True when `toggle_pin(pinned)` would do nothing (state already as requested),
+/// so callers can skip waiting for window focus.
+pub fn is_noop(pinned: bool) -> bool {
+    let desired = if pinned { STATE_ABOVE } else { STATE_BELOW };
+    already_in_state(LAST_ABOVE.load(Ordering::Relaxed), desired)
+}
+
 /// Whether `toggle_pin(desired)` would be a no-op given what we believe.
 /// An unknown state counts as "not above": a freshly mapped window is never
 /// above, so a request to *unpin* must not send the (toggling) chord — that
