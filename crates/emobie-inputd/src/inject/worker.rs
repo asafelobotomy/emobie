@@ -10,8 +10,8 @@ use super::{finish_listen_suppress, now_ms, EXPAND_ENABLED, SUPPRESS_STARTED_MS}
 
 use ::enigo::Enigo;
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::sync::atomic::Ordering;
-use std::sync::mpsc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{mpsc, Arc};
 use std::thread;
 use std::time::Instant;
 
@@ -27,10 +27,24 @@ pub(super) enum InjectJob {
     },
     Paste {
         reply: mpsc::SyncSender<Result<(), String>>,
+        /// Set by the caller when it gave up waiting; the job must not run late.
+        cancel: Arc<AtomicBool>,
     },
     PinToggle {
         reply: mpsc::SyncSender<Result<(), String>>,
+        cancel: Arc<AtomicBool>,
     },
+}
+
+impl InjectJob {
+    fn is_cancelled(&self) -> bool {
+        match self {
+            InjectJob::Paste { cancel, .. } | InjectJob::PinToggle { cancel, .. } => {
+                cancel.load(Ordering::Acquire)
+            }
+            InjectJob::Expand { .. } => false,
+        }
+    }
 }
 
 fn recover_after_expand_failure(
@@ -89,6 +103,12 @@ pub(super) fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
     let mut last_inject = Instant::now();
 
     while let Ok(job) = rx.recv() {
+        // The requester timed out — a late Ctrl+V / pin chord would land in
+        // whatever window is focused by now.
+        if job.is_cancelled() {
+            finish_listen_suppress();
+            continue;
+        }
         if uinput.is_some() && last_inject.elapsed() >= UINPUT_MAX_IDLE {
             let refreshed = UInputKeyboard::open().ok();
             if refreshed.is_none() {
@@ -114,7 +134,7 @@ pub(super) fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
                                 finish_listen_suppress();
                                 eprintln!("expand failed: {err}");
                             }
-                            InjectJob::Paste { reply } | InjectJob::PinToggle { reply } => {
+                            InjectJob::Paste { reply, .. } | InjectJob::PinToggle { reply, .. } => {
                                 let _ = reply.send(Err(err.clone()));
                                 finish_listen_suppress();
                             }
@@ -186,12 +206,16 @@ pub(super) fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
                     }
                 }
             }
-            InjectJob::Paste { reply } => {
+            InjectJob::Paste { reply, cancel } => {
                 // Best-effort: falls back to the default Ctrl+V chord when
                 // the focused app can't be identified (see paste_chord.rs).
                 let chord = crate::paste_chord::decide(
                     crate::focused_window::detect_class().as_deref(),
                 );
+                if cancel.load(Ordering::Acquire) {
+                    finish_listen_suppress();
+                    continue;
+                }
                 let paste_result = if let Some(kbd) = uinput.as_mut() {
                     catch_unwind(AssertUnwindSafe(|| {
                         let result = kbd.paste_chord(chord);
@@ -227,7 +251,7 @@ pub(super) fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
                 let _ = reply.send(result);
                 finish_listen_suppress();
             }
-            InjectJob::PinToggle { reply } => {
+            InjectJob::PinToggle { reply, .. } => {
                 let toggle_result = if let Some(kbd) = uinput.as_mut() {
                     catch_unwind(AssertUnwindSafe(|| kbd.toggle_above_gnome()))
                 } else {

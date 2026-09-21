@@ -4,6 +4,7 @@ import {
   exportMacrosYaml,
   importMacrosYaml,
 } from "../lib/macroYaml";
+import { errorMessage } from "../lib/errorMessage";
 
 type MacrosSettingsProps = {
   macros: Macro[];
@@ -45,9 +46,7 @@ export function MacrosSettings({
           (result.skipped ? `, skipped ${result.skipped}` : ""),
       );
     } catch (error) {
-      setIoMessage(
-        error instanceof Error ? error.message : "Import failed.",
-      );
+      setIoMessage(errorMessage(error, "Import failed."));
     }
   };
 

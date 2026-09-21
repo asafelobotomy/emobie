@@ -26,7 +26,7 @@ enigo = { version = "0.3", default-features = false, features = ["x11rb", "wayla
 x11rb = "0.13"
 evdev = "0.12"
 xkbcommon = "0.8"
-nix = { version = "0.29", features = ["fs", "uio", "socket", "user"] }
+nix = { version = "0.29", features = ["fs", "uio", "socket", "user", "poll"] }
 ctrlc = "3"
 reis = { version = "0.7", optional = true }
 ashpd = { version = "0.11", optional = true, features = ["tokio"] }

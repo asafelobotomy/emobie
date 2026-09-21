@@ -7,6 +7,15 @@
 mod gnome;
 mod x11;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
+
+/// Upper bound on one focused-window lookup before falling back to Ctrl+V.
+const LOOKUP_TIMEOUT: Duration = Duration::from_millis(300);
+static LOOKUP_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
+
 /// On a Wayland session, tries the optional "Focused Window D-Bus" GNOME
 /// Shell extension (https://extensions.gnome.org/extension/5592/) first —
 /// it's authoritative for native-Wayland clients, whereas XWayland's
@@ -19,6 +28,29 @@ mod x11;
 /// without an X server, this returns `None` and paste_chord::decide falls
 /// back to its pre-existing default.
 pub fn detect_class() -> Option<String> {
+    // The D-Bus / X11 calls below have no timeout of their own, and this runs
+    // on the single inject worker — a wedged Shell or X server must not stall
+    // every paste. Bound the lookup, and skip it entirely while a previous
+    // (hung) lookup is still outstanding.
+    if LOOKUP_IN_FLIGHT.swap(true, Ordering::AcqRel) {
+        return None;
+    }
+    let (tx, rx) = mpsc::channel();
+    let spawned = thread::Builder::new()
+        .name("emobie-focus-lookup".into())
+        .spawn(move || {
+            let class = detect_class_blocking();
+            LOOKUP_IN_FLIGHT.store(false, Ordering::Release);
+            let _ = tx.send(class);
+        });
+    if spawned.is_err() {
+        LOOKUP_IN_FLIGHT.store(false, Ordering::Release);
+        return None;
+    }
+    rx.recv_timeout(LOOKUP_TIMEOUT).ok().flatten()
+}
+
+fn detect_class_blocking() -> Option<String> {
     if std::env::var_os("WAYLAND_DISPLAY").is_some() {
         gnome::active_window_class().or_else(x11::active_window_class)
     } else {

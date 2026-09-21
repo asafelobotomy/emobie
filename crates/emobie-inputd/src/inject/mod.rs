@@ -9,7 +9,7 @@ use worker::{inject_worker_loop, InjectJob};
 
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, SyncSender};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -224,12 +224,16 @@ pub fn expand_trigger(
 /// Queue Ctrl+V on the inject worker and wait for completion (serialized with expands).
 pub fn inject_ctrl_v() -> Result<(), String> {
     let (reply_tx, reply_rx) = mpsc::sync_channel(1);
+    let cancel = Arc::new(AtomicBool::new(false));
     // Suppress listen briefly so synthetic Ctrl+V does not pollute the match buffer.
     let prev_jobs = LISTEN_SUPPRESS_JOBS.fetch_add(1, Ordering::AcqRel);
     if prev_jobs == 0 {
         SUPPRESS_STARTED_MS.store(now_ms(), Ordering::Release);
     }
-    match inject_sender().try_send(InjectJob::Paste { reply: reply_tx }) {
+    match inject_sender().try_send(InjectJob::Paste {
+        reply: reply_tx,
+        cancel: cancel.clone(),
+    }) {
         Ok(()) => {}
         Err(_) => {
             finish_listen_suppress();
@@ -239,7 +243,9 @@ pub fn inject_ctrl_v() -> Result<(), String> {
     match reply_rx.recv_timeout(Duration::from_secs(2)) {
         Ok(result) => result,
         Err(_) => {
-            // Worker still holds suppress until paste finishes — avoids surprise paste.
+            // Tell the worker to drop the job if it has not started yet, so a
+            // paste we reported as failed cannot fire later.
+            cancel.store(true, Ordering::Release);
             Err("inject paste timed out".to_string())
         }
     }
@@ -251,11 +257,15 @@ pub fn inject_ctrl_v() -> Result<(), String> {
 /// synthetic keychord here.
 pub fn inject_pin_toggle() -> Result<(), String> {
     let (reply_tx, reply_rx) = mpsc::sync_channel(1);
+    let cancel = Arc::new(AtomicBool::new(false));
     let prev_jobs = LISTEN_SUPPRESS_JOBS.fetch_add(1, Ordering::AcqRel);
     if prev_jobs == 0 {
         SUPPRESS_STARTED_MS.store(now_ms(), Ordering::Release);
     }
-    match inject_sender().try_send(InjectJob::PinToggle { reply: reply_tx }) {
+    match inject_sender().try_send(InjectJob::PinToggle {
+        reply: reply_tx,
+        cancel: cancel.clone(),
+    }) {
         Ok(()) => {}
         Err(_) => {
             finish_listen_suppress();
@@ -264,6 +274,9 @@ pub fn inject_pin_toggle() -> Result<(), String> {
     }
     match reply_rx.recv_timeout(Duration::from_secs(2)) {
         Ok(result) => result,
-        Err(_) => Err("pin toggle inject timed out".to_string()),
+        Err(_) => {
+            cancel.store(true, Ordering::Release);
+            Err("pin toggle inject timed out".to_string())
+        }
     }
 }

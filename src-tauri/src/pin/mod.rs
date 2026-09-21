@@ -32,19 +32,25 @@ pub struct PinCapability {
     pub gnome_setup_needed: bool,
 }
 
+/// Async so it runs off the main thread: applying the pin can shell out and
+/// (on GNOME) wait for window focus, which round-trips to the main thread.
 #[tauri::command]
-pub fn apply_window_pin(app: AppHandle, pinned: bool) -> Result<PinApplyResult, String> {
-    let Some(window) = app.get_webview_window("main") else {
-        return Err("main window missing".into());
-    };
-    Ok(apply_to_window(&window, pinned))
+pub async fn apply_window_pin(app: AppHandle, pinned: bool) -> Result<PinApplyResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(window) = app.get_webview_window("main") else {
+            return Err("main window missing".to_string());
+        };
+        Ok(apply_to_window(&window, pinned))
+    })
+    .await
+    .map_err(|err| err.to_string())?
 }
 
 #[tauri::command]
 pub fn pin_capability() -> PinCapability {
     #[cfg(target_os = "linux")]
     {
-        return linux::capability();
+        linux::capability()
     }
     #[cfg(not(target_os = "linux"))]
     {
@@ -66,7 +72,7 @@ pub fn pin_gnome_setup() -> Result<PinCapability, String> {
     #[cfg(target_os = "linux")]
     {
         linux::gnome::setup_binding()?;
-        return Ok(linux::capability());
+        Ok(linux::capability())
     }
     #[cfg(not(target_os = "linux"))]
     {
@@ -78,7 +84,7 @@ pub fn apply_to_window(window: &WebviewWindow, pinned: bool) -> PinApplyResult {
     let _ = window.set_always_on_top(pinned);
     #[cfg(target_os = "linux")]
     {
-        return linux::apply_compositor_pin(pinned);
+        linux::apply_compositor_pin(window, pinned)
     }
     #[cfg(not(target_os = "linux"))]
     {

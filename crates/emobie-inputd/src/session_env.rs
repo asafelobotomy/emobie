@@ -66,12 +66,9 @@ pub fn compositor_likely_available() -> bool {
 
 fn detect_wayland_display() -> Option<&'static str> {
     let runtime = std::env::var("XDG_RUNTIME_DIR").ok()?;
-    for name in ["wayland-0", "wayland-1", "wayland-2"] {
-        if PathBuf::from(&runtime).join(name).exists() {
-            return Some(name);
-        }
-    }
-    None
+    ["wayland-0", "wayland-1", "wayland-2"]
+        .into_iter()
+        .find(|name| PathBuf::from(&runtime).join(name).exists())
 }
 
 #[cfg(test)]
@@ -87,7 +84,7 @@ mod tests {
             std::env::var("WAYLAND_DISPLAY").ok().as_deref(),
             Some("wayland-0")
         );
-        let _ = std::env::remove_var("WAYLAND_DISPLAY");
+        std::env::remove_var("WAYLAND_DISPLAY");
     }
 
     #[test]
@@ -97,7 +94,7 @@ mod tests {
         if !sock.exists() {
             return;
         }
-        let _ = std::env::remove_var("WAYLAND_DISPLAY");
+        std::env::remove_var("WAYLAND_DISPLAY");
         ensure_session_env();
         assert_eq!(
             std::env::var("WAYLAND_DISPLAY").ok().as_deref(),

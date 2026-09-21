@@ -176,7 +176,7 @@ devices. Do not run `emobie-inputd` as root or expose a world-writable socket.
 
 | Boundary | Protection | Residual risk |
 |----------|------------|---------------|
-| Cross-user | Socket mode `0600`, directory `0700`, `SO_PEERCRED` rejects foreign UIDs | Misconfigured `/tmp/emobie-$UID` or stale sockets — prefer `$XDG_RUNTIME_DIR/emobie` |
+| Cross-user | Socket mode `0600`, directory `0700`, `SO_PEERCRED` rejects foreign UIDs on the daemon side; the app only connects to sockets in directories owned by you (or root, not group/other-writable) and owned by you itself | Stale sockets — prefer `$XDG_RUNTIME_DIR/emobie` |
 | Same-user session | Any process running as **you** may call `InjectPaste`, `SyncMatches`, and `SetEnabled` on the Unix socket | Malware or a compromised app in your session can inject keystrokes — same trust as any input helper |
 | Remote | No network listener; JSON line protocol on a local socket only | None without local code execution |
 | Webview → helper | emobie talks to inputd via Tauri IPC; daemon enforces match/trigger caps | XSS in emobie could sync macros or request paste — treat the webview as trusted UI |
@@ -185,9 +185,15 @@ devices. Do not run `emobie-inputd` as root or expose a world-writable socket.
 processes owned by your user. Do not run untrusted binaries alongside emobie
 when relying on Auto-paste.
 
-**Polkit / root:** paste access setup runs once via `pkexec` on annotated script
-paths only (`/usr/share/emobie/…` or `/usr/local/share/emobie/…`). User-writable
-copies are staged to `/usr/local/share/emobie/` before elevation.
+**Polkit / root:** paste access setup runs once via `pkexec`, and only ever runs
+root-owned inputs: either the package's `/usr/share/emobie/setup-input-access.sh`
+or a copy staged to `/usr/local/share/emobie/`. The staged script, udev rule,
+polkit policy and SELinux module are the exact bytes **embedded in the emobie
+binary at build time** (never read from `~/.local/share/emobie`, the AppImage
+mount, or any other user-writable path), and the root script refuses to run if
+it or its directory is not root-owned. Re-running Grant also replaces an
+outdated installed udev rule; the app treats a rule that differs from the
+shipped one as "not configured".
 
 ## Known limitations
 
@@ -221,7 +227,19 @@ copies are staged to `/usr/local/share/emobie/` before elevation.
     table (same approach Espanso's hard-coded per-app patches use), not a
     generic rule — if a terminal you use isn't recognized, add it there, or
     use **Settings → Clipboard → Paste key** to force a chord manually.
-- **The daemon's trigger-listening code is dormant, not removed.** Now that
+- **The daemon only reads the keyboard while expansion is enabled.** The
+  listener starts on `SetEnabled(true)` (or at boot if the persisted state says
+  enabled) and closes its keyboard devices shortly after it is disabled again;
+  a paste-only daemon never holds `/dev/input/event*` open. If you granted
+  access with an older release, your installed
+  `/etc/udev/rules.d/99-emobie-input.rules` may still contain a keyboard-read
+  rule — the app now reports that as "outdated"; re-run **Grant** to replace it.
+- **Typed-key expansion assumes a US-QWERTY layout.** The short-ASCII fast path
+  sends physical keycodes, which the compositor maps through your active
+  layout, so on AZERTY/QWERTZ the text comes out wrong. It is only reachable
+  through the deferred Expand feature; fix (route non-US layouts through the
+  clipboard path) before re-enabling it.
+- **The daemon's trigger-listening code is otherwise dormant.** Now that
   as-you-type expansion is deferred, a compositor crash/restart affecting the
   (unused) listen thread is no longer user-visible — noted here only because
   [`sleep_watch.rs`](../crates/emobie-inputd/src/sleep_watch.rs) and the

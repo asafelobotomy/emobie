@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { errorMessage } from "../lib/errorMessage";
 
 type SettingsLifecycleHintsProps = {
   trayUnavailable?: boolean;
@@ -37,9 +38,7 @@ export function SettingsLifecycleHints({
       onRefreshPinCapability?.();
       setSetupMessage("Pin shortcut set up — try Pin again.");
     } catch (error) {
-      setSetupMessage(
-        error instanceof Error ? error.message : "Could not set up pin shortcut.",
-      );
+      setSetupMessage(errorMessage(error, "Could not set up pin shortcut."));
     } finally {
       setBusy(false);
     }

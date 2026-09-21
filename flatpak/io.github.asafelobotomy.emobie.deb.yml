@@ -126,9 +126,17 @@ modules:
           exit 1
         fi
         install -Dm644 "$policy_src" "$HOST/io.github.asafelobotomy.emobie.inputd.policy"
-        if [ -f deb-extract/usr/share/emobie/selinux/emobie-inputd.te ]; then
-          install -Dm644 deb-extract/usr/share/emobie/selinux/emobie-inputd.te \
-            "$HOST/selinux/emobie-inputd.te"
+        if [ ! -f deb-extract/usr/share/emobie/selinux/emobie-inputd.te ]; then
+          echo "emobie.deb missing usr/share/emobie/selinux/emobie-inputd.te" >&2
+          exit 1
         fi
-        tar czf "$SHARE/inputd-host-bundle.tgz" -C "$HOST" .
+        install -Dm644 deb-extract/usr/share/emobie/selinux/emobie-inputd.te \
+          "$HOST/selinux/emobie-inputd.te"
+        # Explicit members (no "./" prefix): the app extracts by exact name, and
+        # this must match TAR_MEMBERS in src-tauri/src/input_helper/bootstrap.rs
+        # and scripts/stage-inputd.sh.
+        tar czf "$SHARE/inputd-host-bundle.tgz" -C "$HOST" \
+          emobie-inputd bootstrap-inputd-host.sh setup-input-access.sh \
+          99-emobie-input.rules io.github.asafelobotomy.emobie.inputd.policy \
+          selinux/emobie-inputd.te
         rm -rf "$HOST"

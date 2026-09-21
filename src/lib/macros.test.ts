@@ -231,3 +231,21 @@ describe("macroYaml", () => {
     assert.throws(() => importMacrosYaml(huge, []), /too large/i);
   });
 });
+
+describe("importMacrosYaml daemon-compat validation", () => {
+  it("skips triggers with control characters and expansions with NUL", () => {
+    const yaml = [
+      "matches:",
+      '  - trigger: "bad\\ntrigger"',
+      '    replace: "x"',
+      '  - trigger: ":nul"',
+      '    replace: "a\\0b"',
+      '  - trigger: ":ok"',
+      '    replace: "fine"',
+    ].join("\n");
+    const result = importMacrosYaml(yaml, []);
+    assert.equal(result.imported, 1);
+    assert.equal(result.skipped, 2);
+    assert.deepEqual(result.macros.map((m) => m.trigger), [":ok"]);
+  });
+});

@@ -13,6 +13,8 @@ use evdev::{Device, InputEventKind};
 use keys::{expire_stale_pending, handle_key, trim_buffer, PendingExpand};
 use std::collections::HashSet;
 use std::path::PathBuf;
+use nix::poll::{poll, PollFd, PollFlags, PollTimeout};
+use std::os::fd::{AsRawFd, BorrowedFd};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
@@ -25,6 +27,57 @@ use devices::list_keyboard_paths;
 
 /// Hotplug scan interval — avoid opening every event node more often than needed.
 const HOTPLUG_INTERVAL: Duration = Duration::from_secs(5);
+/// How long a device thread waits for input before re-checking `enabled`/`stop`.
+const DEVICE_POLL_MS: u16 = 500;
+/// Idle wait while expansion is disabled (no keyboard device is open).
+const DISABLED_RECHECK: Duration = Duration::from_secs(1);
+
+struct Shared {
+    enabled: Arc<AtomicBool>,
+    trie: Arc<Mutex<TriggerTrie>>,
+    stop: Arc<AtomicBool>,
+}
+
+static SHARED: OnceLock<Shared> = OnceLock::new();
+static STARTED: AtomicBool = AtomicBool::new(false);
+
+/// Register the state the listener needs. Does not start listening.
+pub fn configure(
+    enabled: Arc<AtomicBool>,
+    trie: Arc<Mutex<TriggerTrie>>,
+    stop: Arc<AtomicBool>,
+) {
+    let _ = SHARED.set(Shared { enabled, trie, stop });
+}
+
+/// Start the keyboard listener (once). Called only when expansion is enabled,
+/// so a daemon that is only used for paste never opens keyboard event nodes.
+pub fn ensure_running() {
+    let Some(shared) = SHARED.get() else {
+        return;
+    };
+    if STARTED.swap(true, Ordering::AcqRel) {
+        return;
+    }
+    spawn_listener(
+        shared.enabled.clone(),
+        shared.trie.clone(),
+        shared.stop.clone(),
+    );
+}
+
+/// Wait until the device has input (or the timeout elapses). Returns true when
+/// there is something to read or the fd reported an error/hangup.
+fn wait_readable(device: &Device) -> bool {
+    // SAFETY: `device` owns the fd and outlives this call.
+    let fd = unsafe { BorrowedFd::borrow_raw(device.as_raw_fd()) };
+    let mut fds = [PollFd::new(fd, PollFlags::POLLIN)];
+    match poll(&mut fds, PollTimeout::from(DEVICE_POLL_MS)) {
+        Ok(0) => false,
+        Ok(_) => true,
+        Err(_) => true,
+    }
+}
 
 static PENDING_HOLDER: OnceLock<Arc<Mutex<Option<PendingExpand>>>> = OnceLock::new();
 static BUFFER_HOLDER: OnceLock<Arc<Mutex<String>>> = OnceLock::new();
@@ -88,11 +141,22 @@ fn spawn_device_thread(
                 if stop.load(Ordering::Relaxed) {
                     return Ok(());
                 }
+                // Expansion switched off: close the device promptly instead of
+                // continuing to read the keyboard.
+                if !enabled.load(Ordering::Relaxed) {
+                    if let Ok(mut guard) = buffer.lock() {
+                        guard.clear();
+                    }
+                    return Ok(());
+                }
                 if last_reload.elapsed() >= Duration::from_secs(30) {
                     keymap.reload_from_session();
                     last_reload = Instant::now();
                 }
                 expire_stale_pending(&pending, &buffer);
+                if !wait_readable(&device) {
+                    continue;
+                }
                 let events = match device.fetch_events() {
                     Ok(events) => events,
                     Err(_) => {
@@ -123,7 +187,7 @@ fn spawn_device_thread(
     });
 }
 
-pub fn spawn_listener(
+fn spawn_listener(
     enabled: Arc<AtomicBool>,
     trie: Arc<Mutex<TriggerTrie>>,
     stop: Arc<AtomicBool>,
@@ -137,6 +201,10 @@ pub fn spawn_listener(
         loop {
             if stop.load(Ordering::Relaxed) {
                 break;
+            }
+            if !enabled.load(Ordering::Relaxed) {
+                thread::sleep(DISABLED_RECHECK);
+                continue;
             }
             let paths = list_keyboard_paths();
             if paths.is_empty() {

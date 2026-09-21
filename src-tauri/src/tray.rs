@@ -21,8 +21,15 @@ pub fn show_main_window(app: &AppHandle) {
         // synthesizes a keypress that lands on whatever window has focus —
         // it must be this one, not focused after the fact.
         let _ = window.set_focus();
-        // Re-apply pin after show — WMs often clear keep-above on hide.
-        crate::pin::apply_from_prefs(&window);
+        // Re-apply pin after show — WMs often clear keep-above on hide. Off
+        // the calling thread (tray activation / single-instance callback,
+        // some of which run on the main event loop) for the same reason as
+        // the startup path in lib.rs — this can shell out to gsettings/
+        // systemctl and bootstrap emobie-inputd, taking several seconds.
+        let window_for_pin = window.clone();
+        std::thread::spawn(move || {
+            crate::pin::apply_from_prefs(&window_for_pin);
+        });
     }
 }
 
@@ -54,6 +61,9 @@ mod linux {
         };
         let (width, height) = img.dimensions();
         let mut data = img.into_rgba8().into_vec();
+        // `chunks_exact_mut` keeps this building on older toolchains than
+        // `as_chunks_mut` (which newer clippy suggests).
+        #[allow(unknown_lints, clippy::chunks_exact_to_as_chunks)]
         for pixel in data.chunks_exact_mut(4) {
             pixel.rotate_right(1); // RGBA → ARGB
         }

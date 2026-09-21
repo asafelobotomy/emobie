@@ -33,6 +33,7 @@
     "allow-save-durable-preferences",
     "allow-apply-window-pin",
     "allow-pin-capability",
+    "allow-pin-gnome-setup",
     "allow-input-helper-status",
     "allow-input-helper-set-enabled",
     "allow-input-helper-sync-matches",

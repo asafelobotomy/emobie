@@ -1,11 +1,13 @@
 //! Unix-domain socket client for emobie-inputd.
 
 use serde::Deserialize;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+
+const MAX_RESPONSE_BYTES: u64 = 64 * 1024;
 
 #[derive(Deserialize)]
 pub struct DaemonResponse {
@@ -40,20 +42,29 @@ fn tmp_emobie_socket() -> PathBuf {
     PathBuf::from(format!("/tmp/emobie-{}/emobie-inputd.sock", current_uid()))
 }
 
+/// Candidate socket paths, in priority order. Every one — not just the env
+/// override — must pass `trusted_socket_path`, so a directory another local
+/// user pre-created (e.g. `/tmp/emobie-<uid>`) is never connected to.
 fn candidate_sockets() -> Vec<PathBuf> {
     let mut paths = Vec::new();
     if let Ok(custom) = std::env::var("EMOBIE_INPUTD_SOCKET") {
-        let path = PathBuf::from(&custom);
-        if trusted_socket_path(&path) {
-            paths.push(path);
-        }
+        paths.push(PathBuf::from(&custom));
     }
     if let Ok(runtime) = std::env::var("XDG_RUNTIME_DIR") {
         paths.push(PathBuf::from(runtime).join("emobie/emobie-inputd.sock"));
     }
     paths.push(PathBuf::from("/run/emobie/emobie-inputd.sock"));
     paths.push(tmp_emobie_socket());
+    paths.retain(|p| trusted_socket_path(p) && socket_file_ours(p));
     paths
+}
+
+/// The socket node itself must be owned by us (the daemon runs as our uid).
+fn socket_file_ours(path: &Path) -> bool {
+    use std::os::unix::fs::FileTypeExt;
+    std::fs::symlink_metadata(path)
+        .map(|m| m.file_type().is_socket() && m.uid() == current_uid())
+        .unwrap_or(false)
 }
 
 pub(super) fn trusted_socket_path(path: &Path) -> bool {
@@ -83,18 +94,20 @@ pub(super) fn trusted_socket_path(path: &Path) -> bool {
 }
 
 fn socket_parent_dir_safe(path: &Path) -> bool {
-    let Ok(meta) = std::fs::metadata(path) else {
+    let Ok(meta) = std::fs::symlink_metadata(path) else {
         return false;
     };
     if !meta.is_dir() {
         return false;
     }
-    let uid = current_uid();
-    if meta.uid() == uid {
-        return true;
-    }
-    let mode = meta.mode();
-    (mode & 0o002) == 0 || (mode & 0o1000) != 0
+    dir_owner_acceptable(meta.uid(), current_uid(), meta.mode())
+}
+
+/// Ours at any mode, or root's and not group/other-writable. A directory owned
+/// by any other user is never trusted, even at 0755 — its owner could plant a
+/// socket there. Keep in sync with the daemon's `socket_path::dir_owner_acceptable`.
+pub(super) fn dir_owner_acceptable(owner: u32, uid: u32, mode: u32) -> bool {
+    owner == uid || (owner == 0 && (mode & 0o022) == 0)
 }
 
 fn connect_with_timeout(timeout: Duration) -> Option<UnixStream> {
@@ -120,7 +133,9 @@ pub(super) fn request_with_timeout(
         connect_with_timeout(timeout).ok_or_else(|| "emobie-inputd not running".to_string())?;
     let payload = serde_json::to_string(&cmd).map_err(|e| e.to_string())?;
     writeln!(stream, "{payload}").map_err(|e| e.to_string())?;
-    let mut reader = BufReader::new(stream);
+    // Bound the reply: the daemon's status lines are tiny, and a socket that
+    // streams without a newline must not be able to grow this buffer forever.
+    let mut reader = BufReader::new(stream.take(MAX_RESPONSE_BYTES));
     let mut line = String::new();
     reader.read_line(&mut line).map_err(|e| e.to_string())?;
     serde_json::from_str(line.trim()).map_err(|e| e.to_string())

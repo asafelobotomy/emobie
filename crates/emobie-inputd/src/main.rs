@@ -116,7 +116,12 @@ fn main() {
     // Set WAYLAND_DISPLAY once before any worker threads (set_var is not thread-safe).
     session_env::ensure_session_env();
 
-    listen::spawn_listener(enabled.clone(), trie.clone(), stop.clone());
+    // The keyboard listener only runs while expansion is enabled — a paste-only
+    // daemon must not hold keyboard event devices open.
+    listen::configure(enabled.clone(), trie.clone(), stop.clone());
+    if persisted.enabled {
+        listen::ensure_running();
+    }
     sleep_watch::spawn();
 
     // Restrict socket mode at creation time (avoid a brief wider window).

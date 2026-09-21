@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Privileged setup no longer trusts user-writable files.** Grant used to copy
+  a `setup-input-access.sh` (newest mtime wins), udev rule and polkit policy from
+  `~/.local/share/emobie/` into `/usr/local` and run/install them as root, so any
+  process running as the user could plant a root payload. The app now stages the
+  exact bytes embedded in its own binary, and the root script refuses to run
+  unless it and its directory are root-owned and no longer reads user homes.
+- **Updater verifies downloads.** One-click update requires a `SHA256SUMS`
+  release asset, streams the download into a private `0700` directory, checks the
+  hash, then re-verifies it on a root-owned copy right before `dpkg`/`dnf`/`rpm`
+  runs (closes the swap-after-download window). It also refuses non-newer
+  versions and malformed tags. The release workflow now publishes `SHA256SUMS`.
+- **`emobie-inputd` reads the keyboard only while expansion is enabled.** It used
+  to hold a keyboard event device open unconditionally. The app now also treats an
+  installed udev rule that differs from the shipped one as "not configured" —
+  installs from before the keyboard-read rule was removed keep it until Grant is
+  re-run.
+- The app only connects to inputd sockets in directories owned by you (or root),
+  owned by you themselves; the same rule applies inside the daemon.
+- `preferences.json` is written `0600` (atomic, fsynced, unique temp file).
+
+### Fixed
+
+- **Host-helper bootstrap and native (`~/.local`) updates were broken since
+  0.6.11**: `tar --no-absolute-names` is not a GNU tar option, so extraction always
+  failed. The release Flatpak's host bundle also had `./`-prefixed members that the
+  extractor could not match. Both fixed, with regression tests that run real `tar`.
+- The "Set up GNOME pin shortcut" button was rejected by the Tauri ACL
+  (`pin_gnome_setup` had no permission). A new `check:acl` script fails CI if a
+  registered or invoked command lacks a permission.
+- GNOME pin: overlapping toggles could double-toggle (tray + startup) — now
+  serialized; an unknown state no longer sends the *unpin* chord (which pinned a
+  fresh window); the toggle waits for emobie to be focused; the summon hotkey
+  focuses before pinning; `apply_window_pin` no longer blocks the main thread.
+- Preferences: deleting a macro/favorite/recent (or clearing recents/usage stats)
+  no longer comes back after a restart — the active store is authoritative and
+  other snapshots only recover keys it lacks. The durable mirror's write revision is
+  now monotonic across launches (it used to restart at 1 and silently drop writes).
+- systemd unit no longer fails with 226/NAMESPACE when `~/.local/share/emobie`
+  does not exist yet (`ReadWritePaths=-…`).
+- The root setup script no longer aborts with "same file" when run from its
+  staged `/usr/local` copy.
+- Paste no longer fires late after the app already reported a timeout, and the
+  focused-window lookup is bounded (300 ms) instead of able to stall every paste.
+- Rust command errors (plain strings) are now shown instead of a generic message.
+- Macro import skips triggers/expansions the helper would reject (control
+  characters, NUL) instead of failing the whole sync; autostart `Exec=` is quoted
+  per the Desktop Entry spec; the suspend/resume restart only happens under systemd.
+
+### Changed
+
+- Flatpak offline sources now cover both lockfiles (`scripts/flatpak-cargo-sources.py`).
+- CI: actions pinned to commit SHAs, least-privilege workflow permissions,
+  `appimagetool` pinned to 1.9.1 with a checksum, clippy (`-D warnings`), app
+  crate tests, production `npm audit`, Flatpak-sources freshness and ACL checks.
+- `PKGBUILD` bumped to 0.6.25; README Node requirement corrected to 22.6+.
+
 ## [0.6.25] - 2026-09-16
 
 ### Fixed

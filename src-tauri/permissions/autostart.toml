@@ -64,6 +64,11 @@ description = "Allows reading whether pin is reliable on this compositor"
 commands.allow = ["pin_capability"]
 
 [[permission]]
+identifier = "allow-pin-gnome-setup"
+description = "Allows the one-time, consent-gated GNOME toggle-above shortcut setup"
+commands.allow = ["pin_gnome_setup"]
+
+[[permission]]
 identifier = "allow-input-helper-status"
 description = "Allows querying emobie-inputd status"
 commands.allow = ["input_helper_status"]

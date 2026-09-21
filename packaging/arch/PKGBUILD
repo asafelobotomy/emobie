@@ -7,7 +7,7 @@
 # Prefer Flatpak/AppImage + packaging/install-inputd-user.sh for most users.
 
 pkgname=emobie
-pkgver=0.6.21
+pkgver=0.6.25
 pkgrel=1
 pkgdesc="Compact emoji palette with macros and optional text expansion"
 arch=('x86_64')
@@ -27,6 +27,8 @@ optdepends=(
   'acl: setfacl for instant keyboard access after Grant without logout'
 )
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+# Run `updpkgsums` once the v$pkgver tag exists (the tarball hash cannot be known
+# before then). Do not publish with SKIP.
 sha256sums=('SKIP')
 
 prepare() {

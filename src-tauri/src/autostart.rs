@@ -4,7 +4,7 @@
 //! Flathub-constrained Flatpak: use the XDG Background portal (no autostart FS).
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const APP_NAME: &str = "emobie";
 const FLATPAK_APP_ID: &str = "io.github.asafelobotomy.emobie";
@@ -38,9 +38,30 @@ fn marker_path() -> Option<PathBuf> {
     Some(data.join(FLATPAK_APP_ID).join(MARKER_NAME))
 }
 
+/// Quote one `Exec=` argument per the Desktop Entry spec: wrap in double
+/// quotes, backslash-escape `"`, `` ` ``, `$` and `\` (the backslash itself is
+/// doubled again by the file's string escaping), and double `%` so it is not
+/// read as a field code.
+pub(crate) fn quote_exec_arg(arg: &str) -> String {
+    let mut out = String::with_capacity(arg.len() + 2);
+    out.push('"');
+    for c in arg.chars() {
+        match c {
+            '"' | '`' | '$' | '\\' => {
+                out.push_str("\\\\");
+                out.push(c);
+            }
+            '%' => out.push_str("%%"),
+            _ => out.push(c),
+        }
+    }
+    out.push('"');
+    out
+}
+
 fn native_autostart_exec() -> Result<String, String> {
-    fn escape_desktop_path(path: &PathBuf) -> String {
-        path.display().to_string().replace(' ', "\\ ")
+    fn escape_desktop_path(path: &Path) -> String {
+        quote_exec_arg(&path.display().to_string())
     }
 
     // Prefer stable install paths over the ephemeral AppImage mount at current_exe().
@@ -65,7 +86,7 @@ fn native_autostart_exec() -> Result<String, String> {
     }
     let exe = std::env::current_exe().map_err(|err| err.to_string())?;
     let exe = exe.canonicalize().unwrap_or(exe);
-    Ok(escape_desktop_path(&PathBuf::from(exe)))
+    Ok(escape_desktop_path(&exe))
 }
 
 fn native_desktop_contents() -> Result<String, String> {
@@ -101,7 +122,7 @@ X-Flatpak={FLATPAK_APP_ID}
     )
 }
 
-fn remove_legacy_entries(dir: &PathBuf) {
+fn remove_legacy_entries(dir: &Path) {
     let _ = fs::remove_file(dir.join(LEGACY_DESKTOP));
     if !is_flatpak() {
         let _ = fs::remove_file(dir.join(format!("{FLATPAK_APP_ID}.desktop")));
@@ -230,4 +251,18 @@ pub fn set_launch_on_startup(enabled: bool) -> Result<(), String> {
         }
     }
     write_desktop_file(enabled)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::quote_exec_arg;
+
+    #[test]
+    fn quotes_paths_for_desktop_exec() {
+        assert_eq!(quote_exec_arg("/usr/bin/emobie"), "\"/usr/bin/emobie\"");
+        assert_eq!(quote_exec_arg("/home/a b/emobie"), "\"/home/a b/emobie\"");
+        assert_eq!(quote_exec_arg("/x/100%/e"), "\"/x/100%%/e\"");
+        assert_eq!(quote_exec_arg("/x/$y"), "\"/x/\\\\$y\"");
+        assert_eq!(quote_exec_arg("/x/\"q\""), "\"/x/\\\\\"q\\\\\"\"");
+    }
 }

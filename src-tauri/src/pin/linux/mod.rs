@@ -2,6 +2,7 @@ use super::{PinApplyResult, PinCapability};
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
+use tauri::WebviewWindow;
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
@@ -76,7 +77,20 @@ emobie will not override it. Use GNOME's own Super+right-click window menu inste
     }
 }
 
-pub fn apply_compositor_pin(pinned: bool) -> PinApplyResult {
+/// The GNOME toggle is a synthetic keypress that lands on whatever window has
+/// focus, so wait (bounded) for *our* window to be focused before sending it.
+/// Must not be called on the main thread — `is_focused` round-trips to it.
+fn wait_for_focus(window: &WebviewWindow) -> bool {
+    for _ in 0..30 {
+        if window.is_focused().unwrap_or(false) {
+            return true;
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
+    false
+}
+
+pub fn apply_compositor_pin(window: &WebviewWindow, pinned: bool) -> PinApplyResult {
     if !on_wayland() {
         return PinApplyResult {
             applied: true,
@@ -89,13 +103,22 @@ pub fn apply_compositor_pin(pinned: bool) -> PinApplyResult {
         };
     }
 
-    if gnome::desktop_is_gnome() && !desktop_is_plasma() {
-        if matches!(gnome::binding_status(), gnome::BindingStatus::Ready) {
-            return gnome::toggle_pin(pinned);
+    // Unconfigured/conflict falls through to the same "limited" result
+    // Plasma-less Wayland already returns below, so the user still gets an
+    // honest explanation instead of silent failure.
+    if gnome::desktop_is_gnome()
+        && !desktop_is_plasma()
+        && matches!(gnome::binding_status(), gnome::BindingStatus::Ready)
+    {
+        if !wait_for_focus(window) {
+            return PinApplyResult {
+                applied: false,
+                limited: false,
+                detail: "emobie is not focused yet — the pin is applied when it gains focus."
+                    .into(),
+            };
         }
-        // Unconfigured/conflict — fall through to the same "limited" result
-        // Plasma-less Wayland already returns below, so the user still gets
-        // an honest explanation instead of silent failure.
+        return gnome::toggle_pin(pinned);
     }
 
     match plasma_keep_above(pinned) {
@@ -163,14 +186,23 @@ for (const w of wins) {{
 "#
     );
 
+    // Only the per-user runtime dir: a predictable file under a shared /tmp
+    // could be pre-created or symlinked by another user.
     let dir = std::env::var_os("XDG_RUNTIME_DIR")
         .map(PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir)
+        .ok_or_else(|| "XDG_RUNTIME_DIR is not set".to_string())?
         .join("emobie");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join("kwin-pin.js");
     {
-        let mut file = fs::File::create(&path).map_err(|e| e.to_string())?;
+        use std::os::unix::fs::OpenOptionsExt;
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&path)
+            .map_err(|e| e.to_string())?;
         file.write_all(script.as_bytes())
             .map_err(|e| e.to_string())?;
     }

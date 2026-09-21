@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import type { InputHelperStatus } from "../lib/inputHelper";
 import { prepareInputHelperForPaste } from "../lib/inputHelperClient";
+import { errorMessage } from "../lib/errorMessage";
 
 type FirstRunSetupProps = {
   open: boolean;
@@ -9,11 +10,8 @@ type FirstRunSetupProps = {
   onDone: () => void;
 };
 
-function errorMessage(error: unknown): string {
-  if (typeof error === "string" && error.trim()) return error;
-  if (error instanceof Error && error.message) return error.message;
-  return "Setup failed or was cancelled.";
-}
+const setupError = (error: unknown) =>
+  errorMessage(error, "Setup failed or was cancelled.");
 
 export function FirstRunSetup({
   open,
@@ -57,7 +55,7 @@ export function FirstRunSetup({
         setMessage(next.detail || "Could not finish setup.");
       }
     } catch (error) {
-      setMessage(errorMessage(error));
+      setMessage(setupError(error));
     } finally {
       setBusy(false);
     }

@@ -38,6 +38,8 @@ script_path() {
 
 # Resolve udev rules from packaged, staged, or user bootstrap trees.
 # $1 = optional username whose ~/.local/share/emobie should be searched.
+#      ONLY pass it from the non-root phase (a user deliberately running this
+#      script from their own checkout). The root phase must pass "".
 resolve_rules_src() {
   local user_home=""
   if [[ -n "${1:-}" ]]; then
@@ -94,15 +96,10 @@ stage_user_assets_to_local() {
   if [[ -n "$policy_src" && -f "$policy_src" ]]; then
     install -m 644 "$policy_src" "$LOCAL_DIR/${POLICY_NAME}"
   fi
-  local te=""
-  for te in \
-    "$(dirname "$src_script")/selinux/emobie-inputd.te" \
-    "${HOME:+$HOME/.local/share/emobie/selinux/emobie-inputd.te}"; do
-    if [[ -n "$te" && -f "$te" ]]; then
-      install -m 644 "$te" "$LOCAL_DIR/selinux/emobie-inputd.te"
-      break
-    fi
-  done
+  local te="$(dirname "$src_script")/selinux/emobie-inputd.te"
+  if [[ -f "$te" ]]; then
+    install -m 644 "$te" "$LOCAL_DIR/selinux/emobie-inputd.te"
+  fi
 }
 
 if [[ "$(id -u)" -ne 0 ]]; then
@@ -140,9 +137,24 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exec pkexec env SUDO_USER="${INVOKING_USER}" "$LOCAL_SETUP" "$@"
 fi
 
-TARGET_USER="${SUDO_USER:-}"
-if [[ -z "$TARGET_USER" && -n "${PKEXEC_UID:-}" ]]; then
+# Root phase. Everything below runs with full privileges, so it may only use
+# root-owned inputs: refuse a script that a non-root user could have modified,
+# and never read rules/policy/SELinux files out of a user's home directory.
+SELF_REAL="$(script_path)"
+if [[ "${EMOBIE_ALLOW_UNOWNED_SCRIPT:-}" != "1" ]] \
+  && { [[ "$(stat -c %u "$SELF_REAL")" != "0" ]] || [[ "$(stat -c %u "$(dirname "$SELF_REAL")")" != "0" ]]; }; then
+  echo "Refusing to run as root: $SELF_REAL (or its directory) is not root-owned." >&2
+  echo "Run it as your normal user (it stages a root-owned copy), or set EMOBIE_ALLOW_UNOWNED_SCRIPT=1 if you trust this checkout." >&2
+  exit 1
+fi
+
+# pkexec's PKEXEC_UID is authoritative; SUDO_USER only for plain sudo runs.
+TARGET_USER=""
+if [[ -n "${PKEXEC_UID:-}" ]]; then
   TARGET_USER="$(getent passwd "$PKEXEC_UID" | cut -d: -f1 || true)"
+fi
+if [[ -z "$TARGET_USER" ]]; then
+  TARGET_USER="${SUDO_USER:-}"
 fi
 if [[ -z "$TARGET_USER" || "$TARGET_USER" == "root" ]]; then
   echo "Could not determine invoking user. Run: pkexec env SUDO_USER=\$USER $0" >&2
@@ -151,12 +163,12 @@ fi
 TARGET_UID="$(id -u "$TARGET_USER")"
 TARGET_GID="$(id -g "$TARGET_USER")"
 
-RULES_SRC="$(resolve_rules_src "$TARGET_USER" || true)"
+RULES_SRC="$(resolve_rules_src "" || true)"
 if [[ -z "$RULES_SRC" ]]; then
-  echo "Cannot find ${RULES_NAME} (looked in /usr/share/emobie, /usr/local/share/emobie, and ~${TARGET_USER}/.local/share/emobie)" >&2
+  echo "Cannot find ${RULES_NAME} (looked in /usr/share/emobie and /usr/local/share/emobie)" >&2
   exit 1
 fi
-POLICY_SRC="$(resolve_policy_src "$TARGET_USER" || true)"
+POLICY_SRC="$(resolve_policy_src "" || true)"
 
 # Run a command as TARGET_USER without depending on sudo (we are already root).
 run_as_user() {
@@ -191,8 +203,11 @@ fi
 
 # User/AppImage installs: keep Polkit-annotated tree complete for future Grants.
 SELF="$(script_path)"
-if [[ "$SELF" != "$(readlink -f "$SYSTEM_SETUP" 2>/dev/null || echo __none__)" ]]; then
-  stage_user_assets_to_local "$0" "$RULES_SRC" "${POLICY_SRC:-}"
+# Already running from the package or the staged copy: nothing to stage
+# (installing a file onto itself fails with "same file").
+if [[ "$SELF" != "$(readlink -f "$SYSTEM_SETUP" 2>/dev/null || echo __none__)" \
+   && "$SELF" != "$(readlink -f "$LOCAL_SETUP" 2>/dev/null || echo __none__)" ]]; then
+  stage_user_assets_to_local "$SELF" "$RULES_SRC" "${POLICY_SRC:-}"
   echo "Installed $LOCAL_SETUP for future Grant prompts."
 fi
 
@@ -291,8 +306,7 @@ try_load_selinux_module() {
   for candidate in \
     "$SCRIPT_DIR/selinux/emobie-inputd.te" \
     "$LOCAL_DIR/selinux/emobie-inputd.te" \
-    "/usr/share/emobie/selinux/emobie-inputd.te" \
-    "$(getent passwd "$TARGET_USER" | cut -d: -f6)/.local/share/emobie/selinux/emobie-inputd.te"; do
+    "/usr/share/emobie/selinux/emobie-inputd.te"; do
     if [[ -f "$candidate" ]]; then
       te="$candidate"
       break
@@ -303,13 +317,18 @@ try_load_selinux_module() {
     return 0
   fi
   if command -v checkmodule >/dev/null && command -v semodule_package >/dev/null; then
-    local mod="/tmp/emobie-inputd.mod" pp="/tmp/emobie-inputd.pp"
+    local build_dir mod pp
+    build_dir="$(mktemp -d)"
+    mod="$build_dir/emobie-inputd.mod"
+    pp="$build_dir/emobie-inputd.pp"
     if checkmodule -M -m -o "$mod" "$te" && semodule_package -o "$pp" -m "$mod"; then
       if semodule -i "$pp"; then
         echo "Loaded SELinux module for emobie-inputd."
+        rm -rf "$build_dir"
         return 0
       fi
     fi
+    rm -rf "$build_dir"
     echo "Warning: could not compile/load SELinux module — see packaging/selinux/README.md" >&2
   else
     echo "SELinux enforcing — install checkpolicy/policycoreutils-python-utils for auto module load." >&2

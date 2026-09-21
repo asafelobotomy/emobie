@@ -120,7 +120,9 @@ pub(crate) fn handle_client(
             Ok(Request::SetEnabled { enabled: value }) => {
                 enabled.store(value, Ordering::Relaxed);
                 inject::set_expand_enabled(value);
-                if !value {
+                if value {
+                    listen::ensure_running();
+                } else {
                     listen::clear_pending();
                 }
                 // Hold `stored` while saving so we cannot overwrite a concurrent

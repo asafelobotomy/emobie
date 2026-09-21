@@ -26,6 +26,16 @@ function normalizeCountMap(value: unknown): Record<string, number> {
   return result;
 }
 
+// Keep in sync with emobie-inputd `state::validate_matches`: the daemon rejects
+// the *whole* sync if any trigger has a control character or any text has NUL.
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/;
+
+/** True when the daemon would accept this trigger/expansion pair. */
+export function macroTextIsValid(trigger: string, expansion: string): boolean {
+  return !CONTROL_CHARS.test(trigger) && !expansion.includes("\u0000");
+}
+
 function normalizeMacro(raw: unknown): Macro | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const item = raw as Record<string, unknown>;
@@ -34,6 +44,7 @@ function normalizeMacro(raw: unknown): Macro | null {
   const expansion =
     typeof item.expansion === "string" ? item.expansion : "";
   if (!id || !trigger || expansion.length === 0) return null;
+  if (!macroTextIsValid(trigger, expansion)) return null;
   const hotkeyRaw = item.hotkey;
   const hotkey =
     typeof hotkeyRaw === "string" && hotkeyRaw.trim()

@@ -28,12 +28,7 @@ pub fn install_native_from_deb(deb: &Path) -> Result<(), String> {
                 .is_some_and(|n| n.starts_with("data.tar"))
         })
         .ok_or_else(|| "deb missing data.tar.*".to_string())?;
-    run_checked(
-        Command::new("tar")
-            .args(["xf", "--no-absolute-names", "--no-overwrite-dir"])
-            .arg(&data_tar)
-            .current_dir(&work),
-    )?;
+    extract_data_tar(&data_tar, &work)?;
     let extracted = work.join("usr/bin/emobie");
     if !extracted.is_file() {
         let _ = fs::remove_dir_all(&work);
@@ -93,6 +88,20 @@ pub fn install_native_from_deb(deb: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Extract a deb's `data.tar.*` into `dest`. GNU tar already strips leading
+/// `/` and refuses `..` members, so no extra flag is needed (and
+/// `--no-absolute-names` is not a GNU tar option). The archive is passed via
+/// `-f` *before* other options so it cannot be mistaken for a flag argument.
+fn extract_data_tar(data_tar: &Path, dest: &Path) -> Result<(), String> {
+    run_checked(
+        Command::new("tar")
+            .arg("-xf")
+            .arg(data_tar)
+            .arg("--no-overwrite-dir")
+            .current_dir(dest),
+    )
+}
+
 fn install_native_inputd_assets(extracted_root: &Path, inputd_bin: &Path) -> Result<(), String> {
     let data = std::env::var_os("XDG_DATA_HOME")
         .map(PathBuf::from)
@@ -141,7 +150,7 @@ fn install_native_inputd_assets(extracted_root: &Path, inputd_bin: &Path) -> Res
             .join("systemd/user");
         fs::create_dir_all(&unit_dir).map_err(|e| e.to_string())?;
         let unit = format!(
-            "[Unit]\nDescription=emobie input helper (text expansion / paste)\nAfter=graphical-session.target\nPartOf=graphical-session.target\n\n[Service]\nType=simple\nExecStart={}\nRestart=on-failure\nRestartSec=2\nNoNewPrivileges=true\nPassEnvironment=WAYLAND_DISPLAY DISPLAY XAUTHORITY XDG_RUNTIME_DIR XKB_DEFAULT_LAYOUT XKB_DEFAULT_MODEL XKB_DEFAULT_VARIANT XKB_DEFAULT_OPTIONS\nUMask=0077\nRuntimeDirectory=emobie\nRuntimeDirectoryMode=0700\nPrivateDevices=no\nPrivateNetwork=yes\nProtectSystem=strict\nProtectHome=read-only\nReadWritePaths=%h/.local/share/emobie\nRestrictAddressFamilies=AF_UNIX\nRestrictNamespaces=yes\nProtectKernelTunables=yes\nProtectKernelModules=yes\nProtectControlGroups=yes\nLockPersonality=yes\nRestrictRealtime=yes\nRestrictSUIDSGID=yes\n\n[Install]\nWantedBy=graphical-session.target\n",
+            "[Unit]\nDescription=emobie input helper (text expansion / paste)\nAfter=graphical-session.target\nPartOf=graphical-session.target\n\n[Service]\nType=simple\nExecStart={}\nRestart=on-failure\nRestartSec=2\nNoNewPrivileges=true\nPassEnvironment=WAYLAND_DISPLAY DISPLAY XAUTHORITY XDG_RUNTIME_DIR XKB_DEFAULT_LAYOUT XKB_DEFAULT_MODEL XKB_DEFAULT_VARIANT XKB_DEFAULT_OPTIONS\nUMask=0077\nRuntimeDirectory=emobie\nRuntimeDirectoryMode=0700\nPrivateDevices=no\nPrivateNetwork=yes\nProtectSystem=strict\nProtectHome=read-only\nReadWritePaths=-%h/.local/share/emobie\nRestrictAddressFamilies=AF_UNIX\nRestrictNamespaces=yes\nProtectKernelTunables=yes\nProtectKernelModules=yes\nProtectControlGroups=yes\nLockPersonality=yes\nRestrictRealtime=yes\nRestrictSUIDSGID=yes\n\n[Install]\nWantedBy=graphical-session.target\n",
             inputd_bin.display()
         );
         fs::write(unit_dir.join("emobie-inputd.service"), unit).map_err(|e| e.to_string())?;
@@ -242,4 +251,33 @@ fn install_native_desktop_assets(extracted_root: &Path, launcher: &Path) -> Resu
         .arg(data.join("icons/hicolor"))
         .status();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::extract_data_tar;
+
+    #[test]
+    fn extracts_data_tar_with_gnu_tar() {
+        let root = std::env::temp_dir().join(format!("emobie-native-tar-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let src = root.join("src/usr/bin");
+        let work = root.join("work");
+        std::fs::create_dir_all(&src).unwrap();
+        std::fs::create_dir_all(&work).unwrap();
+        std::fs::write(src.join("emobie"), b"bin").unwrap();
+        let tar = root.join("data.tar.gz");
+        let made = std::process::Command::new("tar")
+            .arg("czf")
+            .arg(&tar)
+            .arg("-C")
+            .arg(root.join("src"))
+            .arg(".")
+            .status();
+        let Ok(status) = made else { return }; // no tar on this host
+        assert!(status.success());
+        extract_data_tar(&tar, &work).expect("extract");
+        assert!(work.join("usr/bin/emobie").is_file());
+        let _ = std::fs::remove_dir_all(&root);
+    }
 }

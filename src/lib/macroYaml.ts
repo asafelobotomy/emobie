@@ -1,6 +1,6 @@
 import { parse, stringify } from "yaml";
 import type { Macro } from "../types/preferences.ts";
-import { normalizeMacros } from "./normalizePreferences.ts";
+import { macroTextIsValid, normalizeMacros } from "./normalizePreferences.ts";
 
 /** Keep in sync with emobie-inputd state caps. */
 const MAX_YAML_BYTES = 256 * 1024;
@@ -115,6 +115,10 @@ export function importMacrosYaml(
 
     for (const trigger of triggers) {
       if ([...trigger].length > MAX_TRIGGER_LEN) {
+        skipped += 1;
+        continue;
+      }
+      if (!macroTextIsValid(trigger, expansion)) {
         skipped += 1;
         continue;
       }

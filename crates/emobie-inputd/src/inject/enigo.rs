@@ -21,10 +21,12 @@ pub(super) const ENIGO_MAX_IDLE: Duration = Duration::from_secs(45);
 
 pub(super) fn new_enigo() -> Result<Enigo, String> {
     catch_unwind(AssertUnwindSafe(|| {
-        let mut settings = Settings::default();
         // Re-detect every time: systemd often starts us before Wayland exists.
         // Read-only — do not call ensure_session_env from worker threads.
-        settings.wayland_display = session_env::wayland_display_for_enigo();
+        let settings = Settings {
+            wayland_display: session_env::wayland_display_for_enigo(),
+            ..Settings::default()
+        };
         Enigo::new(&settings)
     }))
     .map_err(|_| "input injection backend panicked".to_string())?

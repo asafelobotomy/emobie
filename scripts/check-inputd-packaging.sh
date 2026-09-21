@@ -38,3 +38,31 @@ for (const bundle of ["deb", "rpm"]) {
 }
 console.log("inputd packaging maps OK (deb + rpm)");
 EOF
+
+# Every copy of the hardened unit must tolerate a missing state directory,
+# otherwise systemd fails the unit with 226/NAMESPACE on a fresh account.
+for f in \
+  "$ROOT/packaging/systemd/emobie-inputd.service" \
+  "$ROOT/packaging/bootstrap-inputd-host.sh" \
+  "$ROOT/packaging/install-inputd-user.sh" \
+  "$ROOT/src-tauri/src/updates/native.rs"; do
+  if grep -q 'ReadWritePaths=%h' "$f"; then
+    echo "$f: ReadWritePaths must be prefixed with '-' (missing dir => 226/NAMESPACE)" >&2
+    exit 1
+  fi
+done
+
+# The shipped udev rule must not grant keyboard *read* access (event nodes).
+if grep -Ev '^[[:space:]]*(#|$)' "$ROOT/packaging/udev/99-emobie-input.rules" | grep -q 'event\*'; then
+  echo "packaging/udev/99-emobie-input.rules grants keyboard event access" >&2
+  exit 1
+fi
+
+# The host bundle must be built with explicit members, never ".", so member
+# names carry no "./" prefix (the app extracts by exact name).
+if grep -qE 'inputd-host-bundle\.tgz" -C "\$HOST" \.$' "$ROOT"/flatpak/*.yml; then
+  echo "a flatpak manifest builds inputd-host-bundle.tgz from '.' (members get a ./ prefix)" >&2
+  exit 1
+fi
+echo "inputd unit/udev/bundle checks OK"
+

@@ -1,7 +1,16 @@
 import type { Macro, Preferences } from "../types/preferences";
 import { normalizeMacros } from "./normalizePreferences.ts";
 
-/** Merge user lists/stats from multiple preference sources (update-safe). */
+/**
+ * Combine the active store with the other on-disk snapshots.
+ *
+ * The primary store is authoritative for every user list/map it already has —
+ * even an empty one — so deleting a macro/favorite/recent, clearing recents, or
+ * clearing usage stats survives a restart. Other snapshots (durable mirror,
+ * legacy or other-install stores) only *recover* keys the primary lacks, which
+ * is the fresh-install / migration case. A plain union would resurrect anything
+ * a stale snapshot still contained.
+ */
 export function mergePreferencePartials(
   primary: Partial<Preferences> | undefined,
   extras: Array<Partial<Preferences> | undefined>,
@@ -23,28 +32,43 @@ export function mergePreferencePartials(
     }
   }
 
-  base.macros = mergeMacros(
-    sources.flatMap((source) =>
-      Array.isArray(source.macros) ? source.macros : [],
-    ),
+  const recovery = extras.filter((item): item is Partial<Preferences> =>
+    Boolean(item),
   );
-  base.favorites = mergeUnique(
-    sources.flatMap((source) =>
-      Array.isArray(source.favorites) ? source.favorites : [],
-    ),
-  );
-  base.recents = mergeUnique(
-    sources.flatMap((source) =>
-      Array.isArray(source.recents) ? source.recents : [],
-    ),
-  );
-  base.usageCounts = mergeMaxMaps(
-    sources.map((source) => source.usageCounts),
-  );
-  base.firstUsedAt = mergeMinMaps(
-    sources.map((source) => source.firstUsedAt),
-  );
+  const own = primary ?? {};
+
+  base.macros = Array.isArray(own.macros)
+    ? mergeMacros(own.macros)
+    : mergeMacros(
+        recovery.flatMap((source) =>
+          Array.isArray(source.macros) ? source.macros : [],
+        ),
+      );
+  base.favorites = Array.isArray(own.favorites)
+    ? mergeUnique(own.favorites)
+    : mergeUnique(
+        recovery.flatMap((source) =>
+          Array.isArray(source.favorites) ? source.favorites : [],
+        ),
+      );
+  base.recents = Array.isArray(own.recents)
+    ? mergeUnique(own.recents)
+    : mergeUnique(
+        recovery.flatMap((source) =>
+          Array.isArray(source.recents) ? source.recents : [],
+        ),
+      );
+  base.usageCounts = isCountMap(own.usageCounts)
+    ? mergeMaxMaps([own.usageCounts])
+    : mergeMaxMaps(recovery.map((source) => source.usageCounts));
+  base.firstUsedAt = isCountMap(own.firstUsedAt)
+    ? mergeMinMaps([own.firstUsedAt])
+    : mergeMinMaps(recovery.map((source) => source.firstUsedAt));
   return base;
+}
+
+function isCountMap(value: unknown): value is Record<string, number> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 function mergeMacros(macros: Macro[]): Macro[] {

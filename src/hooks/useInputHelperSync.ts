@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { errorMessage } from "../lib/errorMessage";
 import type { InputHelperStatus } from "../lib/inputHelper";
 import type { PasteChordOverride } from "../types/preferences";
 
@@ -13,12 +14,6 @@ type Options = {
   /** Called when sync/enable fails so settings can show a hard error. */
   onSyncError?: (message: string) => void;
 };
-
-function errMessage(error: unknown, fallback: string): string {
-  if (typeof error === "string" && error.trim()) return error;
-  if (error instanceof Error && error.message.trim()) return error.message;
-  return fallback;
-}
 
 /** Serialize helper IPC so cancelled effect runs cannot reorder enable/sync. */
 let helperSyncChain: Promise<void> = Promise.resolve();
@@ -65,7 +60,7 @@ export function useInputHelperSync({
 
     const fail = (error: unknown, fallback: string) => {
       if (!isCurrent()) return;
-      onSyncErrorRef.current?.(errMessage(error, fallback));
+      onSyncErrorRef.current?.(errorMessage(error, fallback));
     };
 
     void enqueueHelperSync(async () => {

@@ -42,6 +42,15 @@ fn watch() -> zbus::Result<()> {
     for signal in proxy.receive_prepare_for_sleep()? {
         let args = signal.args()?;
         if !args.start {
+            // Exiting is only a restart when a supervisor brings us back.
+            // A detached helper (no systemd unit) would just die, so stay up.
+            if std::env::var_os("INVOCATION_ID").is_none() {
+                eprintln!(
+                    "emobie-inputd: resumed from suspend but not supervised by systemd; \
+                     keeping the current process"
+                );
+                continue;
+            }
             eprintln!("emobie-inputd: resumed from suspend — restarting for a clean state");
             // Non-zero so systemd's Restart=on-failure brings it back up;
             // a plain exit(0) would not trigger a restart.

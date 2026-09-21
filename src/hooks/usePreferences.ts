@@ -19,12 +19,17 @@ export function usePreferences() {
   const [prefsError, setPrefsError] = useState<string | null>(null);
   const writeGeneration = useRef(0);
   const pendingWrite = useRef(Promise.resolve());
+  // Latest committed preferences. Updates are computed from this ref rather
+  // than inside a `setPrefs` updater, so persisting (a side effect) never runs
+  // from a function React may invoke twice (StrictMode) or replay.
+  const prefsRef = useRef<Preferences>(DEFAULT_PREFERENCES);
 
   useEffect(() => {
     let cancelled = false;
     readPreferences()
       .then((loaded) => {
         if (!cancelled) {
+          prefsRef.current = loaded;
           setPrefs(loaded);
           setReady(true);
         }
@@ -45,7 +50,11 @@ export function usePreferences() {
   }, []);
 
   const persist = useCallback((next: Preferences) => {
-    const generation = ++writeGeneration.current;
+    // Monotonic across app launches: the durable mirror keeps the highest rev it
+    // has seen and drops older writers, so a per-session counter that restarts
+    // at 1 would have every write of a later session silently discarded.
+    const generation = Math.max(writeGeneration.current + 1, Date.now());
+    writeGeneration.current = generation;
     pendingWrite.current = pendingWrite.current.then(async () => {
       const ok = await writePreferences(next, generation);
       if (generation !== writeGeneration.current) return;
@@ -53,15 +62,28 @@ export function usePreferences() {
     });
   }, []);
 
-  const update = useCallback(
-    (patch: Partial<Preferences>) => {
-      setPrefs((current) => {
-        const next = { ...current, ...patch };
-        persist(next);
-        return next;
-      });
+  const commit = useCallback(
+    (next: Preferences) => {
+      prefsRef.current = next;
+      setPrefs(next);
+      persist(next);
     },
     [persist],
+  );
+
+  /** Apply `fn` to the latest preferences; return the same object to skip. */
+  const mutate = useCallback(
+    (fn: (current: Preferences) => Preferences) => {
+      const current = prefsRef.current;
+      const next = fn(current);
+      if (next !== current) commit(next);
+    },
+    [commit],
+  );
+
+  const update = useCallback(
+    (patch: Partial<Preferences>) => mutate((current) => ({ ...current, ...patch })),
+    [mutate],
   );
 
   const setTheme = useCallback(
@@ -77,18 +99,13 @@ export function usePreferences() {
     [update],
   );
   const setRecentMax = useCallback(
-    (recentMax: number) => {
-      setPrefs((current) => {
-        const next = {
-          ...current,
-          recentMax,
-          recents: current.recents.slice(0, recentMax),
-        };
-        persist(next);
-        return next;
-      });
-    },
-    [persist],
+    (recentMax: number) =>
+      mutate((current) => ({
+        ...current,
+        recentMax,
+        recents: current.recents.slice(0, recentMax),
+      })),
+    [mutate],
   );
   const setSkinTone = useCallback(
     (skinTone: SkinTone) => update({ skinTone }),
@@ -165,31 +182,23 @@ export function usePreferences() {
   );
 
   const upsertMacro = useCallback(
-    (macro: Macro) => {
-      setPrefs((current) => {
+    (macro: Macro) =>
+      mutate((current) => {
         const without = current.macros.filter((item) => item.id !== macro.id);
         const clash = without.some((item) => item.trigger === macro.trigger);
         if (clash) return current;
-        const next = { ...current, macros: [...without, macro] };
-        persist(next);
-        return next;
-      });
-    },
-    [persist],
+        return { ...current, macros: [...without, macro] };
+      }),
+    [mutate],
   );
 
   const removeMacro = useCallback(
-    (id: string) => {
-      setPrefs((current) => {
-        const next = {
-          ...current,
-          macros: current.macros.filter((item) => item.id !== id),
-        };
-        persist(next);
-        return next;
-      });
-    },
-    [persist],
+    (id: string) =>
+      mutate((current) => ({
+        ...current,
+        macros: current.macros.filter((item) => item.id !== id),
+      })),
+    [mutate],
   );
 
   const setMacros = useCallback(
@@ -198,8 +207,8 @@ export function usePreferences() {
   );
 
   const pushRecent = useCallback(
-    (emoji: string) => {
-      setPrefs((current) => {
+    (emoji: string) =>
+      mutate((current) => {
         const nextRecents = [
           emoji,
           ...current.recents.filter((item) => item !== emoji),
@@ -220,17 +229,14 @@ export function usePreferences() {
           };
         }
 
-        const next = {
+        return {
           ...current,
           recents: nextRecents,
           usageCounts,
           firstUsedAt,
         };
-        persist(next);
-        return next;
-      });
-    },
-    [persist],
+      }),
+    [mutate],
   );
 
   const clearRecents = useCallback(() => {
@@ -242,18 +248,15 @@ export function usePreferences() {
   }, [update]);
 
   const toggleFavorite = useCallback(
-    (hexcode: string) => {
-      setPrefs((current) => {
+    (hexcode: string) =>
+      mutate((current) => {
         const exists = current.favorites.includes(hexcode);
         const favorites = exists
           ? current.favorites.filter((item) => item !== hexcode)
           : [hexcode, ...current.favorites];
-        const next = { ...current, favorites };
-        persist(next);
-        return next;
-      });
-    },
-    [persist],
+        return { ...current, favorites };
+      }),
+    [mutate],
   );
 
   return {

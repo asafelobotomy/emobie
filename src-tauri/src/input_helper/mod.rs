@@ -7,6 +7,8 @@ mod access;
 #[cfg(unix)]
 pub mod bootstrap;
 #[cfg(unix)]
+mod bootstrap_tar;
+#[cfg(unix)]
 pub mod unix;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,7 +73,7 @@ fn offline_linux_only() -> InputHelperStatus {
 pub fn input_helper_status() -> InputHelperStatus {
     #[cfg(unix)]
     {
-        return access::with_flatpak_flag(unix::status());
+        access::with_flatpak_flag(unix::status())
     }
     #[cfg(not(unix))]
     {
@@ -83,7 +85,7 @@ pub fn input_helper_status() -> InputHelperStatus {
 pub fn input_helper_ensure_started() -> InputHelperStatus {
     #[cfg(unix)]
     {
-        return access::with_flatpak_flag(unix::ensure_started());
+        access::with_flatpak_flag(unix::ensure_started())
     }
     #[cfg(not(unix))]
     {
@@ -95,7 +97,7 @@ pub fn input_helper_ensure_started() -> InputHelperStatus {
 pub fn input_helper_set_enabled(enabled: bool) -> Result<InputHelperStatus, String> {
     #[cfg(unix)]
     {
-        return unix::set_enabled(enabled).map(access::with_flatpak_flag);
+        unix::set_enabled(enabled).map(access::with_flatpak_flag)
     }
     #[cfg(not(unix))]
     {
@@ -108,7 +110,7 @@ pub fn input_helper_set_enabled(enabled: bool) -> Result<InputHelperStatus, Stri
 pub fn input_helper_sync_matches(matches: Vec<InputMatch>) -> Result<InputHelperStatus, String> {
     #[cfg(unix)]
     {
-        return unix::sync_matches(matches).map(access::with_flatpak_flag);
+        unix::sync_matches(matches).map(access::with_flatpak_flag)
     }
     #[cfg(not(unix))]
     {
@@ -124,7 +126,7 @@ pub fn input_helper_set_options(
 ) -> Result<InputHelperStatus, String> {
     #[cfg(unix)]
     {
-        return unix::set_options(restore_clipboard, paste_chord).map(access::with_flatpak_flag);
+        unix::set_options(restore_clipboard, paste_chord).map(access::with_flatpak_flag)
     }
     #[cfg(not(unix))]
     {
@@ -137,7 +139,7 @@ pub fn input_helper_set_options(
 pub fn input_helper_inject_paste() -> Result<(), String> {
     #[cfg(unix)]
     {
-        return unix::inject_paste();
+        unix::inject_paste()
     }
     #[cfg(not(unix))]
     {
@@ -149,7 +151,7 @@ pub fn input_helper_inject_paste() -> Result<(), String> {
 pub fn input_helper_run_access_setup() -> Result<InputHelperStatus, String> {
     #[cfg(unix)]
     {
-        return access::run_access_setup();
+        access::run_access_setup()
     }
     #[cfg(not(unix))]
     {

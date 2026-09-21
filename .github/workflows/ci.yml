@@ -14,16 +14,18 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
           cache: npm
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          components: clippy
 
       - name: Install Linux dependencies
         run: |
@@ -48,6 +50,15 @@ jobs:
       - name: Check inputd packaging maps
         run: bash scripts/check-inputd-packaging.sh
 
+      - name: Check Flatpak cargo sources match both lockfiles
+        run: python3 scripts/flatpak-cargo-sources.py --check flatpak/cargo-sources.json src-tauri/Cargo.lock crates/emobie-inputd/Cargo.lock
+
+      - name: Check Tauri command ACL
+        run: bash scripts/check-tauri-acl.sh
+
+      - name: Audit production npm dependencies
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Unit tests
         run: npm test
 
@@ -56,6 +67,15 @@ jobs:
 
       - name: Cargo check
         run: cargo check --manifest-path src-tauri/Cargo.toml
+
+      - name: Clippy (app)
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+
+      - name: Clippy (input helper)
+        run: cargo clippy --manifest-path crates/emobie-inputd/Cargo.toml --all-targets -- -D warnings
+
+      - name: App unit tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
 
       - name: Input helper unit tests
         run: cargo test --manifest-path crates/emobie-inputd/Cargo.toml

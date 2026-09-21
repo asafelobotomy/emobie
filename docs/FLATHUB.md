@@ -23,6 +23,11 @@ Regenerate dependency manifests after lockfile changes:
 ./scripts/generate-flatpak-sources.sh
 ```
 
+`cargo-sources.json` is generated from **both** `src-tauri/Cargo.lock` and
+`crates/emobie-inputd/Cargo.lock` (the manifest builds both crates offline) by
+[`scripts/flatpak-cargo-sources.py`](../scripts/flatpak-cargo-sources.py); CI
+fails if it is stale. `node-sources.json` still needs `flatpak-node-generator`.
+
 Then bump `tag` / `commit` in the source manifest to the release being packaged.
 
 ## Remaining before Flathub
@@ -34,7 +39,7 @@ Then bump `tag` / `commit` in the source manifest to the release being packaged.
 5. **`--talk-name=org.freedesktop.Flatpak`:** grants `flatpak-spawn --host`, which Flathub
    reviewers scrutinize closely since it can run arbitrary host commands. Every call site
    (`src-tauri/src/input_helper/bootstrap.rs`, `access/permanent.rs`, `access/stage.rs`,
-   `unix/lifecycle.rs`, `src-tauri/src/pin.rs`, `src-tauri/src/updates/apply.rs`) passes a
+   `unix/lifecycle.rs`, `src-tauri/src/pin/linux/`, `src-tauri/src/updates/apply.rs`) passes a
    hardcoded argv (no shell interpolation of untrusted data) and is used only to: install/
    restart the host `emobie-inputd` helper, check/repair the udev+group permanent-access
    setup, call `qdbus` for the optional KWin pin-on-top, and apply self-updates. Be ready to

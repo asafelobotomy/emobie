@@ -1,19 +1,12 @@
 //! Install bundled emobie-inputd on the host (AppImage / Flatpak).
 
 use std::io::{Read, Write};
+
+use super::bootstrap_tar::{extract_tarball_to, host_extract_script};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::SystemTime;
 
-/// Members allowed in the host bootstrap tarball (must match scripts/stage-inputd.sh).
-const TAR_MEMBERS: &[&str] = &[
-    "emobie-inputd",
-    "bootstrap-inputd-host.sh",
-    "setup-input-access.sh",
-    "99-emobie-input.rules",
-    "io.github.asafelobotomy.emobie.inputd.policy",
-    "selinux/emobie-inputd.te",
-];
 
 fn bundled_tarball_paths() -> Vec<PathBuf> {
     let mut paths = Vec::new();
@@ -224,33 +217,6 @@ fn run_host_bootstrap(bootstrap: &Path, binary: &Path) -> bool {
         .unwrap_or(false)
 }
 
-fn extract_tarball_to(data: &Path, bytes: &[u8]) -> bool {
-    if fs_create_dir_all(data).is_err() {
-        return false;
-    }
-    let mut cmd = Command::new("tar");
-    cmd.args(["xzf", "-", "-C"])
-        .arg(data)
-        .args(["--no-absolute-names", "--no-overwrite-dir"])
-        .args(TAR_MEMBERS)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-    cmd.spawn()
-        .and_then(|mut child| {
-            if let Some(mut stdin) = child.stdin.take() {
-                stdin.write_all(bytes)?;
-            }
-            child.wait()
-        })
-        .map(|status| status.success())
-        .unwrap_or(false)
-}
-
-fn fs_create_dir_all(path: &Path) -> std::io::Result<()> {
-    std::fs::create_dir_all(path)
-}
-
 fn install_from_tarball(tarball: &Path) -> bool {
     let mut file = match std::fs::File::open(tarball) {
         Ok(f) => f,
@@ -270,18 +236,7 @@ fn install_from_tarball(tarball: &Path) -> bool {
 
     if std::env::var_os("FLATPAK_ID").is_some() {
         // Host-side extract via flatpak-spawn; paths come from host HOME, not the sandbox.
-        let data_str = data.to_string_lossy();
-        let members = TAR_MEMBERS
-            .iter()
-            .map(|m| format!("'{m}'"))
-            .collect::<Vec<_>>()
-            .join(" ");
-        let script = format!(
-            "set -euo pipefail; \
-             mkdir -p '{data_str}'; \
-             tar xzf - -C '{data_str}' --no-absolute-names --no-overwrite-dir {members}; \
-             exec bash '{data_str}/bootstrap-inputd-host.sh' '{data_str}/emobie-inputd'"
-        );
+        let script = host_extract_script(&data.to_string_lossy());
         Command::new("flatpak-spawn")
             .args(["--host", "bash", "-c"])
             .arg(&script)
@@ -335,10 +290,11 @@ fn install_from_loose_dir(dir: &Path) -> bool {
 pub fn try_bootstrap_host_helper() -> bool {
     // Refresh when a bundled tarball is newer than the installed helper.
     for path in bundled_tarball_paths() {
-        if path.is_file() && bundled_helper_newer_than_installed(&path) {
-            if install_from_tarball(&path) {
-                return host_helper_installed();
-            }
+        if path.is_file()
+            && bundled_helper_newer_than_installed(&path)
+            && install_from_tarball(&path)
+        {
+            return host_helper_installed();
         }
     }
     if host_helper_installed() {

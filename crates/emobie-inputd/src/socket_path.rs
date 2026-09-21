@@ -16,21 +16,21 @@ use std::path::{Path, PathBuf};
 const SOCKET_NAME: &str = "emobie-inputd.sock";
 const LOCK_NAME: &str = "emobie-inputd.lock";
 
-/// Directory is safe for a same-UID socket (not a world-writable hijack point).
+/// Whether a directory with this owner/mode may host our socket: it must be
+/// ours (any mode — we chmod it 0700) or root's and not group/other-writable.
+/// A directory owned by any *other* user is never trusted, even when it is not
+/// world-writable, because its owner could plant a socket in it.
+fn dir_owner_acceptable(owner: u32, uid: u32, mode: u32) -> bool {
+    owner == uid || (owner == 0 && (mode & 0o022) == 0)
+}
+
+/// Directory is safe for a same-UID socket (not a hijack point).
 fn dir_is_safe(path: &Path) -> bool {
-    let Ok(meta) = fs::metadata(path) else {
+    // symlink_metadata: a symlinked directory is never accepted.
+    let Ok(meta) = fs::symlink_metadata(path) else {
         return false;
     };
-    if !meta.is_dir() {
-        return false;
-    }
-    let uid = getuid().as_raw();
-    if meta.uid() == uid {
-        return true;
-    }
-    let mode = meta.mode();
-    // Not writable by others, or sticky (like /tmp).
-    (mode & 0o002) == 0 || (mode & 0o1000) != 0
+    meta.is_dir() && dir_owner_acceptable(meta.uid(), getuid().as_raw(), meta.mode())
 }
 
 /// Whether `path` is an allowed socket location (under runtime dir or /run/emobie).
@@ -124,6 +124,20 @@ pub fn acquire_instance_lock() -> Result<Flock<File>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dir_owner_rules() {
+        // ours: fine at any mode
+        assert!(dir_owner_acceptable(1000, 1000, 0o700));
+        assert!(dir_owner_acceptable(1000, 1000, 0o777));
+        // root-owned: only when not group/other-writable
+        assert!(dir_owner_acceptable(0, 1000, 0o755));
+        assert!(!dir_owner_acceptable(0, 1000, 0o777));
+        assert!(!dir_owner_acceptable(0, 1000, 0o775));
+        // another user's dir: never, even at 0755 (pre-created /tmp/emobie-UID)
+        assert!(!dir_owner_acceptable(1001, 1000, 0o755));
+        assert!(!dir_owner_acceptable(1001, 1000, 0o700));
+    }
 
     #[test]
     fn rejects_arbitrary_socket_override() {

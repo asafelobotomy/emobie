@@ -3,6 +3,7 @@
 //! Permanent access = group `emobie-input` + `/etc/udev/rules.d/99-emobie-input.rules`.
 //! Ephemeral `can_listen` (ACL / orphaned GID) must not skip Grant.
 
+mod assets;
 mod permanent;
 mod stage;
 

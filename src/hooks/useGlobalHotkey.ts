@@ -12,12 +12,14 @@ async function toggleVisibility(pinned: boolean) {
   } else {
     await window.unminimize();
     await window.show();
+    // Focus first: on GNOME Wayland the pin is a synthetic keypress that lands
+    // on whichever window has focus, so it must be this one.
+    await window.setFocus();
     try {
       await invoke("apply_window_pin", { pinned });
     } catch {
       await window.setAlwaysOnTop(pinned);
     }
-    await window.setFocus();
   }
 }
 

@@ -200,6 +200,15 @@ mod tests {
     }
 
     #[test]
+    fn dir_owner_rules_match_daemon() {
+        use super::socket::dir_owner_acceptable;
+        assert!(dir_owner_acceptable(1000, 1000, 0o700));
+        assert!(dir_owner_acceptable(0, 1000, 0o755));
+        assert!(!dir_owner_acceptable(0, 1000, 0o777));
+        assert!(!dir_owner_acceptable(1001, 1000, 0o755));
+    }
+
+    #[test]
     fn rejects_untrusted_socket() {
         assert!(!trusted_socket_path(Path::new(
             "/tmp/evil/emobie-inputd.sock"

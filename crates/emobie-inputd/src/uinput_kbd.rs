@@ -178,7 +178,7 @@ impl UInputKeyboard {
     }
 
     /// Ctrl+Alt+Super+F12 — must match the accelerator string
-    /// `src-tauri/src/pin.rs` writes to GNOME's `toggle-above` keybinding
+    /// `src-tauri/src/pin/linux/gnome.rs` writes to GNOME's `toggle-above` keybinding
     /// (`org.gnome.desktop.wm.keybindings`). Toggles whichever window
     /// currently has focus between "always above" and normal — see
     /// `crate::inject::inject_pin_toggle` for why this must only be sent

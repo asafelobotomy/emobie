@@ -1,16 +1,20 @@
 //! Download a GitHub release asset and install it for this package type.
 
 use serde::Serialize;
-use std::fs::{self, File};
-use std::io::{copy, Write};
+use sha2::{Digest, Sha256};
+use std::fs::{self, OpenOptions};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use super::native::install_native_from_deb;
+use super::verified_install::{install_deb, install_rpm};
 
 const USER_AGENT: &str = concat!("emobie/", env!("CARGO_PKG_VERSION"));
 pub const ALLOWED_PREFIX: &str =
     "https://github.com/asafelobotomy/emobie/releases/download/";
+/// Packages are tens of MB; refuse anything absurd rather than fill the disk.
+const MAX_DOWNLOAD_BYTES: u64 = 512 * 1024 * 1024;
 
 /// Best-effort: refresh host inputd after an app/package update.
 fn refresh_inputd_after_update(kind: InstallKind) {
@@ -105,7 +109,7 @@ pub fn detect_install_kind() -> InstallKind {
     InstallKind::Native
 }
 
-fn which(bin: &str) -> bool {
+pub(super) fn which(bin: &str) -> bool {
     Command::new("sh")
         .args(["-c", &format!("command -v {bin} >/dev/null 2>&1")])
         .status()
@@ -121,12 +125,27 @@ pub(crate) fn cache_dir() -> Result<PathBuf, String> {
         })
         .ok_or_else(|| "HOME is not set".to_string())?;
     let dir = base.join("emobie").join("updates");
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let mut builder = fs::DirBuilder::new();
+    builder.recursive(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(&dir).map_err(|e| e.to_string())?;
+    // Downloads are later installed as root — keep other users out of the dir
+    // even if an older version created it with looser permissions.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&dir, fs::Permissions::from_mode(0o700))
+            .map_err(|e| e.to_string())?;
+    }
     Ok(dir)
 }
 
 fn validate_download_url(url: &str) -> Result<(), String> {
-    if url.chars().any(|c| c.is_whitespace()) {
+    if url.chars().any(|c| c.is_whitespace() || c.is_control()) {
         return Err("Invalid download URL.".into());
     }
     if !url.starts_with(ALLOWED_PREFIX) {
@@ -135,18 +154,56 @@ fn validate_download_url(url: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn download_asset(url: &str, dest: &Path) -> Result<(), String> {
+pub(super) fn lower_hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// Download `url` to `dest` (created exclusively, mode 0600) and verify its
+/// SHA-256 against `expected_sha256`. On any failure the partial file is removed.
+fn download_asset(url: &str, dest: &Path, expected_sha256: &str) -> Result<(), String> {
     validate_download_url(url)?;
-    let response = ureq::get(url)
-        .set("User-Agent", USER_AGENT)
-        .set("Accept", "application/octet-stream")
-        .call()
-        .map_err(|e| format!("Download failed: {e}"))?;
-    let mut reader = response.into_reader();
-    let mut file = File::create(dest).map_err(|e| e.to_string())?;
-    copy(&mut reader, &mut file).map_err(|e| e.to_string())?;
-    file.flush().map_err(|e| e.to_string())?;
-    Ok(())
+    let result = (|| {
+        let response = ureq::get(url)
+            .set("User-Agent", USER_AGENT)
+            .set("Accept", "application/octet-stream")
+            .call()
+            .map_err(|e| format!("Download failed: {e}"))?;
+        let mut reader = response.into_reader().take(MAX_DOWNLOAD_BYTES + 1);
+        let mut opts = OpenOptions::new();
+        opts.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            opts.mode(0o600);
+        }
+        let mut file = opts.open(dest).map_err(|e| e.to_string())?;
+        let mut hasher = Sha256::new();
+        let mut buf = [0u8; 64 * 1024];
+        let mut total = 0u64;
+        loop {
+            let n = reader.read(&mut buf).map_err(|e| e.to_string())?;
+            if n == 0 {
+                break;
+            }
+            total += n as u64;
+            if total > MAX_DOWNLOAD_BYTES {
+                return Err("Download is larger than expected.".to_string());
+            }
+            hasher.update(&buf[..n]);
+            file.write_all(&buf[..n]).map_err(|e| e.to_string())?;
+        }
+        file.flush().map_err(|e| e.to_string())?;
+        if lower_hex(&hasher.finalize()) != expected_sha256.to_ascii_lowercase() {
+            return Err(
+                "Downloaded file failed checksum verification — not installing.".to_string(),
+            );
+        }
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(dest);
+    }
+    result
 }
 
 pub(crate) fn run_checked(cmd: &mut Command) -> Result<(), String> {
@@ -260,59 +317,23 @@ fn install_appimage(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn install_deb(path: &Path) -> Result<(), String> {
-    if which("apt-get") {
-        return run_checked(Command::new("pkexec").args([
-            "env",
-            "DEBIAN_FRONTEND=noninteractive",
-            "apt-get",
-            "install",
-            "-y",
-            &path.display().to_string(),
-        ]));
-    }
-    run_checked(
-        Command::new("pkexec")
-            .arg("dpkg")
-            .arg("-i")
-            .arg(path),
-    )
-}
-
-fn install_rpm(path: &Path) -> Result<(), String> {
-    if which("dnf") {
-        return run_checked(
-            Command::new("pkexec")
-                .args(["dnf", "install", "-y"])
-                .arg(path),
-        );
-    }
-    if which("zypper") {
-        return run_checked(
-            Command::new("pkexec")
-                .args(["zypper", "--non-interactive", "install", "--allow-unsigned-rpm"])
-                .arg(path),
-        );
-    }
-    run_checked(
-        Command::new("pkexec")
-            .args(["rpm", "-Uvh"])
-            .arg(path),
-    )
-}
-
 pub fn apply_update(
     release_tag: String,
     download_url: String,
     asset_name: String,
 ) -> Result<ApplyUpdateResult, String> {
     validate_download_url(&download_url)?;
-    if asset_name.contains('/') || asset_name.contains("..") {
+    if asset_name.contains('/')
+        || asset_name.contains("..")
+        || asset_name.starts_with('-')
+        || asset_name.chars().any(|c| c.is_whitespace() || c.is_control())
+    {
         return Err("Invalid asset name.".into());
     }
 
     let kind = detect_install_kind();
-    super::verify_update_asset(&release_tag, &download_url, &asset_name, kind)?;
+    let expected_sha256 =
+        super::verify_update_asset(&release_tag, &download_url, &asset_name, kind)?;
     let expected = match kind {
         InstallKind::Flatpak => ".flatpak",
         InstallKind::AppImage => ".AppImage",
@@ -328,7 +349,7 @@ pub fn apply_update(
     let dir = cache_dir()?;
     let dest = dir.join(&asset_name);
     let _ = fs::remove_file(&dest);
-    download_asset(&download_url, &dest)?;
+    download_asset(&download_url, &dest, &expected_sha256)?;
 
     let result = match kind {
         InstallKind::Flatpak => install_flatpak(&dest).map(|_| ApplyUpdateResult {
@@ -347,12 +368,12 @@ pub fn apply_update(
                 .into(),
             restart_required: true,
         }),
-        InstallKind::Deb => install_deb(&dest).map(|_| ApplyUpdateResult {
+        InstallKind::Deb => install_deb(&dest, &expected_sha256).map(|_| ApplyUpdateResult {
             ok: true,
             detail: "Package installed. Quit and relaunch emobie to finish.".into(),
             restart_required: true,
         }),
-        InstallKind::Rpm => install_rpm(&dest).map(|_| ApplyUpdateResult {
+        InstallKind::Rpm => install_rpm(&dest, &expected_sha256).map(|_| ApplyUpdateResult {
             ok: true,
             detail: "Package installed. Quit and relaunch emobie to finish.".into(),
             restart_required: true,

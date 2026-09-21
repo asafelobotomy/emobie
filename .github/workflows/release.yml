@@ -11,8 +11,9 @@ on:
         required: false
         type: string
 
+# Least privilege by default; only the publishing job may write.
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
@@ -27,14 +28,18 @@ jobs:
       tag: ${{ steps.meta.outputs.tag }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Resolve version and tag
         id: meta
+        env:
+          # Passed via env, never interpolated into the script body.
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.tag }}" ]]; then
-            TAG="${{ inputs.tag }}"
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && -n "$INPUT_TAG" ]]; then
+            TAG="$INPUT_TAG"
           elif [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             TAG="${GITHUB_REF_NAME}"
           else
@@ -67,16 +72,16 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
           cache: npm
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
 
       - name: Install Linux dependencies
         run: |
@@ -97,8 +102,11 @@ jobs:
       - name: Install appimagetool
         run: |
           set -euo pipefail
+          # Pinned release + checksum (was the moving "continuous" build).
+          # SHA-256 matches the digest GitHub reports for the 1.9.1 asset.
           curl -fsSL -o /tmp/appimagetool \
-            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+            https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+          echo "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0  /tmp/appimagetool" | sha256sum -c -
           chmod +x /tmp/appimagetool
           # Wrapper so APPIMAGE_EXTRACT_AND_RUN works without FUSE.
           printf '%s\n' '#!/bin/sh' 'exec env APPIMAGE_EXTRACT_AND_RUN=1 /tmp/appimagetool "$@"' \
@@ -206,7 +214,7 @@ jobs:
           ls -lh dist-release flatpak/emobie.deb
 
       - name: Upload Linux packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: emobie-linux
           path: |
@@ -223,10 +231,10 @@ jobs:
       options: --privileged
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Download Linux packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: emobie-linux
           path: artifacts
@@ -238,7 +246,7 @@ jobs:
           ls -lh flatpak/emobie.deb
 
       - name: Build Flatpak
-        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        uses: flatpak/flatpak-github-actions/flatpak-builder@79327416609af08178ad73b352877e51450790b3 # v6
         with:
           bundle: emobie-${{ needs.prepare.outputs.version }}-x86_64.flatpak
           # Deb-wrap for GitHub Releases. Flathub-bound source build:
@@ -249,7 +257,7 @@ jobs:
           arch: x86_64
 
       - name: Upload Flatpak
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: emobie-flatpak
           path: emobie-${{ needs.prepare.outputs.version }}-x86_64.flatpak
@@ -259,12 +267,14 @@ jobs:
     name: Publish GitHub Release
     needs: [prepare, build-linux, build-flatpak]
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: artifacts
 
@@ -322,10 +332,13 @@ jobs:
           # Keep flatpak/emobie.deb out of the public release if duplicated;
           # named dist-release copies are enough.
           rm -f release-files/emobie.deb
+          # The in-app updater refuses to install a package unless it matches
+          # its entry in this file (sha256sum format).
+          (cd release-files && sha256sum -- * > SHA256SUMS && cat SHA256SUMS)
           ls -lh release-files
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
           name: emobie ${{ needs.prepare.outputs.version }}

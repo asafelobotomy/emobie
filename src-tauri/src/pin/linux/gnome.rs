@@ -13,7 +13,8 @@
 
 use crate::pin::PinApplyResult;
 use std::process::Command;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
+use std::sync::Mutex;
 
 /// Must match `UInputKeyboard::toggle_above_gnome` /
 /// `toggle_above_gnome_enigo` in emobie-inputd exactly.
@@ -29,6 +30,13 @@ const STATE_ABOVE: u8 = 2;
 /// unknown on hide (see `note_hidden`) so a real re-toggle happens on next
 /// show rather than being skipped because this still remembers the old value.
 static LAST_ABOVE: AtomicU8 = AtomicU8::new(STATE_UNKNOWN);
+/// Serializes the whole check → inject → record sequence in `toggle_pin`.
+/// Mutter *toggles*, so two overlapping callers (tray show + startup, rapid
+/// activations) would both see "not yet pinned" and toggle twice.
+static TOGGLE_LOCK: Mutex<()> = Mutex::new(());
+/// Bumped by `note_hidden`; lets an in-flight toggle notice the window was
+/// hidden underneath it and not record a stale state.
+static HIDE_EPOCH: AtomicU64 = AtomicU64::new(0);
 
 pub fn desktop_is_gnome() -> bool {
     let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
@@ -81,12 +89,23 @@ pub fn setup_binding() -> Result<(), String> {
 /// guarantees the next show-while-pinned always re-asserts for real instead
 /// of silently no-op'ing because our tracker still says "already above".
 pub fn note_hidden() {
+    HIDE_EPOCH.fetch_add(1, Ordering::AcqRel);
     LAST_ABOVE.store(STATE_UNKNOWN, Ordering::Relaxed);
+}
+
+/// Whether `toggle_pin(desired)` would be a no-op given what we believe.
+/// An unknown state counts as "not above": a freshly mapped window is never
+/// above, so a request to *unpin* must not send the (toggling) chord — that
+/// would pin it instead.
+fn already_in_state(last: u8, desired: u8) -> bool {
+    last == desired || (desired == STATE_BELOW && last == STATE_UNKNOWN)
 }
 
 pub fn toggle_pin(pinned: bool) -> PinApplyResult {
     let desired = if pinned { STATE_ABOVE } else { STATE_BELOW };
-    if LAST_ABOVE.load(Ordering::Relaxed) == desired {
+    let _guard = TOGGLE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let epoch = HIDE_EPOCH.load(Ordering::Acquire);
+    if already_in_state(LAST_ABOVE.load(Ordering::Relaxed), desired) {
         return PinApplyResult {
             applied: true,
             limited: false,
@@ -99,7 +118,13 @@ pub fn toggle_pin(pinned: bool) -> PinApplyResult {
     }
     match crate::input_helper::unix::inject_pin_toggle() {
         Ok(()) => {
-            LAST_ABOVE.store(desired, Ordering::Relaxed);
+            // Hidden while the chord was in flight → we no longer know.
+            let recorded = if HIDE_EPOCH.load(Ordering::Acquire) == epoch {
+                desired
+            } else {
+                STATE_UNKNOWN
+            };
+            LAST_ABOVE.store(recorded, Ordering::Relaxed);
             PinApplyResult {
                 applied: true,
                 limited: false,
@@ -163,5 +188,33 @@ fn finish(output: std::process::Output) -> Result<String, String> {
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     } else {
         Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unknown_state_never_sends_unpin_chord() {
+        assert!(already_in_state(STATE_UNKNOWN, STATE_BELOW));
+        assert!(already_in_state(STATE_BELOW, STATE_BELOW));
+        assert!(!already_in_state(STATE_ABOVE, STATE_BELOW));
+    }
+
+    #[test]
+    fn unknown_state_still_pins() {
+        assert!(!already_in_state(STATE_UNKNOWN, STATE_ABOVE));
+        assert!(!already_in_state(STATE_BELOW, STATE_ABOVE));
+        assert!(already_in_state(STATE_ABOVE, STATE_ABOVE));
+    }
+
+    #[test]
+    fn parses_gsettings_arrays() {
+        assert_eq!(parse_string_array("@as []"), Some(vec![]));
+        assert_eq!(
+            parse_string_array("['<Control><Alt><Super>F12']"),
+            Some(vec!["<Control><Alt><Super>F12".to_string()])
+        );
     }
 }

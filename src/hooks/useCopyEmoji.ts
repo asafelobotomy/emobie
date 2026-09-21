@@ -18,6 +18,8 @@ export type CopyTextOptions = {
   flashKey?: string;
 };
 
+const CLIPBOARD_RESTORE_DELAY_MS = 900;
+
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
@@ -80,9 +82,11 @@ async function tryAutoPaste(
   }
 
   if (previous !== null && previous !== text) {
+    // Match emobie-inputd's restore delay: the target app reads the clipboard
+    // when it *handles* Ctrl+V, which can lag on slow/Electron apps.
     window.setTimeout(() => {
       void writeText(previous).catch(() => undefined);
-    }, 500);
+    }, CLIPBOARD_RESTORE_DELAY_MS);
   }
   return null;
 }

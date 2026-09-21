@@ -4,7 +4,12 @@
 use serde::Serialize;
 use serde_json::Value;
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
+use std::sync::Mutex;
+
+/// Serializes the read-rev → write sequence within this process.
+static SAVE_LOCK: Mutex<()> = Mutex::new(());
 
 const APP_IDENTIFIER: &str = "io.github.asafelobotomy.emobie";
 /// Pre-0.6.7 native store path (Tauri identifier was com.emobie.app).
@@ -75,7 +80,7 @@ fn flatpak_store_path() -> Option<PathBuf> {
     )
 }
 
-fn preferences_from_file(path: &PathBuf) -> Option<Value> {
+fn preferences_from_file(path: &std::path::Path) -> Option<Value> {
     let raw = fs::read_to_string(path).ok()?;
     let value: Value = serde_json::from_str(&raw).ok()?;
     if let Some(prefs) = value.get("preferences").cloned() {
@@ -155,6 +160,7 @@ pub fn save_durable_preferences(preferences: Value, write_rev: u64) -> Result<()
     if !preferences.is_object() {
         return Err("preferences must be a JSON object".into());
     }
+    let _guard = SAVE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let path = durable_path().ok_or_else(|| "HOME is not set".to_string())?;
     let mut stored_rev = 0u64;
     if let Ok(raw) = fs::read_to_string(&path) {
@@ -176,15 +182,39 @@ pub fn save_durable_preferences(preferences: Value, write_rev: u64) -> Result<()
         write_rev
     };
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        // Macros can hold personal text: keep the directory private.
+        let mut builder = fs::DirBuilder::new();
+        builder.recursive(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::DirBuilderExt;
+            builder.mode(0o700);
+        }
+        builder.create(parent).map_err(|e| e.to_string())?;
     }
     let wrapped = serde_json::json!({
         "preferences": preferences,
         "writeRev": effective_rev,
     });
     let body = serde_json::to_string_pretty(&wrapped).map_err(|e| e.to_string())?;
-    let tmp = path.with_extension("json.tmp");
-    fs::write(&tmp, body).map_err(|e| e.to_string())?;
-    fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
-    Ok(())
+    // Unique temp name so concurrent instances cannot clobber each other's
+    // partial write; 0600 like emobie-inputd's state file; fsync before rename.
+    let tmp = path.with_extension(format!("json.{}.tmp", std::process::id()));
+    let write = || -> std::io::Result<()> {
+        let mut opts = fs::OpenOptions::new();
+        opts.write(true).create(true).truncate(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            opts.mode(0o600);
+        }
+        let mut file = opts.open(&tmp)?;
+        file.write_all(body.as_bytes())?;
+        file.sync_all()?;
+        fs::rename(&tmp, &path)
+    };
+    write().map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        e.to_string()
+    })
 }

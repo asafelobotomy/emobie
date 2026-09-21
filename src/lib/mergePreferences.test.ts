@@ -12,34 +12,53 @@ const macro = (id: string, trigger: string): Macro => ({
 });
 
 describe("mergePreferencePartials", () => {
-  it("unions macros favorites and recents across sources", () => {
+  it("keeps deletions: the primary store is authoritative for lists it has", () => {
     const primary: Partial<Preferences> = {
       theme: "dark",
       macros: [macro("a", ":a")],
       favorites: ["1F600"],
-      recents: ["😀"],
+      recents: [],
     };
-    const other: Partial<Preferences> = {
+    const stale: Partial<Preferences> = {
       theme: "light",
-      macros: [macro("b", ":b")],
+      macros: [macro("a", ":a"), macro("b", ":b")],
       favorites: ["1F602", "1F600"],
       recents: ["😂", "😀"],
     };
 
-    const merged = mergePreferencePartials(primary, [other]);
+    const merged = mergePreferencePartials(primary, [stale]);
     assert.equal(merged.theme, "dark");
-    assert.deepEqual(
-      (merged.macros ?? []).map((item) => item.trigger).sort(),
-      [":a", ":b"],
-    );
-    assert.deepEqual(merged.favorites, ["1F600", "1F602"]);
-    assert.deepEqual(merged.recents, ["😀", "😂"]);
+    assert.deepEqual((merged.macros ?? []).map((m) => m.trigger), [":a"]);
+    assert.deepEqual(merged.favorites, ["1F600"]);
+    assert.deepEqual(merged.recents, [], "cleared recents must stay cleared");
   });
 
-  it("merges usage maps with max counts and earliest first-used", () => {
+  it("keeps cleared usage stats instead of restoring the old maximum", () => {
     const merged = mergePreferencePartials(
-      { usageCounts: { a: 2 }, firstUsedAt: { a: 100 } },
-      [{ usageCounts: { a: 5, b: 1 }, firstUsedAt: { a: 50, b: 90 } }],
+      { usageCounts: {}, firstUsedAt: {} },
+      [{ usageCounts: { a: 5 }, firstUsedAt: { a: 50 } }],
+    );
+    assert.deepEqual(merged.usageCounts, {});
+    assert.deepEqual(merged.firstUsedAt, {});
+  });
+
+  it("recovers only the keys the primary store lacks", () => {
+    const merged = mergePreferencePartials(
+      { macros: [macro("a", ":a")] },
+      [{ macros: [macro("b", ":b")], favorites: ["1F44D"], recents: ["👍"] }],
+    );
+    assert.deepEqual((merged.macros ?? []).map((m) => m.trigger), [":a"]);
+    assert.deepEqual(merged.favorites, ["1F44D"]);
+    assert.deepEqual(merged.recents, ["👍"]);
+  });
+
+  it("merges recovered usage maps with max counts and earliest first-used", () => {
+    const merged = mergePreferencePartials(
+      {},
+      [
+        { usageCounts: { a: 2 }, firstUsedAt: { a: 100 } },
+        { usageCounts: { a: 5, b: 1 }, firstUsedAt: { a: 50, b: 90 } },
+      ],
     );
     assert.deepEqual(merged.usageCounts, { a: 5, b: 1 });
     assert.deepEqual(merged.firstUsedAt, { a: 50, b: 90 });

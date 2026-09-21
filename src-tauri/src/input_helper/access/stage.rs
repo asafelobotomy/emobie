@@ -1,98 +1,16 @@
 //! Resolve, stage, and run the Polkit-annotated setup script.
+//!
+//! Trust model: the only things ever executed or installed as root are
+//! (a) the package-managed `/usr/share/emobie/setup-input-access.sh`, or
+//! (b) the bytes embedded in this binary (see `assets`), staged into
+//! `/usr/local/share/emobie/`. No user-writable file is ever copied to root.
 
-use super::permanent::{
-    host_file_exists, host_setup_hint, in_flatpak, LOCAL_SETUP, SYSTEM_SETUP,
-};
-use std::path::{Path, PathBuf};
+use super::assets::STAGED_FILES;
+use super::permanent::{host_setup_hint, in_flatpak, LOCAL_SETUP, SYSTEM_SETUP};
+use std::io::Write;
 use std::process::{Command, Stdio};
-use std::time::SystemTime;
 
 const LOCAL_DIR: &str = "/usr/local/share/emobie";
-
-fn user_setup_script() -> Option<PathBuf> {
-    std::env::var_os("HOME").map(|h| {
-        PathBuf::from(h).join(".local/share/emobie/setup-input-access.sh")
-    })
-}
-
-fn user_data_dir() -> Option<PathBuf> {
-    std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share/emobie"))
-}
-
-fn sandbox_setup_scripts() -> Vec<PathBuf> {
-    let mut paths = Vec::new();
-    let home = std::env::var_os("HOME").map(PathBuf::from);
-    let local_helper = home
-        .as_ref()
-        .map(|h| h.join(".local/bin/emobie-inputd"))
-        .filter(|p| p.is_file());
-    // Prefer user/local copies when the host helper is under ~/.local/bin
-    // (AppImage/Flatpak bootstrap) so Grant does not run a stale system script.
-    if local_helper.is_some() {
-        // Prefer Polkit-annotated /usr/local copy when present (Grant stages it).
-        paths.push(PathBuf::from(LOCAL_SETUP));
-        if let Some(user) = user_setup_script() {
-            paths.push(user);
-        }
-        paths.push(PathBuf::from(SYSTEM_SETUP));
-    } else {
-        paths.push(PathBuf::from(SYSTEM_SETUP));
-        paths.push(PathBuf::from(LOCAL_SETUP));
-        if let Some(user) = user_setup_script() {
-            paths.push(user);
-        }
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            paths.push(dir.join("setup-input-access.sh"));
-            paths.push(dir.join("../../../packaging/setup-input-access.sh"));
-        }
-    }
-    paths
-}
-
-fn host_setup_candidates() -> Vec<String> {
-    let mut paths = Vec::new();
-    if let Ok(home) = std::env::var("HOME") {
-        let local_bin = format!("{home}/.local/bin/emobie-inputd");
-        let user_setup = format!("{home}/.local/share/emobie/setup-input-access.sh");
-        if host_file_exists(&local_bin) {
-            paths.push(LOCAL_SETUP.to_string());
-            paths.push(user_setup);
-            paths.push(SYSTEM_SETUP.to_string());
-            return paths;
-        }
-        paths.push(SYSTEM_SETUP.to_string());
-        paths.push(LOCAL_SETUP.to_string());
-        paths.push(user_setup);
-    } else {
-        paths.push(SYSTEM_SETUP.to_string());
-        paths.push(LOCAL_SETUP.to_string());
-    }
-    paths
-}
-
-fn mtime(path: &Path) -> Option<SystemTime> {
-    std::fs::metadata(path).ok()?.modified().ok()
-}
-
-/// Pick the newest existing script among candidates (avoids stale packaged Grant).
-fn newest_existing(paths: &[PathBuf]) -> Option<PathBuf> {
-    let mut best: Option<(SystemTime, PathBuf)> = None;
-    for path in paths {
-        if !path.is_file() {
-            continue;
-        }
-        let Some(modified) = mtime(path) else {
-            continue;
-        };
-        match &best {
-            Some((t, _)) if *t >= modified => {}
-            _ => best = Some((modified, path.clone())),
-        }
-    }
-    best.map(|(_, p)| p)
-}
 
 fn with_session_env(cmd: &mut Command) {
     for key in [
@@ -108,31 +26,54 @@ fn with_session_env(cmd: &mut Command) {
     }
 }
 
-fn is_polkit_annotated_path(script: &str) -> bool {
-    script == SYSTEM_SETUP || script == LOCAL_SETUP
+/// Root-owned file contents, or `None` when missing/unreadable. Only used to
+/// decide whether a staged copy is already current — the data never gets
+/// executed by this process.
+fn read_installed(path: &str, flatpak: bool) -> Option<Vec<u8>> {
+    let output = if flatpak {
+        Command::new("flatpak-spawn")
+            .args(["--host", "cat", path])
+            .stdin(Stdio::null())
+            .stderr(Stdio::null())
+            .output()
+            .ok()?
+    } else {
+        return std::fs::read(path).ok();
+    };
+    output.status.success().then_some(output.stdout)
 }
 
-fn pkexec_install(flatpak: bool, mode: &str, source: &str, dest: &str) -> Result<(), String> {
-    let install_args = ["install", "-D", "-m", mode, source, dest];
-    let output = if flatpak {
-        let mut cmd = Command::new("flatpak-spawn");
-        cmd.arg("--host").arg("pkexec").args(install_args);
-        with_session_env(&mut cmd);
-        cmd.stdin(Stdio::null()).output()
+/// `pkexec install -D -m MODE /dev/stdin DEST`, feeding `bytes` on stdin so the
+/// data root installs is exactly what we hold in memory (no path to swap).
+fn pkexec_install_bytes(flatpak: bool, mode: &str, bytes: &[u8], dest: &str) -> Result<(), String> {
+    let install_args = ["install", "-D", "-m", mode, "/dev/stdin", dest];
+    let mut cmd = if flatpak {
+        let mut c = Command::new("flatpak-spawn");
+        c.arg("--host").arg("pkexec").args(install_args);
+        c
     } else {
-        let mut cmd = Command::new("pkexec");
-        cmd.args(install_args);
-        with_session_env(&mut cmd);
-        cmd.stdin(Stdio::null()).output()
+        let mut c = Command::new("pkexec");
+        c.args(install_args);
+        c
+    };
+    with_session_env(&mut cmd);
+    let mut child = cmd
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Could not stage {dest} ({e}). {}", host_setup_hint()))?;
+    if let Some(mut stdin) = child.stdin.take() {
+        // Errors surface through the exit status below (e.g. auth cancelled).
+        let _ = stdin.write_all(bytes);
     }
-    .map_err(|e| format!("Could not stage {dest} ({e}). {}", host_setup_hint()))?;
-
+    let output = child
+        .wait_with_output()
+        .map_err(|e| format!("Could not stage {dest} ({e}). {}", host_setup_hint()))?;
     if output.status.success() {
         return Ok(());
     }
-    let detail = String::from_utf8_lossy(&output.stderr)
-        .trim()
-        .to_string();
+    let detail = String::from_utf8_lossy(&output.stderr).trim().to_string();
     Err(if detail.is_empty() {
         format!("Could not install {dest}. {}", host_setup_hint())
     } else {
@@ -140,121 +81,41 @@ fn pkexec_install(flatpak: bool, mode: &str, source: &str, dest: &str) -> Result
     })
 }
 
-/// Copy setup script + udev/policy siblings to the Polkit-annotated local path.
-fn stage_setup_to_local(source: &str, flatpak: bool) -> Result<(), String> {
-    if is_polkit_annotated_path(source) {
-        // Still ensure udev rules sit beside LOCAL_SETUP for AppImage re-Grants.
-        if source == LOCAL_SETUP {
-            stage_local_siblings(source, flatpak)?;
+/// Stage every embedded asset that is missing or differs from the installed
+/// copy into `/usr/local/share/emobie/` (root-owned).
+fn stage_embedded_assets(flatpak: bool) -> Result<(), String> {
+    for (bytes, mode, rel) in STAGED_FILES {
+        let dest = format!("{LOCAL_DIR}/{rel}");
+        if read_installed(&dest, flatpak).as_deref() == Some(bytes) {
+            continue;
         }
-        return Ok(());
+        pkexec_install_bytes(flatpak, mode, bytes, &dest)?;
     }
-    pkexec_install(flatpak, "755", source, LOCAL_SETUP)?;
-    stage_local_siblings(source, flatpak)?;
-    Ok(())
-}
-
-fn stage_local_siblings(setup_source: &str, flatpak: bool) -> Result<(), String> {
-    let setup_path = Path::new(setup_source);
-    let sibling_dir = setup_path
-        .parent()
-        .map(Path::to_path_buf)
-        .or_else(user_data_dir);
-
-    let rules_candidates: Vec<PathBuf> = {
-        let mut v = Vec::new();
-        if let Some(dir) = &sibling_dir {
-            v.push(dir.join("99-emobie-input.rules"));
-        }
-        if let Some(dir) = user_data_dir() {
-            v.push(dir.join("99-emobie-input.rules"));
-        }
-        v.push(PathBuf::from("/usr/share/emobie/99-emobie-input.rules"));
-        v
-    };
-    let rules_src = rules_candidates.into_iter().find(|p| {
-        if flatpak {
-            host_file_exists(&p.to_string_lossy())
-        } else {
-            p.is_file()
-        }
-    });
-    if let Some(rules) = rules_src {
-        let dest = format!("{LOCAL_DIR}/99-emobie-input.rules");
-        let missing = if flatpak {
-            !host_file_exists(&dest)
-        } else {
-            !Path::new(&dest).is_file()
-        };
-        if missing {
-            pkexec_install(flatpak, "644", &rules.to_string_lossy(), &dest)?;
-        }
-    }
-
-    let policy_candidates: Vec<PathBuf> = {
-        let mut v = Vec::new();
-        if let Some(dir) = &sibling_dir {
-            v.push(dir.join("io.github.asafelobotomy.emobie.inputd.policy"));
-        }
-        if let Some(dir) = user_data_dir() {
-            v.push(dir.join("io.github.asafelobotomy.emobie.inputd.policy"));
-        }
-        v
-    };
-    let policy_src = policy_candidates.into_iter().find(|p| {
-        if flatpak {
-            host_file_exists(&p.to_string_lossy())
-        } else {
-            p.is_file()
-        }
-    });
-    if let Some(policy) = policy_src {
-        let dest = format!("{LOCAL_DIR}/io.github.asafelobotomy.emobie.inputd.policy");
-        let missing = if flatpak {
-            !host_file_exists(&dest)
-        } else {
-            !Path::new(&dest).is_file()
-        };
-        if missing {
-            let _ = pkexec_install(flatpak, "644", &policy.to_string_lossy(), &dest);
-        }
-    }
-
     Ok(())
 }
 
 pub(super) fn ensure_polkit_annotated_setup(script: &str, flatpak: bool) -> Result<String, String> {
-    if is_polkit_annotated_path(script) {
-        if script == LOCAL_SETUP {
-            stage_local_siblings(script, flatpak)?;
-        }
+    if script == SYSTEM_SETUP {
+        // Package-managed and root-owned: trusted as-is.
         return Ok(script.to_string());
     }
-    stage_setup_to_local(script, flatpak)?;
+    stage_embedded_assets(flatpak)?;
     Ok(LOCAL_SETUP.to_string())
 }
 
-fn pkexec_args(script: &str) -> Vec<String> {
-    vec![script.to_string()]
-}
-
 pub(super) fn run_pkexec(script: &str, flatpak: bool) -> Result<(), String> {
-    let args = pkexec_args(script);
     let mut cmd = if flatpak {
         let mut c = Command::new("flatpak-spawn");
-        c.arg("--host").arg("pkexec").args(&args);
+        c.arg("--host").arg("pkexec").arg(script);
         c
     } else {
         let mut c = Command::new("pkexec");
-        c.args(&args);
+        c.arg(script);
         c
     };
     with_session_env(&mut cmd);
-    // Ensure setup script can resolve the invoking user on all distros.
-    if let Ok(user) = std::env::var("USER") {
-        cmd.env("SUDO_USER", user);
-    }
-
+    // pkexec scrubs the environment; the script resolves the invoking user
+    // from PKEXEC_UID.
     let output = cmd.stdin(Stdio::null()).output().map_err(|e| {
         if flatpak {
             format!("flatpak-spawn --host failed ({e}). {}", host_setup_hint())
@@ -276,23 +137,39 @@ pub(super) fn run_pkexec(script: &str, flatpak: bool) -> Result<(), String> {
     Err(format!("Keyboard access setup: {detail}"))
 }
 
+/// Which script to run as root: the package's, if installed, otherwise our
+/// staged embedded copy (staged by `ensure_polkit_annotated_setup`).
 pub(super) fn resolve_setup_script() -> Result<(String, bool), String> {
     let flatpak = in_flatpak();
-    if flatpak {
-        for path in host_setup_candidates() {
-            if host_file_exists(&path) {
-                return Ok((path, true));
-            }
-        }
-        // Never pass sandbox (/app) paths to --host pkexec — the host cannot read them.
-        return Err(host_setup_hint());
+    let system_present = if flatpak {
+        super::permanent::host_file_exists(SYSTEM_SETUP)
+    } else {
+        std::path::Path::new(SYSTEM_SETUP).is_file()
+    };
+    let script = if system_present { SYSTEM_SETUP } else { LOCAL_SETUP };
+    Ok((script.to_string(), flatpak))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::assets::{POLKIT_POLICY, SELINUX_TE, SETUP_SCRIPT, STAGED_FILES, UDEV_RULES};
+
+    #[test]
+    fn embedded_assets_are_present_and_sane() {
+        assert!(SETUP_SCRIPT.starts_with(b"#!/usr/bin/env bash"));
+        assert!(UDEV_RULES.windows(6).any(|w| w == b"uinput"));
+        assert!(POLKIT_POLICY.starts_with(b"<?xml"));
+        assert!(!SELINUX_TE.is_empty());
+        assert_eq!(STAGED_FILES.len(), 4);
     }
 
-    let candidates = sandbox_setup_scripts();
-    let script = newest_existing(&candidates).ok_or_else(|| {
-        "setup-input-access.sh not found — install the emobie package or run \
-packaging/setup-input-access.sh"
-            .to_string()
-    })?;
-    Ok((script.to_string_lossy().into_owned(), false))
+    #[test]
+    fn shipped_udev_rule_grants_no_keyboard_read() {
+        let text = String::from_utf8_lossy(UDEV_RULES);
+        let active: Vec<&str> = text
+            .lines()
+            .filter(|l| !l.trim_start().starts_with('#') && !l.trim().is_empty())
+            .collect();
+        assert!(active.iter().all(|l| !l.contains("event*")), "{active:?}");
+    }
 }

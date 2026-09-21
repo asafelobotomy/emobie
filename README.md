@@ -82,7 +82,7 @@ Linux tray, pin, startup, and SELinux notes: [`docs/LINUX.md`](docs/LINUX.md).
 
 **Prerequisites**
 
-- Node.js 20+
+- Node.js 22.6+ (`npm test` uses `--experimental-strip-types`)
 - Rust (stable)
 
 Debian / Ubuntu:

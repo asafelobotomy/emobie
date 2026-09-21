@@ -2,8 +2,10 @@
 
 mod apply;
 mod native;
+mod verified_install;
 
 use serde::{Deserialize, Serialize};
+use std::io::Read;
 
 pub use apply::InstallKind;
 
@@ -19,6 +21,9 @@ pub fn apply_update(
 }
 
 const REPO: &str = "asafelobotomy/emobie";
+/// Release asset listing `sha256sum`-format hashes for every package.
+const CHECKSUM_ASSET: &str = "SHA256SUMS";
+const MAX_CHECKSUM_BYTES: u64 = 64 * 1024;
 const USER_AGENT: &str = concat!("emobie/", env!("CARGO_PKG_VERSION"));
 
 #[derive(Debug, Clone, Serialize)]
@@ -74,10 +79,7 @@ fn is_newer(latest: &str, current: &str) -> bool {
     }
 }
 
-fn pick_asset<'a>(
-    assets: &'a [GithubAsset],
-    kind: InstallKind,
-) -> Option<&'a GithubAsset> {
+fn pick_asset(assets: &[GithubAsset], kind: InstallKind) -> Option<&GithubAsset> {
     let prefer = match kind {
         InstallKind::Flatpak => [".flatpak"].as_slice(),
         InstallKind::AppImage => [".AppImage"].as_slice(),
@@ -94,22 +96,69 @@ fn pick_asset<'a>(
     })
 }
 
-/// Ensure the frontend-provided asset matches a release on GitHub (not an older tag).
+fn checksum_asset(assets: &[GithubAsset]) -> Option<&GithubAsset> {
+    assets.iter().find(|asset| {
+        asset.name == CHECKSUM_ASSET && asset.browser_download_url.starts_with(apply::ALLOWED_PREFIX)
+    })
+}
+
+/// Accept only plain `X.Y.Z` / `vX.Y.Z` tags. The tag is interpolated into an
+/// API URL, so anything else (`..`, `?`, `/`, prerelease suffixes) is refused.
+pub(crate) fn normalize_release_tag(raw: &str) -> Result<String, String> {
+    let trimmed = raw.trim();
+    let bare = trimmed.strip_prefix('v').unwrap_or(trimmed);
+    let parts: Vec<&str> = bare.split('.').collect();
+    let valid = parts.len() == 3
+        && parts
+            .iter()
+            .all(|p| !p.is_empty() && p.len() <= 6 && p.bytes().all(|b| b.is_ascii_digit()));
+    if !valid {
+        return Err("Invalid release tag.".into());
+    }
+    Ok(format!("v{bare}"))
+}
+
+/// Find `asset_name`'s hash in `sha256sum`-format text (`<hex>  <name>`).
+pub(crate) fn parse_sha256sums(text: &str, asset_name: &str) -> Option<String> {
+    text.lines().find_map(|line| {
+        let (hash, rest) = line.trim().split_once(char::is_whitespace)?;
+        let name = rest.trim_start().trim_start_matches('*');
+        (name == asset_name && hash.len() == 64 && hash.bytes().all(|b| b.is_ascii_hexdigit()))
+            .then(|| hash.to_ascii_lowercase())
+    })
+}
+
+fn fetch_expected_sha256(release: &GithubRelease, asset_name: &str) -> Result<String, String> {
+    let sums = checksum_asset(&release.assets).ok_or_else(|| {
+        format!("This release publishes no {CHECKSUM_ASSET}; use “Open release” to install manually.")
+    })?;
+    let response = ureq::get(&sums.browser_download_url)
+        .set("User-Agent", USER_AGENT)
+        .call()
+        .map_err(|_| "Could not download the release checksums.".to_string())?;
+    let mut text = String::new();
+    response
+        .into_reader()
+        .take(MAX_CHECKSUM_BYTES)
+        .read_to_string(&mut text)
+        .map_err(|_| "Could not read the release checksums.".to_string())?;
+    parse_sha256sums(&text, asset_name)
+        .ok_or_else(|| format!("{CHECKSUM_ASSET} has no entry for {asset_name}."))
+}
+
+/// Ensure the frontend-provided asset matches a real, newer, stable release on
+/// GitHub, and return the expected SHA-256 of that asset from the release's
+/// `SHA256SUMS`.
 pub(crate) fn verify_update_asset(
     release_tag: &str,
     download_url: &str,
     asset_name: &str,
     kind: InstallKind,
-) -> Result<(), String> {
-    let trimmed = release_tag.trim();
-    if trimmed.is_empty() {
-        return Err("Missing release tag.".into());
+) -> Result<String, String> {
+    let tag = normalize_release_tag(release_tag)?;
+    if !is_newer(&tag, env!("CARGO_PKG_VERSION")) {
+        return Err("Refusing to install a version that is not newer than the running one.".into());
     }
-    let tag = if trimmed.starts_with('v') {
-        trimmed.to_string()
-    } else {
-        format!("v{trimmed}")
-    };
     let url = format!("https://api.github.com/repos/{REPO}/releases/tags/{tag}");
     let response = ureq::get(&url)
         .set("User-Agent", USER_AGENT)
@@ -122,6 +171,9 @@ pub(crate) fn verify_update_asset(
     if release.draft || release.prerelease {
         return Err("Refusing to install draft or prerelease.".into());
     }
+    if release.tag_name != tag {
+        return Err("Release tag mismatch.".into());
+    }
     let asset = pick_asset(&release.assets, kind)
         .ok_or_else(|| "No matching asset for this install type.".to_string())?;
     if asset.browser_download_url != download_url || asset.name != asset_name {
@@ -129,7 +181,7 @@ pub(crate) fn verify_update_asset(
             "Update metadata mismatch — check for updates again before installing.".into(),
         );
     }
-    Ok(())
+    fetch_expected_sha256(&release, asset_name)
 }
 
 fn offline_result(current: String, detail: &str, kind: InstallKind) -> UpdateCheckResult {
@@ -171,7 +223,9 @@ pub fn check_for_updates() -> UpdateCheckResult {
 
     let latest = release.tag_name.trim_start_matches('v').to_string();
     let newer = is_newer(&latest, &current);
-    let asset = if newer {
+    // Only offer one-click install when the release ships checksums to verify
+    // the download against.
+    let asset = if newer && checksum_asset(&release.assets).is_some() {
         pick_asset(&release.assets, kind)
     } else {
         None
@@ -201,9 +255,12 @@ pub fn check_for_updates() -> UpdateCheckResult {
 
 #[tauri::command]
 pub fn open_release_page(url: String) -> Result<(), String> {
-    if !(url.starts_with("https://github.com/asafelobotomy/emobie/")
-        || url.starts_with("https://github.com/asafelobotomy/emobie"))
-    {
+    const BASE: &str = "https://github.com/asafelobotomy/emobie";
+    let allowed = url == BASE
+        || url
+            .strip_prefix(BASE)
+            .is_some_and(|rest| rest.starts_with('/') || rest.starts_with('?') || rest.starts_with('#'));
+    if !allowed || url.chars().any(|c| c.is_control() || c.is_whitespace()) {
         return Err("Refusing to open unexpected URL.".into());
     }
     open::that(url).map_err(|err| err.to_string())
@@ -211,7 +268,27 @@ pub fn open_release_page(url: String) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_newer, parse_semver};
+    use super::{is_newer, normalize_release_tag, parse_semver, parse_sha256sums};
+
+    const HASH: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+    #[test]
+    fn tag_normalization_rejects_path_tricks() {
+        assert_eq!(normalize_release_tag("0.7.1").as_deref(), Ok("v0.7.1"));
+        assert_eq!(normalize_release_tag(" v0.7.1 ").as_deref(), Ok("v0.7.1"));
+        for bad in ["", "v1.2", "v1.2.3.4", "../latest", "v1.2.3/../x", "v1.2.3?x=1", "v1.2.3-rc1", "v1.2.x"] {
+            assert!(normalize_release_tag(bad).is_err(), "{bad} should be rejected");
+        }
+    }
+
+    #[test]
+    fn sha256sums_parsing() {
+        let text = format!("{HASH}  emobie_0.7.1_amd64.deb\n{HASH}  other.rpm\n");
+        assert_eq!(parse_sha256sums(&text, "emobie_0.7.1_amd64.deb").as_deref(), Some(HASH));
+        assert_eq!(parse_sha256sums(&format!("{HASH} *x.deb"), "x.deb").as_deref(), Some(HASH));
+        assert_eq!(parse_sha256sums(&text, "missing.deb"), None);
+        assert_eq!(parse_sha256sums("nothex  x.deb", "x.deb"), None);
+    }
 
     #[test]
     fn parses_semver_tags() {

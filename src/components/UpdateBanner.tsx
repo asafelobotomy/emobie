@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { UpdateCheckResult } from "../hooks/useUpdateCheck";
 import { applyUpdate } from "../hooks/useUpdateCheck";
+import { errorMessage } from "../lib/errorMessage";
 
 type UpdateBannerProps = {
   updateInfo: UpdateCheckResult;
@@ -42,7 +43,7 @@ export function UpdateBanner({
       })
       .catch((err: unknown) => {
         setMessage(null);
-        setError(err instanceof Error ? err.message : String(err));
+        setError(errorMessage(err, "Update failed."));
         setBusy(false);
       });
   };

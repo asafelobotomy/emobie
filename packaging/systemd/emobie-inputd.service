@@ -27,7 +27,9 @@ PrivateDevices=no
 PrivateNetwork=yes
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=%h/.local/share/emobie
+# "-" = ignore if missing. Without it the unit fails to start (226/NAMESPACE)
+# for an account whose ~/.local/share/emobie does not exist yet.
+ReadWritePaths=-%h/.local/share/emobie
 RestrictAddressFamilies=AF_UNIX
 RestrictNamespaces=yes
 ProtectKernelTunables=yes

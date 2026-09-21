@@ -1,33 +1,24 @@
 #!/usr/bin/env bash
 # Regenerate Flatpak offline dependency manifests from lockfiles.
-# Requires: Python env with flatpak-node-generator + cargo generator deps
-#   (aiohttp, tomlkit, pyyaml) and a checkout of flatpak/flatpak-builder-tools.
+# Requires: Python 3.11+ (cargo sources, no extra deps) and flatpak-node-generator
+#   on PATH (from flatpak/flatpak-builder-tools) for the npm sources.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-TOOLS_DIR="${FLATPAK_BUILDER_TOOLS:-}"
-if [[ -z "$TOOLS_DIR" ]]; then
-  if [[ -d /tmp/flatpak-builder-tools ]]; then
-    TOOLS_DIR=/tmp/flatpak-builder-tools
-  elif [[ -d "$HOME/src/flatpak-builder-tools" ]]; then
-    TOOLS_DIR="$HOME/src/flatpak-builder-tools"
-  else
-    echo "Set FLATPAK_BUILDER_TOOLS to a flatpak-builder-tools checkout." >&2
-    exit 1
-  fi
-fi
+echo "Generating flatpak/cargo-sources.json (app + emobie-inputd lockfiles)…"
+# The Flatpak builds both crates offline, so the vendored set must cover both
+# lockfiles — flatpak-cargo-generator only accepts one, hence our own script.
+python3 scripts/flatpak-cargo-sources.py \
+  -o flatpak/cargo-sources.json \
+  src-tauri/Cargo.lock \
+  crates/emobie-inputd/Cargo.lock
 
 if ! command -v flatpak-node-generator >/dev/null 2>&1; then
   echo "flatpak-node-generator not on PATH (pip install flatpak-builder-tools/node)." >&2
   exit 1
 fi
-
-echo "Generating flatpak/cargo-sources.json…"
-python3 "$TOOLS_DIR/cargo/flatpak-cargo-generator.py" \
-  src-tauri/Cargo.lock \
-  -o flatpak/cargo-sources.json
 
 echo "Generating flatpak/node-sources.json…"
 MOVED_NODE_MODULES=0

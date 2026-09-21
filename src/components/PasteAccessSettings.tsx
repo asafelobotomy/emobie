@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { InputHelperStatus } from "../lib/inputHelper";
 import type { PasteChordOverride } from "../types/preferences";
 import { runInputHelperAccessSetup } from "../lib/inputHelperClient";
+import { errorMessage } from "../lib/errorMessage";
 
 type PasteAccessSettingsProps = {
   autoPasteOnCopy: boolean;
@@ -62,9 +63,7 @@ export function PasteAccessSettings({
       setMessage(status.detail);
       onHelperReconcile?.();
     } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Paste access setup failed.",
-      );
+      setMessage(errorMessage(error, "Paste access setup failed."));
     } finally {
       setBusy(false);
     }
