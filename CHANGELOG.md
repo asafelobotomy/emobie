@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.27] - 2026-09-22
+
 ### Fixed
 
 - Grant would keep trusting a distro-packaged `setup-input-access.sh` even when

@@ -59,6 +59,13 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.6.27" date="2026-09-22">
+      <description>
+        <p>Fixes Grant permanently failing to repair keyboard-access setup when
+        an older distro package's udev rule was present alongside a newer
+        Flatpak or AppImage install.</p>
+      </description>
+    </release>
     <release version="0.6.26" date="2026-09-21">
       <description>
         <p>Security and reliability release. Setting up paste access no longer
