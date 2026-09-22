@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Grant would keep trusting a distro-packaged `setup-input-access.sh` even when
+  it was older than the running build (e.g. a Flatpak/AppImage installed
+  alongside an older `.deb`/`.rpm`), reinstalling its stale udev rule and never
+  repairing the "outdated" gap 0.6.26 introduced reporting. Grant now checks
+  whether the package's own udev rule matches this build's before trusting it,
+  and stages the embedded copy instead when it doesn't. (Found by Codex review.)
+
 ## [0.6.26] - 2026-09-21
 
 ### Security

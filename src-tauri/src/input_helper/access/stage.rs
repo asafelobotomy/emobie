@@ -5,12 +5,15 @@
 //! (b) the bytes embedded in this binary (see `assets`), staged into
 //! `/usr/local/share/emobie/`. No user-writable file is ever copied to root.
 
-use super::assets::STAGED_FILES;
+use super::assets::{STAGED_FILES, UDEV_RULES as EMBEDDED_UDEV_RULES, UDEV_RULES_NAME};
 use super::permanent::{host_setup_hint, in_flatpak, LOCAL_SETUP, SYSTEM_SETUP};
 use std::io::Write;
 use std::process::{Command, Stdio};
 
 const LOCAL_DIR: &str = "/usr/local/share/emobie";
+/// Directory `SYSTEM_SETUP` lives in — its sibling udev rule is how we decide
+/// whether the distro package is current enough to trust for Grant.
+const SYSTEM_DIR: &str = "/usr/share/emobie";
 
 fn with_session_env(cmd: &mut Command) {
     for key in [
@@ -137,8 +140,26 @@ pub(super) fn run_pkexec(script: &str, flatpak: bool) -> Result<(), String> {
     Err(format!("Keyboard access setup: {detail}"))
 }
 
-/// Which script to run as root: the package's, if installed, otherwise our
-/// staged embedded copy (staged by `ensure_polkit_annotated_setup`).
+/// True when the distro package's own udev rule (shipped beside `SYSTEM_SETUP`)
+/// matches what this build embeds. A distro package can be older than a
+/// Flatpak/AppImage installed alongside it; trusting a stale `SYSTEM_SETUP`
+/// there would keep reinstalling its outdated rule while `permanent_access_configured`
+/// (which compares against the *embedded* rule) forever reports the gap as
+/// unrepaired. When the package is stale, fall through to staging our own
+/// embedded copy under `/usr/local` instead.
+fn system_package_current(flatpak: bool) -> bool {
+    system_rules_match(&format!("{SYSTEM_DIR}/{UDEV_RULES_NAME}"), flatpak)
+}
+
+/// Testable core of `system_package_current`: does the udev rule at `path`
+/// (read the same way `read_installed` reads any root-owned file) match what
+/// this build embeds?
+fn system_rules_match(path: &str, flatpak: bool) -> bool {
+    read_installed(path, flatpak).as_deref() == Some(EMBEDDED_UDEV_RULES)
+}
+
+/// Which script to run as root: the package's, if installed *and current*,
+/// otherwise our staged embedded copy (staged by `ensure_polkit_annotated_setup`).
 pub(super) fn resolve_setup_script() -> Result<(String, bool), String> {
     let flatpak = in_flatpak();
     let system_present = if flatpak {
@@ -146,7 +167,11 @@ pub(super) fn resolve_setup_script() -> Result<(String, bool), String> {
     } else {
         std::path::Path::new(SYSTEM_SETUP).is_file()
     };
-    let script = if system_present { SYSTEM_SETUP } else { LOCAL_SETUP };
+    let script = if system_present && system_package_current(flatpak) {
+        SYSTEM_SETUP
+    } else {
+        LOCAL_SETUP
+    };
     Ok((script.to_string(), flatpak))
 }
 
@@ -171,5 +196,45 @@ mod tests {
             .filter(|l| !l.trim_start().starts_with('#') && !l.trim().is_empty())
             .collect();
         assert!(active.iter().all(|l| !l.contains("event*")), "{active:?}");
+    }
+
+    /// A distro package's own udev rule can be older than a Flatpak/AppImage
+    /// installed alongside it. `resolve_setup_script` must not trust
+    /// `SYSTEM_SETUP` in that case, or Grant could never repair the gap
+    /// `permanent_access_configured` reports (it compares against the
+    /// embedded rule, not whatever the stale package shipped).
+    #[test]
+    fn stale_system_package_is_not_trusted() {
+        use super::system_rules_match;
+        use std::fs;
+
+        let dir = std::env::temp_dir().join(format!(
+            "emobie-stage-test-{}-{}",
+            std::process::id(),
+            line!()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+
+        let current = dir.join("current.rules");
+        fs::write(&current, UDEV_RULES).unwrap();
+        assert!(
+            system_rules_match(current.to_str().unwrap(), false),
+            "byte-identical rule must be trusted"
+        );
+
+        let stale = dir.join("stale.rules");
+        fs::write(&stale, b"# an older, different rule\n").unwrap();
+        assert!(
+            !system_rules_match(stale.to_str().unwrap(), false),
+            "a package shipping a different rule must not be trusted"
+        );
+
+        let missing = dir.join("missing.rules");
+        assert!(
+            !system_rules_match(missing.to_str().unwrap(), false),
+            "a missing sibling rule must not be trusted"
+        );
+
+        let _ = fs::remove_dir_all(&dir);
     }
 }
