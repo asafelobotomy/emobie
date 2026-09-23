@@ -36,12 +36,17 @@ async function applyPin(pinned: boolean): Promise<PinApplyResult | null> {
   }
 }
 
-/** Keep the window above others while pinned; re-apply on focus/show. */
-export function useAlwaysOnTop(
-  pinned: boolean,
-  enabled: boolean,
-  onResult?: (result: PinApplyResult | null) => void,
-) {
+/**
+ * Keep the window above others while pinned; re-apply on focus/show.
+ * Returns why the last pin attempt failed, or null when it applied.
+ */
+export function useAlwaysOnTop(pinned: boolean, enabled: boolean) {
+  const [notice, setNotice] = useState<string | null>(null);
+  const onResult = useCallback((result: PinApplyResult | null) => {
+    if (!result) setNotice("Could not pin the window.");
+    else setNotice(result.applied ? null : result.detail);
+  }, []);
+
   useEffect(() => {
     if (!enabled) return;
     const window = getCurrentWindow();
@@ -51,7 +56,7 @@ export function useAlwaysOnTop(
     const apply = () => {
       if (cancelled) return;
       void applyPin(pinned).then((result) => {
-        if (!cancelled) onResult?.(result);
+        if (!cancelled) onResult(result);
       });
     };
 
@@ -66,20 +71,13 @@ export function useAlwaysOnTop(
         else unsubs.push(unsub);
       });
 
-    void window
-      .listen("tauri://focus", () => {
-        if (pinned) apply();
-      })
-      .then((unsub) => {
-        if (cancelled) unsub();
-        else unsubs.push(unsub);
-      });
-
     return () => {
       cancelled = true;
       for (const unsub of unsubs) unsub();
     };
   }, [pinned, enabled, onResult]);
+
+  return notice;
 }
 
 /** Compositor pin capability for Settings hints, with a manual refresh. */

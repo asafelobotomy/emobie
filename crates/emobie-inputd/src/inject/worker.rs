@@ -6,7 +6,7 @@ use super::enigo::{
     toggle_above_gnome_enigo, warm_up_enigo, ENIGO_MAX_IDLE, POST_PASTE_DELAY,
 };
 use super::uinput::{expand_with_uinput, retype_trigger_uinput, UINPUT_MAX_IDLE};
-use super::{finish_listen_suppress, now_ms, EXPAND_ENABLED, SUPPRESS_STARTED_MS};
+use super::{finish_listen_suppress, now_ms, EXPAND_ENABLED, REOPEN_UINPUT, SUPPRESS_STARTED_MS};
 
 use ::enigo::Enigo;
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -109,7 +109,8 @@ pub(super) fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
             finish_listen_suppress();
             continue;
         }
-        if uinput.is_some() && last_inject.elapsed() >= UINPUT_MAX_IDLE {
+        let resumed = REOPEN_UINPUT.swap(false, Ordering::AcqRel);
+        if uinput.is_some() && (resumed || last_inject.elapsed() >= UINPUT_MAX_IDLE) {
             let refreshed = UInputKeyboard::open().ok();
             if refreshed.is_none() {
                 eprintln!("emobie-inputd: uinput idle-refresh failed; Enigo fallback");
@@ -155,7 +156,15 @@ pub(super) fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
                 // Refresh watchdog per job so a slow-but-healthy queue does not
                 // trip force-open from the first job's start time.
                 SUPPRESS_STARTED_MS.store(now_ms(), Ordering::Release);
-                if !EXPAND_ENABLED.load(Ordering::Relaxed) {
+                let excluded = crate::guard::has_excluded_apps()
+                    && crate::guard::app_excluded(
+                        crate::focused_window::detect_class().as_deref(),
+                    );
+                if excluded {
+                    eprintln!("emobie-inputd: expand skipped (focused app is excluded)");
+                }
+                if !EXPAND_ENABLED.load(Ordering::Relaxed) || excluded {
+                    // Nothing was erased: the trigger stays as typed.
                     listen::restore_to_buffer(&trigger);
                     finish_listen_suppress();
                     continue;

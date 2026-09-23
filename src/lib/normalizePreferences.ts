@@ -36,6 +36,26 @@ export function macroTextIsValid(trigger: string, expansion: string): boolean {
   return !CONTROL_CHARS.test(trigger) && !expansion.includes("\u0000");
 }
 
+// Keep in sync with emobie-inputd rpc.rs MAX_EXCLUDED_APPS / MAX_EXCLUDED_APP_LEN.
+const MAX_EXCLUDED_APPS = 64;
+const MAX_EXCLUDED_APP_LEN = 128;
+
+export function normalizeExcludedApps(value: unknown): string[] {
+  if (!Array.isArray(value)) return [...DEFAULT_PREFERENCES.expandExcludedApps];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of value) {
+    if (typeof raw !== "string") continue;
+    const app = raw.trim();
+    const key = app.toLowerCase();
+    if (!app || app.length > MAX_EXCLUDED_APP_LEN || seen.has(key)) continue;
+    seen.add(key);
+    out.push(app);
+    if (out.length >= MAX_EXCLUDED_APPS) break;
+  }
+  return out;
+}
+
 function normalizeMacro(raw: unknown): Macro | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const item = raw as Record<string, unknown>;
@@ -153,6 +173,7 @@ export function normalizePreferences(
     expandAsYouType: Boolean(merged.expandAsYouType),
     expandTriggerMode: normalizeTriggerMode(merged.expandTriggerMode),
     expandKeepTriggerSpace: Boolean(merged.expandKeepTriggerSpace),
+    expandExcludedApps: normalizeExcludedApps(merged.expandExcludedApps),
     expandRestoreClipboard: Boolean(merged.expandRestoreClipboard),
     pasteChordOverride: normalizePasteChordOverride(merged.pasteChordOverride),
     checkUpdatesOnStartup: merged.checkUpdatesOnStartup !== false,

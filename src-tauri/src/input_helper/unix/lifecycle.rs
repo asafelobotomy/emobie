@@ -1,10 +1,11 @@
 //! Start/stop emobie-inputd via systemd or a detached binary.
 
-use super::socket::request;
+use super::socket::{request, DaemonResponse};
 use super::{offline_status, status_from_resp};
 use crate::input_helper::InputHelperStatus;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 
@@ -143,9 +144,36 @@ pub fn ensure_started() -> InputHelperStatus {
     })
 }
 
+/// The running-helper version check happens once per app session.
+static VERSION_CHECKED: AtomicBool = AtomicBool::new(false);
+
+fn helper_outdated(resp: &DaemonResponse) -> bool {
+    match resp.version.as_deref() {
+        Some(running) => {
+            super::super::bootstrap::version_lt(running, env!("CARGO_PKG_VERSION"))
+                .unwrap_or(false)
+        }
+        None => true,
+    }
+}
+
+/// A running helper answers `status`, so the bootstrap (which does the
+/// version comparison) would otherwise never run after an app update.
+/// The bootstrap replaces the binary and restarts the unit.
+fn upgrade_running_helper(current: DaemonResponse) -> InputHelperStatus {
+    if !super::super::bootstrap::try_bootstrap_host_helper() {
+        return status_from_resp(current);
+    }
+    wait_until_running(34)
+        .unwrap_or_else(|| offline_status("emobie-inputd did not come back after updating it"))
+}
+
 fn ensure_started_inner() -> InputHelperStatus {
     let _guard = START_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     if let Ok(resp) = request(serde_json::json!({ "cmd": "status" })) {
+        if !VERSION_CHECKED.swap(true, Ordering::AcqRel) && helper_outdated(&resp) {
+            return upgrade_running_helper(resp);
+        }
         // Enigo re-detects Wayland each inject — do not restart solely because
         // can_inject is false (burns heal and thrash on headless/early boot).
         return status_from_resp(resp);
@@ -192,4 +220,35 @@ pub fn restart_helper() -> InputHelperStatus {
         }
     }
     offline_status("could not restart emobie-inputd")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{helper_outdated, DaemonResponse};
+
+    fn resp(version: Option<&str>) -> DaemonResponse {
+        let mut value = serde_json::json!({
+            "ok": true,
+            "can_inject": true,
+            "can_listen": false,
+            "detail": "",
+            "error": null,
+        });
+        if let Some(v) = version {
+            value["version"] = v.into();
+        }
+        serde_json::from_value(value).unwrap()
+    }
+
+    #[test]
+    fn helper_without_version_is_outdated() {
+        assert!(helper_outdated(&resp(None)));
+    }
+
+    #[test]
+    fn compares_running_version_to_app() {
+        assert!(helper_outdated(&resp(Some("0.0.1"))));
+        assert!(!helper_outdated(&resp(Some(env!("CARGO_PKG_VERSION")))));
+        assert!(!helper_outdated(&resp(Some("99.0.0"))));
+    }
 }

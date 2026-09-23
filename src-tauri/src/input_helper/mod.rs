@@ -26,6 +26,9 @@ pub struct InputHelperStatus {
     /// orphaned GID even when permanent Grant config is missing.
     #[serde(default)]
     pub access_configured: bool,
+    /// True when the opt-in keyboard-read rule (Expand as you type) is installed.
+    #[serde(default)]
+    pub keyboard_read_configured: bool,
     /// In-flight expand jobs holding listen suppress (debug).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suppress_jobs: Option<usize>,
@@ -62,6 +65,7 @@ fn offline_linux_only() -> InputHelperStatus {
         detail: "Input helper is Linux-only.".into(),
         flatpak: false,
         access_configured: false,
+        keyboard_read_configured: false,
         suppress_jobs: None,
         restore_clipboard: None,
         last_inject_backend: None,
@@ -90,6 +94,7 @@ fn task_failed(err: String) -> InputHelperStatus {
         detail: err,
         flatpak: false,
         access_configured: false,
+        keyboard_read_configured: false,
         suppress_jobs: None,
         restore_clipboard: None,
         last_inject_backend: None,
@@ -167,15 +172,17 @@ pub async fn input_helper_sync_matches(
 pub async fn input_helper_set_options(
     restore_clipboard: Option<bool>,
     paste_chord: Option<String>,
+    exclude_apps: Option<Vec<String>>,
 ) -> Result<InputHelperStatus, String> {
     blocking(move || {
         #[cfg(unix)]
         {
-            unix::set_options(restore_clipboard, paste_chord).map(access::with_flatpak_flag)
+            unix::set_options(restore_clipboard, paste_chord, exclude_apps)
+                .map(access::with_flatpak_flag)
         }
         #[cfg(not(unix))]
         {
-            let _ = (restore_clipboard, paste_chord);
+            let _ = (restore_clipboard, paste_chord, exclude_apps);
             Err("Input helper is Linux-only.".to_string())
         }
     })
@@ -191,6 +198,22 @@ pub async fn input_helper_inject_paste() -> Result<(), String> {
         }
         #[cfg(not(unix))]
         {
+            Err("Input helper is Linux-only.".to_string())
+        }
+    })
+    .await?
+}
+
+#[tauri::command]
+pub async fn input_helper_set_keyboard_read(enabled: bool) -> Result<InputHelperStatus, String> {
+    blocking(move || {
+        #[cfg(unix)]
+        {
+            access::set_keyboard_read(enabled)
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = enabled;
             Err("Input helper is Linux-only.".to_string())
         }
     })

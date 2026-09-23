@@ -16,6 +16,8 @@ export type CopyTextOptions = {
   hideForPaste?: boolean;
   /** Value used for UI flash matching; defaults to the copied text. */
   flashKey?: string;
+  /** Put the previous clipboard back after pasting (Settings → Restore clipboard). */
+  restoreClipboard?: boolean;
 };
 
 const CLIPBOARD_RESTORE_DELAY_MS = 900;
@@ -47,12 +49,15 @@ async function showWindowAfterPaste() {
 async function tryAutoPaste(
   text: string,
   hideForPaste: boolean,
+  restoreClipboard: boolean,
 ): Promise<string | null> {
   let previous: string | null = null;
-  try {
-    previous = await readText();
-  } catch {
-    previous = null;
+  if (restoreClipboard) {
+    try {
+      previous = await readText();
+    } catch {
+      previous = null;
+    }
   }
 
   try {
@@ -127,6 +132,7 @@ export function useCopyText(onCopied?: (text: string) => void) {
         const pasteError = await tryAutoPaste(
           text,
           options.hideForPaste !== false,
+          options.restoreClipboard === true,
         );
         if (pasteError === "Copy failed") {
           setCopyError(pasteError);

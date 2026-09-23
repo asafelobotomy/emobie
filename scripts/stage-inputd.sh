@@ -12,6 +12,8 @@ install -m 755 "$ROOT/crates/emobie-inputd/target/release/emobie-inputd" "$STAGE
 install -m 644 "$ROOT/packaging/systemd/emobie-inputd.service" "$STAGE/emobie-inputd.service"
 install -m 755 "$ROOT/packaging/setup-input-access.sh" "$STAGE/setup-input-access.sh"
 install -m 644 "$ROOT/packaging/udev/99-emobie-input.rules" "$STAGE/99-emobie-input.rules"
+install -m 644 "$ROOT/packaging/udev/98-emobie-keyboard-read.rules" \
+  "$STAGE/98-emobie-keyboard-read.rules"
 install -m 644 "$ROOT/packaging/polkit/io.github.asafelobotomy.emobie.inputd.policy" \
   "$STAGE/io.github.asafelobotomy.emobie.inputd.policy"
 install -m 755 "$ROOT/packaging/bootstrap-inputd-host.sh" "$STAGE/bootstrap-inputd-host.sh"

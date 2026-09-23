@@ -66,7 +66,7 @@ Linux tray, pin, startup, and SELinux notes: [`docs/LINUX.md`](docs/LINUX.md).
 | **Macros** | Custom trigger → expansion cards (+ to add), optional favorited-emoji shortcodes/emoticons, per-macro hotkeys, YAML import/export |
 | **Updates** | Optional startup check; Settings can download and install the matching release asset (deb/rpm/AppImage/Flatpak) |
 | **Copy** | One-click clipboard copy; optional auto-paste when the host input helper is available |
-| **Expand** | As-you-type text expansion is deferred for now — macros still copy and auto-paste manually (see [docs/MACROS.md](docs/MACROS.md)) |
+| **Expand** | Opt-in as-you-type text expansion: type a trigger anywhere to replace it (one admin prompt for keyboard access — see [docs/MACROS.md](docs/MACROS.md)) |
 | **Summon** | Global hotkey (default `Ctrl+Shift+Space`; letters/numbers need a modifier) and system tray |
 | **Layout** | Resize freely — horizontal, square, or vertical; frameless by default (optional title bar in Settings) |
 | **Pin** | Always-on-top from the toolbar or tray (X11, Plasma Wayland, and GNOME Wayland after a one-time shortcut setup in Settings; other Wayland compositors may ignore) |
@@ -184,7 +184,7 @@ Or run the **Release** workflow from the Actions tab.
 ## Notes
 
 - Global shortcuts and tray icons can differ on Wayland vs X11 depending on your compositor. On **GNOME**, install an AppIndicator / KStatusNotifierItem extension for the tray ([details](docs/LINUX.md)).
-- Optional **auto-paste** injects a Ctrl+V via host `emobie-inputd` (see [docs/MACROS.md](docs/MACROS.md)); as-you-type text expansion is deferred for now. Clipboard copy always works without the helper. Diagnose setup with `npm run verify:expand`.
+- Optional **auto-paste** injects a Ctrl+V via host `emobie-inputd` (see [docs/MACROS.md](docs/MACROS.md)); **Expand as you type** additionally reads the keyboard while on. Clipboard copy always works without the helper. Diagnose setup with `npm run verify:expand`.
 - Flatpak preferences live under
   `~/.var/app/io.github.asafelobotomy.emobie/…`; native under
   `~/.local/share/io.github.asafelobotomy.emobie/…` (older native builds used

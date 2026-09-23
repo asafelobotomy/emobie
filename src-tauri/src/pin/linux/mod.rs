@@ -9,6 +9,8 @@ use std::time::Duration;
 
 pub(super) mod gnome;
 
+const FLATPAK_APP_ID: &str = "io.github.asafelobotomy.emobie";
+
 pub(super) fn in_flatpak() -> bool {
     std::env::var_os("FLATPAK_ID").is_some()
 }
@@ -26,7 +28,8 @@ fn desktop_is_plasma() -> bool {
 
 pub fn capability() -> PinCapability {
     let wayland = on_wayland();
-    let plasma = desktop_is_plasma() || kwin_reachable();
+    // On GNOME the KWin probe always fails and costs several host spawns.
+    let plasma = desktop_is_plasma() || (!gnome::desktop_is_gnome() && kwin_reachable());
 
     if wayland && !plasma && gnome::desktop_is_gnome() {
         return match gnome::binding_status() {
@@ -90,6 +93,39 @@ fn wait_for_focus(window: &WebviewWindow) -> bool {
     false
 }
 
+/// Shift, Control, Alt (Mod1) and Super/Meta. NumLock (Mod2) and CapsLock are
+/// latched states, not held keys, so they are ignored.
+const HELD_MODIFIER_MASK: u32 = gtk::gdk::ModifierType::SHIFT_MASK.bits()
+    | gtk::gdk::ModifierType::CONTROL_MASK.bits()
+    | gtk::gdk::ModifierType::MOD1_MASK.bits()
+    | gtk::gdk::ModifierType::MOD4_MASK.bits()
+    | gtk::gdk::ModifierType::SUPER_MASK.bits()
+    | gtk::gdk::ModifierType::META_MASK.bits();
+
+fn modifiers_held(window: &WebviewWindow) -> bool {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let queued = window.run_on_main_thread(move || {
+        let state = gtk::gdk::Display::default()
+            .and_then(|display| gtk::gdk::Keymap::for_display(&display))
+            .map(|keymap| keymap.modifier_state())
+            .unwrap_or(0);
+        let _ = tx.send(state & HELD_MODIFIER_MASK != 0);
+    });
+    queued.is_ok() && rx.recv_timeout(Duration::from_millis(200)).unwrap_or(false)
+}
+
+/// Mutter merges modifier state across keyboards, so a still-held summon
+/// hotkey (e.g. Ctrl+Shift) turns our chord into one that matches nothing.
+fn wait_for_modifiers_released(window: &WebviewWindow) -> bool {
+    for _ in 0..40 {
+        if !modifiers_held(window) {
+            return true;
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
+    false
+}
+
 pub fn apply_compositor_pin(window: &WebviewWindow, pinned: bool) -> PinApplyResult {
     if !on_wayland() {
         return PinApplyResult {
@@ -111,15 +147,35 @@ pub fn apply_compositor_pin(window: &WebviewWindow, pinned: bool) -> PinApplyRes
         && matches!(gnome::binding_status(), gnome::BindingStatus::Ready)
     {
         // Already in the requested state: nothing will be sent, so no focus needed.
-        if !gnome::is_noop(pinned) && !wait_for_focus(window) {
-            return PinApplyResult {
-                applied: false,
-                limited: false,
-                detail: "emobie is not focused yet — the pin is applied when it gains focus."
-                    .into(),
-            };
+        if !gnome::is_noop(pinned) {
+            if !wait_for_focus(window) {
+                return PinApplyResult {
+                    applied: false,
+                    limited: false,
+                    detail: "emobie is not focused yet — click it to apply the pin.".into(),
+                };
+            }
+            if !wait_for_modifiers_released(window) {
+                return PinApplyResult {
+                    applied: false,
+                    limited: false,
+                    detail: "Release all keys to apply the pin.".into(),
+                };
+            }
         }
         return gnome::toggle_pin(pinned);
+    }
+
+    if gnome::desktop_is_gnome() && !desktop_is_plasma() {
+        return PinApplyResult {
+            applied: !pinned,
+            limited: true,
+            detail: if pinned {
+                "Pin needs the one-time GNOME shortcut setup in Settings.".into()
+            } else {
+                "Unpinned.".into()
+            },
+        };
     }
 
     match plasma_keep_above(pinned) {
@@ -175,12 +231,18 @@ fn kwin_reachable() -> bool {
 }
 
 fn plasma_keep_above(pinned: bool) -> Result<(), String> {
-    let pid = std::process::id();
     let keep = if pinned { "true" } else { "false" };
+    // Inside Flatpak our PID is namespaced (e.g. 2) and never equals the host
+    // PID KWin sees, so match the Wayland app id instead.
+    let matcher = if in_flatpak() {
+        format!(r#"w.desktopFileName === "{FLATPAK_APP_ID}" || w.resourceClass === "{FLATPAK_APP_ID}""#)
+    } else {
+        format!("w.pid === {}", std::process::id())
+    };
     let script = format!(
         r#"const wins = workspace.windowList();
 for (const w of wins) {{
-  if (w.pid === {pid}) {{
+  if ({matcher}) {{
     w.keepAbove = {keep};
   }}
 }}

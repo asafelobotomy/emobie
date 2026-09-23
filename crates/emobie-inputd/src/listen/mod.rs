@@ -15,15 +15,14 @@ use nix::poll::{poll, PollFd, PollFlags, PollTimeout};
 use std::collections::HashSet;
 use std::os::fd::{AsRawFd, BorrowedFd};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::keymap::KeymapState;
 use crate::matcher::TriggerTrie;
 
-use devices::list_keyboard_paths;
+use devices::list_input_paths;
 
 /// Hotplug scan interval — avoid opening every event node more often than needed.
 const HOTPLUG_INTERVAL: Duration = Duration::from_secs(5);
@@ -76,6 +75,40 @@ fn wait_readable(device: &Device) -> bool {
         Ok(0) => false,
         Ok(_) => true,
         Err(_) => true,
+    }
+}
+
+/// Bumped on resume: device threads close and the scan reopens them, since
+/// an fd held across suspend can stay open yet never deliver events again.
+static RESUME_EPOCH: AtomicU64 = AtomicU64::new(0);
+/// Longer than `DEVICE_POLL_MS`, so device threads have exited (freeing their
+/// slot) before the rescan, and udev has re-announced devices.
+const RESUME_RESCAN_DELAY: Duration = Duration::from_millis(800);
+
+pub fn note_resume() {
+    RESUME_EPOCH.fetch_add(1, Ordering::AcqRel);
+    if let Some(pending) = PENDING_HOLDER.get() {
+        if let Ok(mut guard) = pending.lock() {
+            *guard = None;
+        }
+    }
+    if let Some(buffer) = BUFFER_HOLDER.get() {
+        if let Ok(mut guard) = buffer.lock() {
+            guard.clear();
+        }
+    }
+}
+
+/// Sleep for `interval`, returning early (after a short settle) on resume.
+fn sleep_until_rescan(interval: Duration) {
+    let epoch = RESUME_EPOCH.load(Ordering::Acquire);
+    let deadline = Instant::now() + interval;
+    while Instant::now() < deadline {
+        if RESUME_EPOCH.load(Ordering::Acquire) != epoch {
+            thread::sleep(RESUME_RESCAN_DELAY);
+            return;
+        }
+        thread::sleep(Duration::from_millis(100));
     }
 }
 
@@ -138,12 +171,12 @@ fn spawn_device_thread(
         let cleanup_path = path.clone();
         let cleanup_alive = alive.clone();
         let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
-            let keymap = KeymapState::new();
-            let mut last_reload = Instant::now();
+            let keymap = crate::keymap::shared();
+            let epoch = RESUME_EPOCH.load(Ordering::Acquire);
             let result = (|| -> Result<(), ()> {
                 let mut device = Device::open(&path).map_err(|_| ())?;
                 loop {
-                    if stop.load(Ordering::Relaxed) {
+                    if stop.load(Ordering::Relaxed) || RESUME_EPOCH.load(Ordering::Acquire) != epoch {
                         return Ok(());
                     }
                     // Expansion switched off: close the device promptly instead of
@@ -154,10 +187,7 @@ fn spawn_device_thread(
                         }
                         return Ok(());
                     }
-                    if last_reload.elapsed() >= Duration::from_secs(30) {
-                        keymap.reload_from_session();
-                        last_reload = Instant::now();
-                    }
+                    keymap.reload_periodically();
                     expire_stale_pending(&pending, &buffer);
                     if !wait_readable(&device) {
                         continue;
@@ -169,13 +199,14 @@ fn spawn_device_thread(
                             return Err(());
                         }
                     };
+                    keymap.reload_if_layout_changed();
                     for event in events {
                         if let InputEventKind::Key(key) = event.kind() {
                             let _gate = KEY_HANDLER.lock().unwrap_or_else(|e| e.into_inner());
                             handle_key(
                                 key,
                                 event.value(),
-                                &keymap,
+                                keymap,
                                 &enabled,
                                 &buffer,
                                 &trie,
@@ -208,9 +239,9 @@ fn spawn_listener(enabled: Arc<AtomicBool>, trie: Arc<Mutex<TriggerTrie>>, stop:
                 thread::sleep(DISABLED_RECHECK);
                 continue;
             }
-            let paths = list_keyboard_paths();
+            let paths = list_input_paths();
             if paths.is_empty() {
-                thread::sleep(HOTPLUG_INTERVAL);
+                sleep_until_rescan(HOTPLUG_INTERVAL);
                 continue;
             }
             for path in paths {
@@ -231,7 +262,7 @@ fn spawn_listener(enabled: Arc<AtomicBool>, trie: Arc<Mutex<TriggerTrie>>, stop:
                     alive.clone(),
                 );
             }
-            thread::sleep(HOTPLUG_INTERVAL);
+            sleep_until_rescan(HOTPLUG_INTERVAL);
         }
     });
 }

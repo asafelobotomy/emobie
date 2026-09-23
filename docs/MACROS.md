@@ -4,15 +4,10 @@ emobie macros let you store trigger → expansion snippets, browse them like
 emoji, bind per-macro hotkeys, import/export Espanso-ish YAML, and optionally
 auto-paste after copy via a host helper.
 
-> **As-you-type text expansion is deferred for now.** Macros still work as a
-> browsable, copyable (and optionally auto-pasted) snippet library — the
-> keyboard-listening/trigger-matching half described in older versions of this
-> doc (Layer C below) is disabled. The paste-chord bug that motivated the
-> deferral now has a real (if incomplete — see "Known limitations") fix for
-> Auto-paste; re-enabling Layer C is a separate decision, not blocked on that
-> fix anymore. The daemon, its protocol, and the udev/polkit/SELinux plumbing
-> for keyboard listening are still in the tree and can be re-enabled later;
-> this doc describes the current (paste-only) behavior.
+Settings → **Expand as you type** turns on trigger expansion: type a macro's
+trigger anywhere (e.g. `.hi` then Space) and it is replaced by the expansion.
+It is off by default and asks once for admin approval, because it needs the
+helper to read your keyboard — see "Expand as you type" below.
 
 ## Using macros
 
@@ -31,12 +26,11 @@ YAML import/export remains in Settings.
 |-------|------|---------|
 | A | Macros UI, favorite emoji macros, YAML, hotkeys, clipboard copy | Fully supported |
 | B | Auto-paste after copy (Ctrl+V + clipboard restore) | Needs host `emobie-inputd` |
-| C | As-you-type trigger expansion | **Deferred** — see note above |
+| C | Expand as you type (trigger matching) | Needs host `emobie-inputd` + opt-in keyboard read |
 
-Only Layers A and B are active. Layer C's daemon-side code (keyboard listening,
-trigger matching) still exists but the app never enables it, and the packaged
-udev rule / SELinux module / Polkit setup no longer request keyboard **read**
-access — only `/dev/uinput` **write** access for Layer B's paste injection.
+Layers B and C use separate permissions: B only needs `/dev/uinput` **write**;
+C additionally needs keyboard **read**, granted only when you turn it on and
+removed with **Remove keyboard access**.
 
 Flathub builds do **not** request `--device=input`. The UI talks to a socket at
 `$XDG_RUNTIME_DIR/emobie/emobie-inputd.sock` when the helper is installed on the
@@ -94,9 +88,9 @@ Polkit prompt that:
 3. Applies session ACLs with `setfacl` when available (no logout required)
 4. Restarts `emobie-inputd` so it can inject immediately
 
-No keyboard-**read** access is requested — as-you-type text expansion is
-deferred (see "Known limitations"), so Grant only needs the write-only uinput
-half, a meaningfully smaller permission than reading every keystroke.
+This Grant requests no keyboard-**read** access — only write access to
+`/dev/uinput`. Keyboard read is a separate opt-in for Expand as you type (see
+"Expand as you type → Permissions").
 
 On Wayland/Plasma, a synthetic Ctrl+V (kernel virtual keyboard via
 `/dev/uinput`) pastes after copy. Clipboard content comes from `wl-copy` when
@@ -195,56 +189,87 @@ it or its directory is not root-owned. Re-running Grant also replaces an
 outdated installed udev rule; the app treats a rule that differs from the
 shipped one as "not configured".
 
+## Expand as you type
+
+### How it works
+
+`emobie-inputd` reads keyboard events (`/dev/input/event*`) while expansion is
+on, maps them to text with libxkbcommon using your **session layout**, and
+matches triggers. On a match it erases the trigger with Backspace and inserts
+the expansion through its `/dev/uinput` virtual keyboard:
+
+- **Typed as keys** whenever your layout can produce every character (up to
+  160 characters, no newlines/tabs): planned against the active layout, with
+  Shift/AltGr and Caps Lock honoured. No clipboard and no paste shortcut, so it
+  works the same in terminals, Kate, browsers and games.
+- **Pasted** only for text the layout cannot type (emoji, other scripts,
+  multi-line): clipboard + a per-app paste chord (see below). An optional
+  system `eitype` (libei) is tried first.
+
+The layout comes from `XKB_DEFAULT_*`, GNOME input sources (following the
+active source live via `gsettings monitor`), Plasma `kxkbrc` (following the
+active layout via `org.kde.keyboard`), `localectl`'s
+`/etc/X11/xorg.conf.d/00-keyboard.conf`, then `/etc/default/keyboard` /
+`/etc/vconsole.conf`.
+
+The typed-text buffer resets on mouse/touch presses, Ctrl/Alt/Super
+shortcuts, arrows, Enter, Tab and Esc, so a trigger split across a caret move
+never fires. Keyboards behind remappers (keyd, kanata, kmonad) work: their
+virtual output device is read; only emobie's own injector is skipped.
+
+### Permissions
+
+Turning it on runs Grant with `--keyboard-read on`, which installs
+`/etc/udev/rules.d/98-emobie-keyboard-read.rules`. The rule adds a read
+**ACL** for group `emobie-input` on keyboards, mice, touchpads and
+touchscreens — device ownership is untouched, so the `input` group (used by
+other tools) keeps its access. A user ACL is applied immediately so no
+re-login is needed. Needs the `acl` package (`setfacl`). **Remove keyboard
+access** runs `--keyboard-read off`, deleting the rule and both ACLs. On
+SELinux the module allows reading `event_device_t`.
+
+### Where it stays quiet
+
+- **Lock screen:** matching pauses while logind reports the session locked
+  (`LockedHint`), so an unlock password can never trigger an expansion.
+- **Excluded apps** (Settings; defaults cover common password managers and
+  authentication prompts): matched against the focused app's class. Detection
+  works for X11/XWayland apps everywhere and for native Wayland apps on GNOME
+  with the Focused Window D-Bus extension; native Plasma Wayland apps cannot
+  be identified yet, so the list does not apply to them.
+- **Suspend/resume:** input devices are reopened in place on resume
+  (logind `PrepareForSleep`); the helper no longer restarts itself.
+
+### Environments
+
+| Session | Status |
+|---------|--------|
+| X11 (any desktop) | Supported |
+| GNOME Wayland | Supported; layout switching followed live |
+| Plasma Wayland | Supported; layout switching followed live; excluded apps not detectable |
+| Sway / Hyprland / COSMIC / other Wayland | Supported via evdev + uinput; layout from `XKB_DEFAULT_*` / `localectl` |
+| Flatpak | Supported through the host helper (sandbox never gets `--device=input`) |
+| Immutable distros | Needs writable `/etc/udev/rules.d` for Grant |
+
 ## Known limitations
 
-- **As-you-type text expansion is deferred.** See the note at the top of this
-  doc — Layer C (trigger listening) is disabled and has no Settings UI right
-  now, pending a fix for the paste-chord issue below.
-- **Paste chord is now focused-window-aware, with real coverage gaps.**
-  0.6.19 fixed Kate (and other apps that bind both Ctrl+V and Shift+Insert to
-  paste) double-pasting by dropping Shift+Insert, which broke terminals that
-  need Ctrl+Shift+V instead (Ctrl+V is claimed by the shell there — confirmed
-  live: it's a no-op in GNOME Console). No single fixed chord works for every
-  app — adding Shift+Insert back reintroduces the Kate double-paste, and
-  adding Ctrl+Shift+V instead silently triggers Kate's own "Switch to Next
-  Input Mode" shortcut. [`paste_chord.rs`](../crates/emobie-inputd/src/paste_chord.rs)
-  now picks the chord from the focused app's WM_CLASS via
-  [`focused_window`](../crates/emobie-inputd/src/focused_window), matching
-  the same approach Espanso (the closest prior art) uses:
-  - **X11 / XWayland**: `_NET_ACTIVE_WINDOW` + `WM_CLASS`, works on plain X11
-    sessions and XWayland-backed apps under Wayland.
-  - **GNOME Wayland**: the optional, community-maintained
-    ["Focused Window D-Bus"](https://extensions.gnome.org/extension/5592/)
-    Shell extension, when installed. Not bundled — Espanso's own
-    app-detection is explicitly unsupported on Wayland without an equivalent,
-    and there is no built-in GNOME API for this (Shell's `Eval` is locked
-    outside dev mode).
-  - **Neither present** (native-Wayland toolkit apps with no extension
-    installed — e.g. plain GNOME/KDE Wayland without the extension): falls
-    back to the pre-existing Ctrl+V default, unchanged from before this file
-    existed.
-  - The known-terminal list in `paste_chord.rs` is a curated compatibility
-    table (same approach Espanso's hard-coded per-app patches use), not a
-    generic rule — if a terminal you use isn't recognized, add it there, or
-    use **Settings → Clipboard → Paste key** to force a chord manually.
-- **The daemon only reads the keyboard while expansion is enabled.** The
-  listener starts on `SetEnabled(true)` (or at boot if the persisted state says
-  enabled) and closes its keyboard devices shortly after it is disabled again;
-  a paste-only daemon never holds `/dev/input/event*` open. If you granted
-  access with an older release, your installed
-  `/etc/udev/rules.d/99-emobie-input.rules` may still contain a keyboard-read
-  rule — the app now reports that as "outdated"; re-run **Grant** to replace it.
-- **Typed-key expansion assumes a US-QWERTY layout.** The short-ASCII fast path
-  sends physical keycodes, which the compositor maps through your active
-  layout, so on AZERTY/QWERTZ the text comes out wrong. It is only reachable
-  through the deferred Expand feature; fix (route non-US layouts through the
-  clipboard path) before re-enabling it.
-- **The daemon's trigger-listening code is otherwise dormant.** Now that
-  as-you-type expansion is deferred, a compositor crash/restart affecting the
-  (unused) listen thread is no longer user-visible — noted here only because
-  [`sleep_watch.rs`](../crates/emobie-inputd/src/sleep_watch.rs) and the
-  listen/matcher code paths still exist in the tree for when expansion
-  returns, and this class of bug will need re-checking then.
+- **Password fields can't be detected.** Reading the keyboard directly (as
+  Espanso does on Wayland) cannot tell a password box from any other; the
+  lock-screen pause and the excluded-apps list are the mitigations.
+- **Paste chord for untypeable text.** Emoji and multi-line expansions still
+  paste. The chord is focused-window-aware ([`paste_chord.rs`](../crates/emobie-inputd/src/paste_chord.rs)):
+  X11/XWayland via `_NET_ACTIVE_WINDOW` + `WM_CLASS`, GNOME Wayland via the
+  optional ["Focused Window D-Bus"](https://extensions.gnome.org/extension/5592/)
+  extension, otherwise Ctrl+V. Known terminals get Ctrl+Shift+V; apps like
+  Kate that bind it to something else never do. **Settings → Clipboard →
+  Paste key** forces a chord.
+- **Dead-key / Compose characters** (e.g. `é` on US-International) are not
+  typed as keys; they fall back to paste.
+- **Layouts on wlroots compositors** are not read from the compositor; set
+  `XKB_DEFAULT_LAYOUT` for the user session (or `localectl set-x11-keymap`)
+  if yours differs from the system default.
+- **Global hotkeys** (summon, per-macro) use X11 grabs, so on Wayland they
+  only fire while an XWayland app is focused.
 
 ## YAML format
 

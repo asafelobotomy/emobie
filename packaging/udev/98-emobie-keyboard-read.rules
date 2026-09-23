@@ -1,0 +1,13 @@
+# emobie "Expand as you type" (opt-in, installed only when you enable it).
+# Lets group emobie-input read keyboards (to match triggers) and pointer/touch
+# devices (only so a click can reset the typed-text buffer). ACLs rather than
+# GROUP= so the devices keep their default group (usually `input`), which
+# other tools rely on. Removed again when Expand as you type is turned off.
+ACTION!="add|change", GOTO="emobie_read_end"
+SUBSYSTEM!="input", GOTO="emobie_read_end"
+KERNEL!="event*", GOTO="emobie_read_end"
+ENV{ID_INPUT_KEYBOARD}=="1", RUN+="/usr/bin/setfacl -m g:emobie-input:r $env{DEVNAME}"
+ENV{ID_INPUT_MOUSE}=="1", RUN+="/usr/bin/setfacl -m g:emobie-input:r $env{DEVNAME}"
+ENV{ID_INPUT_TOUCHPAD}=="1", RUN+="/usr/bin/setfacl -m g:emobie-input:r $env{DEVNAME}"
+ENV{ID_INPUT_TOUCHSCREEN}=="1", RUN+="/usr/bin/setfacl -m g:emobie-input:r $env{DEVNAME}"
+LABEL="emobie_read_end"

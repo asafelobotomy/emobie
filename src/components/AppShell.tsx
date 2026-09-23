@@ -76,6 +76,7 @@ export type AppShellProps = {
   setExpandRestoreClipboard: (value: boolean) => void;
   setPasteChordOverride: (value: PasteChordOverride) => void;
   onHelperReconcile?: () => void;
+  updatePrefs: (patch: Partial<Preferences>) => void;
   setCheckUpdatesOnStartup: (value: boolean) => void;
   setDismissedUpdateVersion: (version: string) => void;
   setMacros: (macros: Macro[]) => void;
@@ -139,6 +140,7 @@ export function AppShell(props: AppShellProps) {
     setExpandRestoreClipboard,
     setPasteChordOverride,
     onHelperReconcile,
+    updatePrefs,
     setCheckUpdatesOnStartup,
     setDismissedUpdateVersion,
     setMacros,
@@ -181,6 +183,7 @@ export function AppShell(props: AppShellProps) {
               macros={visibleMacros}
               customMacros={prefs.macros}
               summonHotkey={prefs.hotkey}
+              expandAsYouType={prefs.expandAsYouType}
               flashKey={flashKey}
               emptyMessage={emptyMessage}
               searchActive={query.trim().length > 0}
@@ -237,6 +240,7 @@ export function AppShell(props: AppShellProps) {
           onExpandRestoreClipboard={setExpandRestoreClipboard}
           onPasteChordOverride={setPasteChordOverride}
           onHelperReconcile={onHelperReconcile}
+          updatePrefs={updatePrefs}
           onCheckUpdatesOnStartup={setCheckUpdatesOnStartup}
           onDismissUpdate={(version) => setDismissedUpdateVersion(version)}
           onOpenRelease={(url) => {

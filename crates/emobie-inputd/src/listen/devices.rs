@@ -10,16 +10,17 @@ use std::time::{Duration, Instant};
 static LISTEN_CACHE: Mutex<Option<(Instant, bool)>> = Mutex::new(None);
 const LISTEN_CACHE_TTL: Duration = Duration::from_secs(2);
 
-fn is_virtual_uinput(device: &Device) -> bool {
-    let name = device.name().unwrap_or("").to_ascii_lowercase();
-    name.contains("uinput")
-        || name.contains("enigo")
-        || name.contains("virtual")
-        || name.contains("emobie")
+/// Only our own injector is skipped. Remappers (keyd, kanata, kmonad) grab the
+/// physical keyboard and re-emit through a virtual one — that virtual device is
+/// where the typed text actually comes from, so it must be read.
+fn is_own_injector(device: &Device) -> bool {
+    let id = device.input_id();
+    let ours = id.vendor() == crate::uinput_kbd::VENDOR_ID && id.product() == crate::uinput_kbd::PRODUCT_ID;
+    ours || device.name().unwrap_or("") == crate::uinput_kbd::DEVICE_NAME
 }
 
 fn is_keyboard(device: &Device) -> bool {
-    if is_virtual_uinput(device) {
+    if is_own_injector(device) {
         return false;
     }
     device.supported_keys().is_some_and(|keys| {
@@ -27,7 +28,27 @@ fn is_keyboard(device: &Device) -> bool {
     })
 }
 
+/// Mice, touchpads and touchscreens — read only so a click can reset the
+/// typed-text buffer.
+fn is_pointer(device: &Device) -> bool {
+    if is_own_injector(device) {
+        return false;
+    }
+    device
+        .supported_keys()
+        .is_some_and(|keys| keys.contains(Key::BTN_LEFT) || keys.contains(Key::BTN_TOUCH))
+}
+
+/// Keyboards plus pointer devices (see `is_pointer`).
+pub(super) fn list_input_paths() -> Vec<PathBuf> {
+    list_paths(|device| is_keyboard(device) || is_pointer(device))
+}
+
 pub(super) fn list_keyboard_paths() -> Vec<PathBuf> {
+    list_paths(is_keyboard)
+}
+
+fn list_paths(wanted: impl Fn(&Device) -> bool) -> Vec<PathBuf> {
     let mut paths = Vec::new();
     let Ok(entries) = fs::read_dir("/dev/input") else {
         return paths;
@@ -39,7 +60,7 @@ pub(super) fn list_keyboard_paths() -> Vec<PathBuf> {
             continue;
         }
         if let Ok(device) = Device::open(&path) {
-            if is_keyboard(&device) {
+            if wanted(&device) {
                 paths.push(path);
             }
         }

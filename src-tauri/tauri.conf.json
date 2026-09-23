@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "emobie",
-  "version": "0.6.27",
+  "version": "0.7.0",
   "identifier": "io.github.asafelobotomy.emobie",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -59,6 +59,7 @@
           "/usr/share/emobie/setup-input-access.sh": "inputd-bundle/setup-input-access.sh",
           "/usr/share/emobie/bootstrap-inputd-host.sh": "inputd-bundle/bootstrap-inputd-host.sh",
           "/usr/share/emobie/99-emobie-input.rules": "inputd-bundle/99-emobie-input.rules",
+          "/usr/share/emobie/98-emobie-keyboard-read.rules": "inputd-bundle/98-emobie-keyboard-read.rules",
           "/usr/share/emobie/selinux/emobie-inputd.te": "inputd-bundle/selinux/emobie-inputd.te",
           "/usr/share/polkit-1/actions/io.github.asafelobotomy.emobie.inputd.policy": "inputd-bundle/io.github.asafelobotomy.emobie.inputd.policy"
         }
@@ -81,6 +82,7 @@
           "/usr/share/emobie/setup-input-access.sh": "inputd-bundle/setup-input-access.sh",
           "/usr/share/emobie/bootstrap-inputd-host.sh": "inputd-bundle/bootstrap-inputd-host.sh",
           "/usr/share/emobie/99-emobie-input.rules": "inputd-bundle/99-emobie-input.rules",
+          "/usr/share/emobie/98-emobie-keyboard-read.rules": "inputd-bundle/98-emobie-keyboard-read.rules",
           "/usr/share/emobie/selinux/emobie-inputd.te": "inputd-bundle/selinux/emobie-inputd.te",
           "/usr/share/polkit-1/actions/io.github.asafelobotomy.emobie.inputd.policy": "inputd-bundle/io.github.asafelobotomy.emobie.inputd.policy"
         }

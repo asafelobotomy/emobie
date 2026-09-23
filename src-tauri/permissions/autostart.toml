@@ -102,3 +102,8 @@ commands.allow = ["input_helper_ensure_started"]
 identifier = "allow-input-helper-run-access-setup"
 description = "Allows launching the pkexec keyboard-access setup script"
 commands.allow = ["input_helper_run_access_setup"]
+
+[[permission]]
+identifier = "allow-input-helper-set-keyboard-read"
+description = "Allows granting or removing opt-in keyboard read access via pkexec"
+commands.allow = ["input_helper_set_keyboard_read"]

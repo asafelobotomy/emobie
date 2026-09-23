@@ -46,8 +46,21 @@ pub async fn apply_window_pin(app: AppHandle, pinned: bool) -> Result<PinApplyRe
     .map_err(|err| err.to_string())?
 }
 
+/// Async: probing the compositor shells out (gsettings / qdbus via flatpak-spawn).
 #[tauri::command]
-pub fn pin_capability() -> PinCapability {
+pub async fn pin_capability() -> PinCapability {
+    tauri::async_runtime::spawn_blocking(pin_capability_blocking)
+        .await
+        .unwrap_or_else(|err| PinCapability {
+            wayland: false,
+            plasma: false,
+            reliable: false,
+            detail: format!("Could not check pin support ({err})."),
+            gnome_setup_needed: false,
+        })
+}
+
+fn pin_capability_blocking() -> PinCapability {
     #[cfg(target_os = "linux")]
     {
         linux::capability()
@@ -68,16 +81,20 @@ pub fn pin_capability() -> PinCapability {
 /// the fixed chord emobie-inputd sends. Never overwrites an existing binding —
 /// see `linux::gnome::setup_binding`.
 #[tauri::command]
-pub fn pin_gnome_setup() -> Result<PinCapability, String> {
-    #[cfg(target_os = "linux")]
-    {
-        linux::gnome::setup_binding()?;
-        Ok(linux::capability())
-    }
-    #[cfg(not(target_os = "linux"))]
-    {
-        Err("GNOME pin setup is Linux-only.".into())
-    }
+pub async fn pin_gnome_setup() -> Result<PinCapability, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        #[cfg(target_os = "linux")]
+        {
+            linux::gnome::setup_binding()?;
+            Ok(linux::capability())
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            Err("GNOME pin setup is Linux-only.".into())
+        }
+    })
+    .await
+    .map_err(|err| format!("pin setup task failed: {err}"))?
 }
 
 pub fn apply_to_window(window: &WebviewWindow, pinned: bool) -> PinApplyResult {

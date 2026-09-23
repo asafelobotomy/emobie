@@ -33,6 +33,13 @@ pub(super) static SUPPRESS_STARTED_MS: AtomicU64 = AtomicU64::new(0);
 /// Stuck-job escape: listen despite jobs > 0 until the counter drains.
 static SUPPRESS_FORCE_OPEN: AtomicBool = AtomicBool::new(false);
 static INJECT_TX: OnceLock<SyncSender<InjectJob>> = OnceLock::new();
+/// Set on resume: the virtual keyboard may be dead compositor-side.
+pub(super) static REOPEN_UINPUT: AtomicBool = AtomicBool::new(false);
+
+/// After suspend/resume, recreate the virtual keyboard before the next job.
+pub fn note_resume() {
+    REOPEN_UINPUT.store(true, Ordering::Release);
+}
 static INJECT_CACHE: Mutex<Option<(Instant, bool)>> = Mutex::new(None);
 
 /// True while expand jobs are queued/in-flight or within the post-inject grace window.

@@ -60,7 +60,7 @@ Text expansion needs three layers on every distro:
 | Layer | What | How |
 |-------|------|-----|
 | **Helper daemon** | `emobie-inputd` on the **host** (same user as the desktop session) | Bundled in `.deb`/`.rpm`; AppImage/Flatpak auto-install on first Expand |
-| **Keyboard read** | Open `/dev/input/event*` — **only for the deferred as-you-type Expand**; current releases neither request nor use it, and the helper opens no keyboard device unless expansion is enabled | (previously) udev group `emobie-input` via **Grant**. If you granted with an older release, re-run **Grant** to drop the old keyboard-read rule |
+| **Keyboard read** | Open `/dev/input/event*` — **only for Expand as you type**, and only while it is on | Opt-in Grant installs `98-emobie-keyboard-read.rules`: a read ACL for group `emobie-input` on keyboards and pointers (device groups unchanged). **Remove keyboard access** undoes it. Needs `acl` |
 | **Text inject** | Erase trigger + insert expansion into the focused app | **`/dev/uinput`** via the same Grant (required on Wayland/Plasma — Enigo virtual-keyboard is often unavailable); short ASCII types as keys; rich text uses clipboard (`wl-copy` / arboard) + paste chords; X11 can fall back to Enigo |
 
 Grant’s udev rule sets `GROUP=emobie-input MODE=0660` on `/dev/uinput` and applies a session
@@ -91,14 +91,15 @@ bash scripts/verify-expand-setup.sh
 | Fallback | `pkexec /usr/local/share/emobie/setup-input-access.sh` |
 
 1. **systemd --user** runs `emobie-inputd` (same user as the session — never root)
-2. **udev** + group `emobie-input` (and optional **setfacl**) grant `/dev/input` read **and** `/dev/uinput` write
+2. **udev** + group `emobie-input` (and optional **setfacl**) grant `/dev/uinput` write; the opt-in read rule adds `/dev/input` read for Expand as you type
 3. **Polkit** prompts once for `setup-input-access.sh`
 
 Expand treats access as ready only when **both** are true:
 
 - the helper can open a keyboard now (`can_listen`, may use a session ACL), **and**
-- permanent config exists: group `emobie-input` in `/etc/group` **and**
-  `/etc/udev/rules.d/99-emobie-input.rules`
+- permanent config exists: group `emobie-input` in `/etc/group`,
+  `/etc/udev/rules.d/99-emobie-input.rules` **and**
+  `/etc/udev/rules.d/98-emobie-keyboard-read.rules` (all matching this build)
 
 On Wayland, inject also needs a writable `/dev/uinput` (same Grant). Without it the helper
 reports `can_inject=false` even if a compositor socket exists — Enigo alone cannot reach

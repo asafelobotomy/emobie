@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { AppShell } from "./components/AppShell";
 import {
   FAVORITES_CATEGORY_ID,
@@ -21,6 +20,7 @@ import { useAutostart } from "./hooks/useAutostart";
 import { useAllowMultipleInstances } from "./hooks/useAllowMultipleInstances";
 import { useFirstRunSetup } from "./hooks/useFirstRunSetup";
 import { useInputHelperSync } from "./hooks/useInputHelperSync";
+import { useTrayToggles } from "./hooks/useTrayToggles";
 import {
   useUpdateCheck,
   type TrayStatus,
@@ -69,6 +69,7 @@ function App() {
     clearRecents,
     clearUsageStats,
     toggleFavorite,
+    update: updatePrefs,
   } = usePreferences();
 
   const [rootEl, setRootEl] = useState<HTMLDivElement | null>(null);
@@ -119,7 +120,7 @@ function App() {
   pinnedRef.current = prefs.pinned;
 
   useTheme(prefs.theme);
-  useAlwaysOnTop(prefs.pinned, ready);
+  const pinNotice = useAlwaysOnTop(prefs.pinned, ready);
   const { capability: pinCapability, refresh: refreshPinCapability } =
     usePinCapability(ready);
   useWindowDecorations(prefs.showTitleBar, ready);
@@ -148,8 +149,17 @@ function App() {
     if (!prefs.autoPasteOnCopy || prefs.pinned || trayUnavailable) {
       return { autoPaste: false as const };
     }
-    return { autoPaste: true as const, hideForPaste: true as const };
-  }, [prefs.autoPasteOnCopy, prefs.pinned, trayUnavailable]);
+    return {
+      autoPaste: true as const,
+      hideForPaste: true as const,
+      restoreClipboard: prefs.expandRestoreClipboard,
+    };
+  }, [
+    prefs.autoPasteOnCopy,
+    prefs.pinned,
+    prefs.expandRestoreClipboard,
+    trayUnavailable,
+  ]);
 
   const copyMacro = useCallback(
     (text: string, flashKey?: string) => {
@@ -236,8 +246,8 @@ function App() {
 
   useInputHelperSync({
     ready,
-    restoreClipboard: prefs.expandRestoreClipboard,
-    pasteChord: prefs.pasteChordOverride,
+    prefs,
+    expansionMacros: mergedMacros,
     reconcileNonce,
     onStatus: handleInputStatus,
     onSyncError: handleInputSyncError,
@@ -247,17 +257,13 @@ function App() {
     setPinned(!pinnedRef.current);
   }, [setPinned]);
 
-  useEffect(() => {
-    let unlistenPin: (() => void) | undefined;
-    void listen("tray-pin-toggle", () => {
-      setPinned(!pinnedRef.current);
-    }).then((fn) => {
-      unlistenPin = fn;
-    });
-    return () => {
-      unlistenPin?.();
-    };
-  }, [setPinned]);
+  useTrayToggles({
+    pinned: prefs.pinned,
+    expandAsYouType: prefs.expandAsYouType,
+    setPinned,
+    updatePrefs,
+    onInputStatus: handleInputStatus,
+  });
 
   const sortCtx = useMemo(
     () => ({
@@ -298,7 +304,9 @@ function App() {
       ? hotkeyError
       : inputError
         ? inputError
-        : trayUnavailable
+        : pinNotice
+          ? pinNotice
+          : trayUnavailable
           ? "System tray unavailable — close quits the app."
           : updateInfo?.newerAvailable
             ? updateInfo.detail
@@ -307,7 +315,7 @@ function App() {
               : null;
 
   const statusError = Boolean(
-    copyError || hotkeyError || inputError || trayUnavailable,
+    copyError || hotkeyError || inputError || pinNotice || trayUnavailable,
   );
   const frameless = !prefs.showTitleBar;
 
@@ -368,6 +376,7 @@ function App() {
       setCheckUpdatesOnStartup={setCheckUpdatesOnStartup}
       setDismissedUpdateVersion={setDismissedUpdateVersion}
       setMacros={setMacros}
+      updatePrefs={updatePrefs}
       handleInputStatus={handleInputStatus}
       clearRecents={clearRecents}
       clearUsageStats={clearUsageStats}

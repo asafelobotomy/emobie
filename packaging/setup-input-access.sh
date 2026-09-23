@@ -17,6 +17,32 @@ RULES_NAME="99-emobie-input.rules"
 POLICY_NAME="io.github.asafelobotomy.emobie.inputd.policy"
 RULES_DST="/etc/udev/rules.d/${RULES_NAME}"
 POLICY_DST="/usr/share/polkit-1/actions/${POLICY_NAME}"
+# Opt-in keyboard/pointer read access for "Expand as you type".
+READ_RULES_NAME="98-emobie-keyboard-read.rules"
+READ_RULES_DST="/etc/udev/rules.d/${READ_RULES_NAME}"
+
+# --keyboard-read on|off adds/removes the read tier; without it the read tier
+# is left exactly as it is (plain Grant only sets up paste injection).
+KEYBOARD_READ=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --keyboard-read)
+      case "${2:-}" in
+        on|off) KEYBOARD_READ="$2" ;;
+        *) echo "--keyboard-read needs 'on' or 'off'" >&2; exit 2 ;;
+      esac
+      shift 2
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+FORWARD_ARGS=()
+if [[ -n "$KEYBOARD_READ" ]]; then
+  FORWARD_ARGS=(--keyboard-read "$KEYBOARD_READ")
+fi
 
 acl_package_hint() {
   if command -v apt-get >/dev/null 2>&1; then
@@ -60,6 +86,22 @@ resolve_rules_src() {
   return 1
 }
 
+# Root-owned locations only (package, staged copy) plus this script's own
+# checkout tree, which the root phase has already verified is root-owned.
+resolve_read_rules_src() {
+  local candidate
+  for candidate in \
+    "/usr/share/emobie/${READ_RULES_NAME}" \
+    "${LOCAL_DIR}/${READ_RULES_NAME}" \
+    "${SCRIPT_DIR}/${READ_RULES_NAME}" \
+    "${SCRIPT_DIR}/udev/${READ_RULES_NAME}"; do
+    [[ -f "$candidate" ]] || continue
+    printf '%s\n' "$candidate"
+    return 0
+  done
+  return 1
+}
+
 resolve_policy_src() {
   local user_home=""
   if [[ -n "${1:-}" ]]; then
@@ -96,6 +138,10 @@ stage_user_assets_to_local() {
   if [[ -n "$policy_src" && -f "$policy_src" ]]; then
     install -m 644 "$policy_src" "$LOCAL_DIR/${POLICY_NAME}"
   fi
+  local read_rules="$(dirname "$src_script")/udev/${READ_RULES_NAME}"
+  if [[ -f "$read_rules" ]]; then
+    install -m 644 "$read_rules" "$LOCAL_DIR/${READ_RULES_NAME}"
+  fi
   local te="$(dirname "$src_script")/selinux/emobie-inputd.te"
   if [[ -f "$te" ]]; then
     install -m 644 "$te" "$LOCAL_DIR/selinux/emobie-inputd.te"
@@ -110,14 +156,14 @@ if [[ "$(id -u)" -ne 0 ]]; then
   POLICY_FOR_STAGE="$(resolve_policy_src "$INVOKING_USER" || true)"
 
   if [[ "$SELF" == "$(readlink -f "$SYSTEM_SETUP" 2>/dev/null || echo "$SYSTEM_SETUP")" ]]; then
-    exec pkexec env SUDO_USER="${INVOKING_USER}" "$SYSTEM_SETUP" "$@"
+    exec pkexec env SUDO_USER="${INVOKING_USER}" "$SYSTEM_SETUP" "${FORWARD_ARGS[@]}"
   fi
   if [[ "$SELF" == "$(readlink -f "$LOCAL_SETUP" 2>/dev/null || echo "$LOCAL_SETUP")" ]]; then
     # Ensure siblings exist beside the annotated script before elevation.
     if [[ -n "$RULES_FOR_STAGE" && ! -f "$LOCAL_DIR/${RULES_NAME}" ]]; then
       pkexec install -D -m 644 "$RULES_FOR_STAGE" "$LOCAL_DIR/${RULES_NAME}"
     fi
-    exec pkexec env SUDO_USER="${INVOKING_USER}" "$LOCAL_SETUP" "$@"
+    exec pkexec env SUDO_USER="${INVOKING_USER}" "$LOCAL_SETUP" "${FORWARD_ARGS[@]}"
   fi
 
   # Stage full asset set, then run the annotated local script (one Polkit path).
@@ -130,11 +176,15 @@ if [[ "$(id -u)" -ne 0 ]]; then
   if [[ -n "$POLICY_FOR_STAGE" ]]; then
     pkexec install -D -m 644 "$POLICY_FOR_STAGE" "$LOCAL_DIR/${POLICY_NAME}" || true
   fi
+  READ_FOR_STAGE="$(dirname "$SELF")/udev/${READ_RULES_NAME}"
+  if [[ -f "$READ_FOR_STAGE" ]]; then
+    pkexec install -D -m 644 "$READ_FOR_STAGE" "$LOCAL_DIR/${READ_RULES_NAME}" || true
+  fi
   TE_SRC="$(dirname "$SELF")/selinux/emobie-inputd.te"
   if [[ -f "$TE_SRC" ]]; then
     pkexec install -D -m 644 "$TE_SRC" "$LOCAL_DIR/selinux/emobie-inputd.te" || true
   fi
-  exec pkexec env SUDO_USER="${INVOKING_USER}" "$LOCAL_SETUP" "$@"
+  exec pkexec env SUDO_USER="${INVOKING_USER}" "$LOCAL_SETUP" "${FORWARD_ARGS[@]}"
 fi
 
 # Root phase. Everything below runs with full privileges, so it may only use
@@ -229,6 +279,25 @@ fi
 
 usermod -aG "$GROUP" "$TARGET_USER"
 
+case "$KEYBOARD_READ" in
+  on)
+    if ! command -v setfacl >/dev/null; then
+      echo "Expand as you type needs setfacl to grant keyboard read access." >&2
+      acl_package_hint >&2
+      exit 1
+    fi
+    READ_RULES_SRC="$(resolve_read_rules_src || true)"
+    if [[ -z "$READ_RULES_SRC" ]]; then
+      echo "Cannot find ${READ_RULES_NAME} (looked in /usr/share/emobie and ${LOCAL_DIR})" >&2
+      exit 1
+    fi
+    install -m 644 "$READ_RULES_SRC" "$READ_RULES_DST"
+    ;;
+  off)
+    rm -f "$READ_RULES_DST"
+    ;;
+esac
+
 if [[ ! -e /dev/uinput ]]; then
   if command -v modprobe >/dev/null; then
     modprobe uinput 2>/dev/null || true
@@ -257,6 +326,34 @@ if command -v setfacl >/dev/null; then
   shopt -u nullglob
 else
   acl_package_hint >&2
+fi
+
+# Keyboards, mice, touchpads and touchscreens — the devices the read rule covers.
+read_tier_devices() {
+  local dev
+  shopt -s nullglob
+  for dev in /dev/input/event*; do
+    if udevadm info -q property -n "$dev" 2>/dev/null \
+      | grep -qE '^ID_INPUT_(KEYBOARD|MOUSE|TOUCHPAD|TOUCHSCREEN)=1$'; then
+      printf '%s\n' "$dev"
+    fi
+  done
+  shopt -u nullglob
+}
+
+# The udev rule grants the group; a user ACL makes it work before re-login.
+if [[ "$KEYBOARD_READ" == "on" ]]; then
+  while IFS= read -r dev; do
+    setfacl -m "g:${GROUP}:r" -m "u:${TARGET_USER}:r" "$dev" || \
+      echo "Warning: setfacl failed for $dev." >&2
+  done < <(read_tier_devices)
+  echo "Keyboard read access granted (Expand as you type)."
+elif [[ "$KEYBOARD_READ" == "off" ]] && command -v setfacl >/dev/null; then
+  while IFS= read -r dev; do
+    setfacl -x "g:${GROUP}" "$dev" 2>/dev/null || true
+    setfacl -x "u:${TARGET_USER}" "$dev" 2>/dev/null || true
+  done < <(read_tier_devices)
+  echo "Keyboard read access removed."
 fi
 
 echo "Added $TARGET_USER to $GROUP and installed udev rules."

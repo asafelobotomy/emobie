@@ -163,7 +163,7 @@ pub(super) fn lower_hex(bytes: &[u8]) -> String {
 fn download_asset(url: &str, dest: &Path, expected_sha256: &str) -> Result<(), String> {
     validate_download_url(url)?;
     let result = (|| {
-        let response = ureq::get(url)
+        let response = super::http_agent().get(url)
             .set("User-Agent", USER_AGENT)
             .set("Accept", "application/octet-stream")
             .call()

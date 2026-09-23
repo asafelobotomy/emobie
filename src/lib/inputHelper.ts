@@ -10,6 +10,8 @@ export type InputHelperStatus = {
    * Can be false even when `canListen` is true (temporary ACL / orphaned GID).
    */
   accessConfigured?: boolean;
+  /** True when the opt-in keyboard-read rule (Expand as you type) is installed. */
+  keyboardReadConfigured?: boolean;
   /** In-flight expand jobs holding listen suppress (debug). */
   suppressJobs?: number;
   /** Clipboard restore after paste (default false). */

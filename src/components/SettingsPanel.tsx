@@ -2,6 +2,7 @@ import { useEffect, useId, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { MacrosSettings } from "./MacrosSettings";
 import { PasteAccessSettings } from "./PasteAccessSettings";
+import { TextExpansionSettings } from "./TextExpansionSettings";
 import { SettingsLifecycleHints } from "./SettingsLifecycleHints";
 import { SettingsGeneralSection } from "./SettingsGeneralSection";
 import { UpdateBanner } from "./UpdateBanner";
@@ -51,6 +52,7 @@ type SettingsPanelProps = {
   onExpandRestoreClipboard: (value: boolean) => void;
   onPasteChordOverride: (value: PasteChordOverride) => void;
   onHelperReconcile?: () => void;
+  updatePrefs: (patch: Partial<Preferences>) => void;
   onCheckUpdatesOnStartup: (value: boolean) => void;
   onDismissUpdate: (version: string) => void;
   onOpenRelease: (url: string) => void;
@@ -94,6 +96,7 @@ export function SettingsPanel({
   onExpandRestoreClipboard,
   onPasteChordOverride,
   onHelperReconcile,
+  updatePrefs,
   onCheckUpdatesOnStartup,
   onDismissUpdate,
   onOpenRelease,
@@ -252,6 +255,14 @@ export function SettingsPanel({
           inputStatus={inputStatus}
           onRestoreClipboard={onExpandRestoreClipboard}
           onPasteChordOverride={onPasteChordOverride}
+          onInputStatus={onInputStatus}
+          onHelperReconcile={onHelperReconcile}
+        />
+
+        <TextExpansionSettings
+          prefs={prefs}
+          inputStatus={inputStatus}
+          updatePrefs={updatePrefs}
           onInputStatus={onInputStatus}
           onHelperReconcile={onHelperReconcile}
         />

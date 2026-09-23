@@ -1,14 +1,17 @@
-module emobie_inputd 1.0;
+module emobie_inputd 1.1;
 
 require {
     type unconfined_t;
     type uinput_device_t;
+    type event_device_t;
     class chr_file { open read write ioctl getattr };
 }
 
 # Allow the user's emobie-inputd (unconfined user domain) to use uinput for
-# paste injection ("Auto-paste on copy"). As-you-type text expansion is
-# deferred for now, so no keyboard event-read grant is needed here — see
-# docs/MACROS.md "Known limitations". Re-add an `input_device_t` allow rule
-# if/when Expand as-you-type returns.
+# paste and expansion injection.
 allow unconfined_t uinput_device_t:chr_file { open read write ioctl getattr };
+
+# Read keyboards and pointer buttons for "Expand as you type". Access is still
+# gated by the opt-in 98-emobie-keyboard-read.rules ACL; this only stops
+# SELinux from overriding it.
+allow unconfined_t event_device_t:chr_file { open read ioctl getattr };

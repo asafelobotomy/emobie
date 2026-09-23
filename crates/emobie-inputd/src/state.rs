@@ -22,6 +22,9 @@ pub struct PersistedState {
     pub enabled: bool,
     #[serde(default)]
     pub matches: Vec<MatchRule>,
+    /// Persisted so exclusions apply from boot, before the app re-syncs.
+    #[serde(default)]
+    pub excluded_apps: Vec<String>,
 }
 
 fn state_path() -> Option<PathBuf> {
@@ -156,6 +159,7 @@ fn save_locked(enabled: bool, matches: &[MatchRule]) {
     let state = PersistedState {
         enabled,
         matches: matches.to_vec(),
+        excluded_apps: crate::guard::excluded_apps(),
     };
     let Ok(body) = serde_json::to_string(&state) else {
         return;

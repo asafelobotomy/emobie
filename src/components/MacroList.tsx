@@ -8,6 +8,7 @@ type MacroListProps = {
   macros: MacroEntry[];
   customMacros: Macro[];
   summonHotkey: string;
+  expandAsYouType: boolean;
   flashKey: string | null;
   emptyMessage: string;
   searchActive?: boolean;
@@ -140,6 +141,7 @@ export function MacroList({
   macros,
   customMacros,
   summonHotkey,
+  expandAsYouType,
   flashKey,
   emptyMessage,
   searchActive = false,
@@ -219,6 +221,11 @@ export function MacroList({
             +
           </button>
         </div>
+        <p className="macro-paused-note">
+          {expandAsYouType
+            ? "Type a trigger anywhere to expand it."
+            : "Click a macro to copy it, or turn on Expand as you type in Settings."}
+        </p>
         {custom.length === 0 ? (
           <p
             className={

@@ -1,6 +1,6 @@
 [package]
 name = "emobie"
-version = "0.6.27"
+version = "0.7.0"
 description = "emobie — compact emoji palette for content creators"
 authors = ["aSafeLobotomy"]
 edition = "2021"
@@ -34,6 +34,8 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 enigo = { version = "0.3", default-features = false, features = ["x11rb", "wayland"] }
 ashpd = { version = "0.11", features = ["tokio"] }
 tokio = { version = "1", features = ["rt", "macros"] }
+# Same version Tauri already links; used to read GDK's live modifier state.
+gtk = "0.18"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"

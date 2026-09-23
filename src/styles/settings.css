@@ -174,3 +174,9 @@
   border-color: var(--accent);
   background: var(--accent-soft);
 }
+
+.text-expansion-settings textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: var(--font-mono);
+}

@@ -5,7 +5,10 @@
 //! (b) the bytes embedded in this binary (see `assets`), staged into
 //! `/usr/local/share/emobie/`. No user-writable file is ever copied to root.
 
-use super::assets::{STAGED_FILES, UDEV_RULES as EMBEDDED_UDEV_RULES, UDEV_RULES_NAME};
+use super::assets::{
+    KEYBOARD_READ_RULES, KEYBOARD_READ_RULES_NAME, STAGED_FILES, UDEV_RULES as EMBEDDED_UDEV_RULES,
+    UDEV_RULES_NAME,
+};
 use super::permanent::{host_setup_hint, in_flatpak, LOCAL_SETUP, SYSTEM_SETUP};
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -106,7 +109,7 @@ pub(super) fn ensure_polkit_annotated_setup(script: &str, flatpak: bool) -> Resu
     Ok(LOCAL_SETUP.to_string())
 }
 
-pub(super) fn run_pkexec(script: &str, flatpak: bool) -> Result<(), String> {
+pub(super) fn run_pkexec(script: &str, flatpak: bool, args: &[&str]) -> Result<(), String> {
     let mut cmd = if flatpak {
         let mut c = Command::new("flatpak-spawn");
         c.arg("--host").arg("pkexec").arg(script);
@@ -116,6 +119,7 @@ pub(super) fn run_pkexec(script: &str, flatpak: bool) -> Result<(), String> {
         c.arg(script);
         c
     };
+    cmd.args(args);
     with_session_env(&mut cmd);
     // pkexec scrubs the environment; the script resolves the invoking user
     // from PKEXEC_UID.
@@ -149,6 +153,8 @@ pub(super) fn run_pkexec(script: &str, flatpak: bool) -> Result<(), String> {
 /// embedded copy under `/usr/local` instead.
 fn system_package_current(flatpak: bool) -> bool {
     system_rules_match(&format!("{SYSTEM_DIR}/{UDEV_RULES_NAME}"), flatpak)
+        && read_installed(&format!("{SYSTEM_DIR}/{KEYBOARD_READ_RULES_NAME}"), flatpak).as_deref()
+            == Some(KEYBOARD_READ_RULES)
 }
 
 /// Testable core of `system_package_current`: does the udev rule at `path`
@@ -185,7 +191,20 @@ mod tests {
         assert!(UDEV_RULES.windows(6).any(|w| w == b"uinput"));
         assert!(POLKIT_POLICY.starts_with(b"<?xml"));
         assert!(!SELINUX_TE.is_empty());
-        assert_eq!(STAGED_FILES.len(), 4);
+        assert_eq!(STAGED_FILES.len(), 5);
+    }
+
+    /// Keyboard read must come from the opt-in rule only, and only as an ACL:
+    /// `GROUP=` on event nodes would take them away from the `input` group.
+    #[test]
+    fn keyboard_read_rule_uses_acls_only() {
+        let text = String::from_utf8_lossy(super::super::assets::KEYBOARD_READ_RULES);
+        let active: Vec<&str> = text
+            .lines()
+            .filter(|l| !l.trim_start().starts_with('#') && !l.trim().is_empty())
+            .collect();
+        assert!(active.iter().all(|l| !l.contains("GROUP=") && !l.contains("MODE=")), "{active:?}");
+        assert!(active.iter().any(|l| l.contains("setfacl -m g:emobie-input:r")));
     }
 
     #[test]

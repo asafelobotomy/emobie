@@ -163,7 +163,7 @@ fn host_run_version(path: &Path) -> Option<String> {
     text.lines().next().map(|l| l.trim().to_string())
 }
 
-fn version_lt(installed: &str, bundled: &str) -> Option<bool> {
+pub(crate) fn version_lt(installed: &str, bundled: &str) -> Option<bool> {
     let a = parse_semver(installed)?;
     let b = parse_semver(bundled)?;
     Some(a < b)

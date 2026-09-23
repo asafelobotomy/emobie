@@ -4,6 +4,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
 pub const PIN_EVENT: &str = "tray-pin-toggle";
+pub const EXPAND_EVENT: &str = "tray-expand-toggle";
 const FLATPAK_APP_ID: &str = "io.github.asafelobotomy.emobie";
 
 #[derive(Debug, Clone, Serialize)]
@@ -42,7 +43,7 @@ pub fn hide_main_window(app: &AppHandle) {
 
 #[cfg(target_os = "linux")]
 mod linux {
-    use super::{hide_main_window, show_main_window, FLATPAK_APP_ID, PIN_EVENT};
+    use super::{hide_main_window, show_main_window, EXPAND_EVENT, FLATPAK_APP_ID, PIN_EVENT};
     use image::GenericImageView;
     use ksni::blocking::TrayMethods;
     use ksni::{Category, Icon, MenuItem, ToolTip, Tray};
@@ -135,6 +136,14 @@ mod linux {
                     label: "Toggle pin above windows".into(),
                     activate: Box::new(|this: &mut Self| {
                         let _ = this.app.emit(PIN_EVENT, ());
+                    }),
+                    ..Default::default()
+                }
+                .into(),
+                StandardItem {
+                    label: "Toggle text expansion".into(),
+                    activate: Box::new(|this: &mut Self| {
+                        let _ = this.app.emit(EXPAND_EVENT, ());
                     }),
                     ..Default::default()
                 }

@@ -1,11 +1,12 @@
 //! Permanent keyboard-access detection (group + udev rules).
 
-use super::assets::UDEV_RULES as EMBEDDED_UDEV_RULES;
+use super::assets::{KEYBOARD_READ_RULES, UDEV_RULES as EMBEDDED_UDEV_RULES};
 use std::process::{Command, Stdio};
 
 pub(super) const SYSTEM_SETUP: &str = "/usr/share/emobie/setup-input-access.sh";
 pub(super) const LOCAL_SETUP: &str = "/usr/local/share/emobie/setup-input-access.sh";
 pub(super) const UDEV_RULES_PATH: &str = "/etc/udev/rules.d/99-emobie-input.rules";
+const KEYBOARD_READ_RULES_PATH: &str = "/etc/udev/rules.d/98-emobie-keyboard-read.rules";
 const GROUP_NAME: &str = "emobie-input";
 
 pub(super) fn in_flatpak() -> bool {
@@ -57,13 +58,10 @@ fn local_cmd_succeeds(program: &str, args: &[&str]) -> bool {
         .unwrap_or(false)
 }
 
-/// True when the installed udev rule is byte-identical to the one this build
-/// ships. Existence alone is not enough: an old rule that still grants keyboard
-/// *read* access would otherwise be reported as "configured" forever.
-fn udev_rules_current() -> bool {
-    let installed = if in_flatpak() {
+fn read_root_file(path: &str) -> Option<Vec<u8>> {
+    if in_flatpak() {
         Command::new("flatpak-spawn")
-            .args(["--host", "cat", UDEV_RULES_PATH])
+            .args(["--host", "cat", path])
             .stdin(Stdio::null())
             .stderr(Stdio::null())
             .output()
@@ -71,9 +69,21 @@ fn udev_rules_current() -> bool {
             .filter(|o| o.status.success())
             .map(|o| o.stdout)
     } else {
-        std::fs::read(UDEV_RULES_PATH).ok()
-    };
-    installed.as_deref() == Some(EMBEDDED_UDEV_RULES)
+        std::fs::read(path).ok()
+    }
+}
+
+/// True when the opt-in keyboard-read rule ("Expand as you type") is
+/// installed and matches this build.
+pub fn keyboard_read_configured() -> bool {
+    read_root_file(KEYBOARD_READ_RULES_PATH).as_deref() == Some(KEYBOARD_READ_RULES)
+}
+
+/// True when the installed udev rule is byte-identical to the one this build
+/// ships. Existence alone is not enough: an old rule that still grants keyboard
+/// *read* access would otherwise be reported as "configured" forever.
+fn udev_rules_current() -> bool {
+    read_root_file(UDEV_RULES_PATH).as_deref() == Some(EMBEDDED_UDEV_RULES)
 }
 
 fn udev_rules_present() -> bool {

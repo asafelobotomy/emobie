@@ -59,6 +59,18 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.7.0" date="2026-09-23">
+      <description>
+        <p>Expand as you type is back: type a macro trigger anywhere and it is
+        replaced, typed through your real keyboard layout. Keyboard access is a
+        separate opt-in, and expansion pauses on the lock screen and in
+        excluded apps.</p>
+        <p>Fixes window freezes from update checks and startup tasks, pinning
+        on Plasma under Flatpak, silent pin failures, lost GNOME pin toggles,
+        helper upgrades that never took effect, and clipboard restore running
+        when switched off.</p>
+      </description>
+    </release>
     <release version="0.6.27" date="2026-09-22">
       <description>
         <p>Fixes Grant permanently failing to repair keyboard-access setup when

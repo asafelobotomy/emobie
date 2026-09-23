@@ -15,6 +15,7 @@ const need = [
   "/usr/share/emobie/setup-input-access.sh",
   "/usr/share/emobie/bootstrap-inputd-host.sh",
   "/usr/share/emobie/99-emobie-input.rules",
+  "/usr/share/emobie/98-emobie-keyboard-read.rules",
   "/usr/share/emobie/selinux/emobie-inputd.te",
   "/usr/share/polkit-1/actions/io.github.asafelobotomy.emobie.inputd.policy",
 ];
@@ -55,6 +56,13 @@ done
 # The shipped udev rule must not grant keyboard *read* access (event nodes).
 if grep -Ev '^[[:space:]]*(#|$)' "$ROOT/packaging/udev/99-emobie-input.rules" | grep -q 'event\*'; then
   echo "packaging/udev/99-emobie-input.rules grants keyboard event access" >&2
+  exit 1
+fi
+
+# Opt-in keyboard read is ACL-only: GROUP=/MODE= on event nodes would take
+# them away from the `input` group other tools rely on.
+if grep -Ev '^[[:space:]]*(#|$)' "$ROOT/packaging/udev/98-emobie-keyboard-read.rules" | grep -qE 'GROUP=|MODE='; then
+  echo "packaging/udev/98-emobie-keyboard-read.rules must use ACLs, not GROUP=/MODE=" >&2
   exit 1
 fi
 

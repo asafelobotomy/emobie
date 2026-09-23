@@ -16,17 +16,22 @@ USER_UNIT="$UNIT_DIR/emobie-inputd.service"
 mkdir -p "$BIN_DIR" "$UNIT_DIR" "$DATA"
 install -m755 "$SOURCE" "$BIN_DIR/emobie-inputd"
 
-for asset in setup-input-access.sh 99-emobie-input.rules io.github.asafelobotomy.emobie.inputd.policy; do
-  if [[ -f "$ASSET_DIR/$asset" ]]; then
-    if [[ "$asset" == "setup-input-access.sh" ]]; then
-      install -Dm755 "$ASSET_DIR/$asset" "$DATA/$asset"
-    else
-      install -Dm644 "$ASSET_DIR/$asset" "$DATA/$asset"
+# Flatpak/AppImage extract the bundle straight into $DATA; copying a file onto
+# itself makes `install` fail, which (set -e) aborted before the restart below
+# and left the old helper running after every upgrade.
+if [[ "$ASSET_DIR" != "$(readlink -f "$DATA")" ]]; then
+  for asset in setup-input-access.sh 99-emobie-input.rules io.github.asafelobotomy.emobie.inputd.policy; do
+    if [[ -f "$ASSET_DIR/$asset" ]]; then
+      if [[ "$asset" == "setup-input-access.sh" ]]; then
+        install -Dm755 "$ASSET_DIR/$asset" "$DATA/$asset"
+      else
+        install -Dm644 "$ASSET_DIR/$asset" "$DATA/$asset"
+      fi
     fi
+  done
+  if [[ -f "$ASSET_DIR/selinux/emobie-inputd.te" ]]; then
+    install -Dm644 "$ASSET_DIR/selinux/emobie-inputd.te" "$DATA/selinux/emobie-inputd.te"
   fi
-done
-if [[ -f "$ASSET_DIR/selinux/emobie-inputd.te" ]]; then
-  install -Dm644 "$ASSET_DIR/selinux/emobie-inputd.te" "$DATA/selinux/emobie-inputd.te"
 fi
 
 # Prefer the distro package binary when it is present and not older than the

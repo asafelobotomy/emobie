@@ -11,6 +11,10 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 
+/// Bounds for the excluded-apps list a client may send.
+const MAX_EXCLUDED_APPS: usize = 64;
+const MAX_EXCLUDED_APP_LEN: usize = 128;
+
 const MAX_REQUEST_BYTES: u64 = 512 * 1024;
 pub(crate) const MAX_CLIENT_THREADS: usize = 32;
 
@@ -185,7 +189,20 @@ pub(crate) fn handle_client(
             Ok(Request::SetOptions {
                 restore_clipboard,
                 paste_chord,
+                exclude_apps,
             }) => {
+                if let Some(apps) = exclude_apps {
+                    crate::guard::set_excluded_apps(
+                        apps.into_iter()
+                            .take(MAX_EXCLUDED_APPS)
+                            .filter(|a| a.chars().count() <= MAX_EXCLUDED_APP_LEN)
+                            .collect(),
+                    );
+                    match stored.lock() {
+                        Ok(guard) => persist_locked(enabled, &guard),
+                        Err(poisoned) => persist_locked(enabled, &poisoned.into_inner()),
+                    }
+                }
                 if let Some(value) = restore_clipboard {
                     inject::set_restore_clipboard(value);
                 }

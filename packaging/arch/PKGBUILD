@@ -7,7 +7,7 @@
 # Prefer Flatpak/AppImage + packaging/install-inputd-user.sh for most users.
 
 pkgname=emobie
-pkgver=0.6.27
+pkgver=0.7.0
 pkgrel=1
 pkgdesc="Compact emoji palette with macros and optional text expansion"
 arch=('x86_64')
@@ -27,7 +27,7 @@ optdepends=(
   'acl: setfacl for instant keyboard access after Grant without logout'
 )
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('1192dc5248288a22d0a27f63a3ba88d5efc4e7222ddc0234a8f5d4a12e1da85e')
+sha256sums=('SKIP')
 
 prepare() {
   cd "$pkgname-$pkgver"
@@ -54,6 +54,8 @@ package() {
     "$pkgdir/usr/share/emobie/bootstrap-inputd-host.sh"
   install -Dm644 packaging/udev/99-emobie-input.rules \
     "$pkgdir/usr/share/emobie/99-emobie-input.rules"
+  install -Dm644 packaging/udev/98-emobie-keyboard-read.rules \
+    "$pkgdir/usr/share/emobie/98-emobie-keyboard-read.rules"
   install -Dm644 packaging/polkit/io.github.asafelobotomy.emobie.inputd.policy \
     "$pkgdir/usr/share/polkit-1/actions/io.github.asafelobotomy.emobie.inputd.policy"
   install -Dm644 packaging/selinux/emobie-inputd.te \

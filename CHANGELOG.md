@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-23
+
+### Added
+
+- **Expand as you type is back** (Settings → Text expansion, off by default):
+  type a macro's trigger anywhere and it is replaced by the expansion, on X11
+  and every Wayland compositor, from deb/rpm/Arch/AppImage/Flatpak.
+  - Expansions are **typed through your real keyboard layout** (Shift, AltGr,
+    Caps Lock, the active GNOME/Plasma layout followed live) instead of a US
+    key table, so most text needs no clipboard or paste shortcut at all —
+    the paste-chord problems that led to 0.6.22's deferral now only affect
+    emoji and multi-line expansions.
+  - Keyboard read access is a **separate opt-in Grant**
+    (`98-emobie-keyboard-read.rules`): a read ACL for group `emobie-input`
+    on keyboards and pointers that leaves the devices' `input` group alone,
+    applied immediately and removable with **Remove keyboard access**.
+    Auto-paste users keep the uinput-only permission.
+  - Pauses on the lock screen (logind `LockedHint`) and in excluded apps
+    (defaults cover common password managers and authentication prompts).
+  - Clicks, shortcuts and caret moves reset the typed buffer; key remappers
+    (keyd, kanata, kmonad) work; one shared keymap across all keyboards;
+    devices are reopened in place after suspend instead of restarting the
+    helper (which systemd logged as a failure on every resume).
+  - Tray menu: **Toggle text expansion**.
+
+### Fixed
+
+- **Freezes:** the update check, one-click update, launch-on-startup toggle
+  and pin capability/GNOME setup commands no longer run on the UI thread. The
+  update check could freeze the window on every launch (ureq had no read
+  timeout); all GitHub requests now use 10 s connect / 30 s read timeouts.
+- **Plasma pin under Flatpak never worked:** the KWin script matched windows
+  by PID, but the sandboxed PID never equals the host PID KWin sees. It now
+  matches the app id.
+- Pin failures are now shown in the status bar instead of the button silently
+  claiming the window is pinned.
+- GNOME pin: the toggle chord is no longer sent before Mutter has added a
+  freshly created virtual keyboard (the helper now waits for udev to finish,
+  measured at ~100 ms; the old fixed delay was 80 ms), nor while the summon
+  hotkey's modifiers are still held — both could drop the chord and invert the
+  pin button. GNOME without the pin shortcut no longer falls back to KWin
+  calls, and the pin is re-applied once per focus instead of twice.
+- App updates now replace an older `emobie-inputd` that is already running;
+  previously the version check only ran when the helper was down.
+- Auto-paste no longer restores the previous clipboard when **Restore
+  clipboard after paste** is off.
+- `npm run dev` no longer crashes on the `.flatpak-builder` cache.
+
 ## [0.6.27] - 2026-09-22
 
 ### Fixed

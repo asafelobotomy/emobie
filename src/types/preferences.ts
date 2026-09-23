@@ -61,6 +61,8 @@ export type Preferences = {
   expandTriggerMode: MacroTriggerMode;
   /** When trigger mode is Space: re-type a Space after the expansion. */
   expandKeepTriggerSpace: boolean;
+  /** App classes (substring, case-insensitive) where expansion never fires. */
+  expandExcludedApps: string[];
   /**
    * After paste, restore the previous clipboard (off by default — restore races
    * are a common Expand failure on Plasma Wayland).
@@ -73,6 +75,18 @@ export type Preferences = {
   /** True after the user finishes or skips first-run input helper setup. */
   inputHelperSetupSeen: boolean;
 };
+
+/** Password managers and authentication prompts. */
+export const DEFAULT_EXCLUDED_APPS = [
+  "keepassxc",
+  "bitwarden",
+  "1password",
+  "org.gnome.seahorse",
+  "pinentry",
+  "gcr-prompter",
+  "polkit",
+  "ksshaskpass",
+];
 
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
@@ -97,6 +111,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   expandAsYouType: false,
   expandTriggerMode: "space",
   expandKeepTriggerSpace: false,
+  expandExcludedApps: DEFAULT_EXCLUDED_APPS,
   expandRestoreClipboard: false,
   pasteChordOverride: "auto",
   checkUpdatesOnStartup: true,

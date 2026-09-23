@@ -7,12 +7,42 @@
 
 use evdev::uinput::VirtualDeviceBuilder;
 use evdev::{AttributeSet, BusType, EventType, InputEvent, InputId, Key};
+use std::path::{Path, PathBuf};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const KEY_GAP: Duration = Duration::from_millis(2);
-const POST_CREATE_DELAY: Duration = Duration::from_millis(80);
-const DEVICE_NAME: &str = "emobie-inject";
+/// Compositors (libinput's udev backend) only add a device once udev has
+/// finished processing it, which is marked by its `/run/udev/data` entry.
+const UDEV_INIT_TIMEOUT: Duration = Duration::from_millis(800);
+const POST_INIT_SETTLE: Duration = Duration::from_millis(60);
+const POST_CREATE_FALLBACK: Duration = Duration::from_millis(300);
+pub const DEVICE_NAME: &str = "emobie-inject";
+pub const VENDOR_ID: u16 = 0x2e6f;
+pub const PRODUCT_ID: u16 = 0x696e;
+
+/// evdev char devices are major 13 with minors starting at 64 for `eventN`.
+fn udev_data_path(dev_node: &Path) -> Option<PathBuf> {
+    let name = dev_node.file_name()?.to_str()?;
+    let index: u32 = name.strip_prefix("event")?.parse().ok()?;
+    Some(PathBuf::from(format!("/run/udev/data/c13:{}", 64 + index)))
+}
+
+fn wait_for_udev_init(device: &mut evdev::uinput::VirtualDevice) -> bool {
+    let deadline = Instant::now() + UDEV_INIT_TIMEOUT;
+    while Instant::now() < deadline {
+        let marker = device
+            .enumerate_dev_nodes_blocking()
+            .ok()
+            .and_then(|mut nodes| nodes.find_map(Result::ok))
+            .and_then(|node| udev_data_path(&node));
+        if marker.is_some_and(|path| path.exists()) {
+            return true;
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+    false
+}
 
 pub struct UInputKeyboard {
     device: evdev::uinput::VirtualDevice,
@@ -20,86 +50,28 @@ pub struct UInputKeyboard {
 
 impl UInputKeyboard {
     pub fn open() -> Result<Self, String> {
+        // Every key the layout-aware typer may choose (see crate::keymap).
         let mut keys = AttributeSet::<Key>::new();
-        for key in [
-            Key::KEY_LEFTCTRL,
-            Key::KEY_RIGHTCTRL,
-            Key::KEY_LEFTSHIFT,
-            Key::KEY_RIGHTSHIFT,
-            Key::KEY_LEFTALT,
-            Key::KEY_RIGHTALT,
-            Key::KEY_LEFTMETA,
-            Key::KEY_F12,
-            Key::KEY_V,
-            Key::KEY_C,
-            Key::KEY_INSERT,
-            Key::KEY_BACKSPACE,
-            Key::KEY_ENTER,
-            Key::KEY_SPACE,
-            Key::KEY_TAB,
-            Key::KEY_ESC,
-            Key::KEY_GRAVE,
-            Key::KEY_MINUS,
-            Key::KEY_EQUAL,
-            Key::KEY_LEFTBRACE,
-            Key::KEY_RIGHTBRACE,
-            Key::KEY_BACKSLASH,
-            Key::KEY_SEMICOLON,
-            Key::KEY_APOSTROPHE,
-            Key::KEY_COMMA,
-            Key::KEY_DOT,
-            Key::KEY_SLASH,
-            Key::KEY_A,
-            Key::KEY_B,
-            Key::KEY_C,
-            Key::KEY_D,
-            Key::KEY_E,
-            Key::KEY_F,
-            Key::KEY_G,
-            Key::KEY_H,
-            Key::KEY_I,
-            Key::KEY_J,
-            Key::KEY_K,
-            Key::KEY_L,
-            Key::KEY_M,
-            Key::KEY_N,
-            Key::KEY_O,
-            Key::KEY_P,
-            Key::KEY_Q,
-            Key::KEY_R,
-            Key::KEY_S,
-            Key::KEY_T,
-            Key::KEY_U,
-            Key::KEY_V,
-            Key::KEY_W,
-            Key::KEY_X,
-            Key::KEY_Y,
-            Key::KEY_Z,
-            Key::KEY_1,
-            Key::KEY_2,
-            Key::KEY_3,
-            Key::KEY_4,
-            Key::KEY_5,
-            Key::KEY_6,
-            Key::KEY_7,
-            Key::KEY_8,
-            Key::KEY_9,
-            Key::KEY_0,
-        ] {
-            keys.insert(key);
+        for code in 1..=crate::keymap::MAX_TYPED_CODE {
+            keys.insert(Key::new(code));
         }
 
-        let device = VirtualDeviceBuilder::new()
+        let mut device = VirtualDeviceBuilder::new()
             .map_err(|e| format!("uinput open: {e}"))?
             .name(DEVICE_NAME)
-            .input_id(InputId::new(BusType::BUS_USB, 0x2e6f, 0x696e, 1))
+            .input_id(InputId::new(BusType::BUS_USB, VENDOR_ID, PRODUCT_ID, 1))
             .with_keys(&keys)
             .map_err(|e| format!("uinput keys: {e}"))?
             .build()
             .map_err(|e| format!("uinput create: {e}"))?;
 
-        // Compositor needs a beat to pick up the new device before first events.
-        thread::sleep(POST_CREATE_DELAY);
+        // Events sent before the compositor has added the device are dropped
+        // silently — fatal for GNOME's toggle-above chord, whose state we track.
+        if wait_for_udev_init(&mut device) {
+            thread::sleep(POST_INIT_SETTLE);
+        } else {
+            thread::sleep(POST_CREATE_FALLBACK);
+        }
 
         Ok(Self { device })
     }
@@ -119,17 +91,16 @@ impl UInputKeyboard {
         Ok(())
     }
 
-    /// Tap `key`, optionally holding LeftShift.
-    pub fn tap(&mut self, key: Key, shift: bool) -> Result<(), String> {
-        if shift {
-            self.emit_key(Key::KEY_LEFTSHIFT, 1)?;
+    /// Press `plan.mods`, tap `plan.code`, release the mods in reverse.
+    pub fn type_key(&mut self, plan: &crate::keymap::KeyPlan) -> Result<(), String> {
+        for m in plan.mods {
+            self.emit_key(Key::new(*m), 1)?;
         }
-        let typed = self.click(key);
-        let released = if shift {
-            self.emit_key(Key::KEY_LEFTSHIFT, 0)
-        } else {
-            Ok(())
-        };
+        let typed = self.click(Key::new(plan.code));
+        let mut released = Ok(());
+        for m in plan.mods.iter().rev() {
+            released = released.and(self.emit_key(Key::new(*m), 0));
+        }
         typed.and(released)
     }
 
@@ -192,5 +163,31 @@ impl UInputKeyboard {
         let alt_released = self.emit_key(Key::KEY_LEFTALT, 0);
         let ctrl_released = self.emit_key(Key::KEY_LEFTCTRL, 0);
         typed.and(meta_released).and(alt_released).and(ctrl_released)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn maps_event_node_to_udev_data() {
+        assert_eq!(
+            udev_data_path(Path::new("/dev/input/event7")),
+            Some(PathBuf::from("/run/udev/data/c13:71"))
+        );
+        assert_eq!(udev_data_path(Path::new("/dev/input/mouse0")), None);
+    }
+
+    /// Needs write access to /dev/uinput: `cargo test -- --ignored uinput_open_waits`.
+    #[test]
+    #[ignore]
+    fn uinput_open_waits_for_udev() {
+        let start = Instant::now();
+        let mut kbd = UInputKeyboard::open().expect("open uinput");
+        let elapsed = start.elapsed();
+        assert!(wait_for_udev_init(&mut kbd.device), "udev never initialized the device");
+        eprintln!("uinput open took {elapsed:?}");
+        assert!(elapsed < POST_CREATE_FALLBACK, "fell back to the fixed delay");
     }
 }

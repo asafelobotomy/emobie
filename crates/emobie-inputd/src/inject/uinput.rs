@@ -7,7 +7,7 @@ use super::clipboard::{
 };
 use super::ei;
 use super::enigo::POST_PASTE_DELAY;
-use super::keys_type::{needs_clipboard_insert, type_string};
+use super::keys_type::{plan_text, type_plan};
 use crate::uinput_kbd::UInputKeyboard;
 
 /// Only used when expand fires before the completing key is released (overlap).
@@ -43,8 +43,8 @@ pub(super) fn retype_trigger_uinput(kbd: &mut UInputKeyboard, trigger: &str) {
     if trigger.is_empty() {
         return;
     }
-    if !needs_clipboard_insert(trigger) {
-        let _ = type_string(kbd, trigger);
+    if let Some(plan) = plan_text(trigger) {
+        let _ = type_plan(kbd, &plan);
         return;
     }
     let _ = paste_with_uinput(kbd, trigger);
@@ -71,9 +71,10 @@ pub(super) fn expand_with_uinput(
         return Ok(());
     }
 
-    // Key-safe ASCII: type directly — avoids clipboard races entirely.
-    if !needs_clipboard_insert(expansion) {
-        type_string(kbd, expansion)?;
+    // Everything the layout can type goes in as keys — no clipboard races
+    // and no per-app paste chord.
+    if let Some(plan) = plan_text(expansion) {
+        type_plan(kbd, &plan)?;
         note_backend("keys");
         return Ok(());
     }

@@ -108,6 +108,13 @@
   flex-shrink: 0;
 }
 
+.macro-paused-note {
+  margin: 0;
+  padding: 0 2px;
+  font-size: 0.72rem;
+  color: var(--ink-muted);
+}
+
 .macro-list-count {
   font-size: 0.68rem;
   color: var(--ink-muted);

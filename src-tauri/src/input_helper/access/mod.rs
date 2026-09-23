@@ -13,11 +13,12 @@ use stage::{ensure_polkit_annotated_setup, resolve_setup_script, run_pkexec};
 use super::unix;
 use super::InputHelperStatus;
 
-pub use permanent::{host_setup_hint, permanent_access_configured};
+pub use permanent::{host_setup_hint, keyboard_read_configured, permanent_access_configured};
 
 pub fn with_flatpak_flag(mut status: InputHelperStatus) -> InputHelperStatus {
     status.flatpak = in_flatpak();
     status.access_configured = permanent_access_configured();
+    status.keyboard_read_configured = keyboard_read_configured();
     if !status.daemon
         && status.flatpak
         && !status.detail.contains("Flatpak needs a host helper")
@@ -41,7 +42,7 @@ pub fn with_flatpak_flag(mut status: InputHelperStatus) -> InputHelperStatus {
 pub fn run_access_setup() -> Result<InputHelperStatus, String> {
     let (script, flatpak) = resolve_setup_script()?;
     let script = ensure_polkit_annotated_setup(&script, flatpak)?;
-    run_pkexec(&script, flatpak)?;
+    run_pkexec(&script, flatpak, &[])?;
     let mut status = with_flatpak_flag(unix::restart_helper());
     if !status.access_configured {
         status.detail = format!(
@@ -71,4 +72,13 @@ If session ACLs failed, log out/in once so the emobie-input group applies."
         );
     }
     Ok(status)
+}
+
+/// Opt in/out of keyboard read access for "Expand as you type" (one Polkit
+/// prompt), then restart the helper so it reopens devices.
+pub fn set_keyboard_read(enabled: bool) -> Result<InputHelperStatus, String> {
+    let (script, flatpak) = resolve_setup_script()?;
+    let script = ensure_polkit_annotated_setup(&script, flatpak)?;
+    run_pkexec(&script, flatpak, &["--keyboard-read", if enabled { "on" } else { "off" }])?;
+    Ok(with_flatpak_flag(unix::restart_helper()))
 }

@@ -125,6 +125,7 @@ pub fn run() {
             input_helper::input_helper_set_options,
             input_helper::input_helper_inject_paste,
             input_helper::input_helper_run_access_setup,
+            input_helper::input_helper_set_keyboard_read,
             updates::check_for_updates,
             updates::open_release_page,
             updates::apply_update,

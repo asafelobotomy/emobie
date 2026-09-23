@@ -12,12 +12,16 @@ pub use apply::InstallKind;
 use apply::ApplyUpdateResult;
 
 #[tauri::command]
-pub fn apply_update(
+pub async fn apply_update(
     release_tag: String,
     download_url: String,
     asset_name: String,
 ) -> Result<ApplyUpdateResult, String> {
-    apply::apply_update(release_tag, download_url, asset_name)
+    tauri::async_runtime::spawn_blocking(move || {
+        apply::apply_update(release_tag, download_url, asset_name)
+    })
+    .await
+    .map_err(|err| format!("update task failed: {err}"))?
 }
 
 const REPO: &str = "asafelobotomy/emobie";
@@ -25,6 +29,17 @@ const REPO: &str = "asafelobotomy/emobie";
 const CHECKSUM_ASSET: &str = "SHA256SUMS";
 const MAX_CHECKSUM_BYTES: u64 = 64 * 1024;
 const USER_AGENT: &str = concat!("emobie/", env!("CARGO_PKG_VERSION"));
+
+/// ureq's default agent has no read timeout, so a stalled connection would
+/// hang forever. The read timeout is per socket read, so large downloads
+/// still work as long as bytes keep arriving.
+pub(crate) fn http_agent() -> ureq::Agent {
+    ureq::AgentBuilder::new()
+        .timeout_connect(std::time::Duration::from_secs(10))
+        .timeout_read(std::time::Duration::from_secs(30))
+        .timeout_write(std::time::Duration::from_secs(30))
+        .build()
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -132,7 +147,7 @@ fn fetch_expected_sha256(release: &GithubRelease, asset_name: &str) -> Result<St
     let sums = checksum_asset(&release.assets).ok_or_else(|| {
         format!("This release publishes no {CHECKSUM_ASSET}; use “Open release” to install manually.")
     })?;
-    let response = ureq::get(&sums.browser_download_url)
+    let response = http_agent().get(&sums.browser_download_url)
         .set("User-Agent", USER_AGENT)
         .call()
         .map_err(|_| "Could not download the release checksums.".to_string())?;
@@ -160,7 +175,7 @@ pub(crate) fn verify_update_asset(
         return Err("Refusing to install a version that is not newer than the running one.".into());
     }
     let url = format!("https://api.github.com/repos/{REPO}/releases/tags/{tag}");
-    let response = ureq::get(&url)
+    let response = http_agent().get(&url)
         .set("User-Agent", USER_AGENT)
         .set("Accept", "application/vnd.github+json")
         .call()
@@ -199,12 +214,24 @@ fn offline_result(current: String, detail: &str, kind: InstallKind) -> UpdateChe
 }
 
 #[tauri::command]
-pub fn check_for_updates() -> UpdateCheckResult {
+pub async fn check_for_updates() -> UpdateCheckResult {
+    tauri::async_runtime::spawn_blocking(check_for_updates_blocking)
+        .await
+        .unwrap_or_else(|_| {
+            offline_result(
+                env!("CARGO_PKG_VERSION").to_string(),
+                "Update check failed.",
+                apply::detect_install_kind(),
+            )
+        })
+}
+
+fn check_for_updates_blocking() -> UpdateCheckResult {
     let current = env!("CARGO_PKG_VERSION").to_string();
     let kind = apply::detect_install_kind();
     let url = format!("https://api.github.com/repos/{REPO}/releases/latest");
 
-    let response = ureq::get(&url)
+    let response = http_agent().get(&url)
         .set("User-Agent", USER_AGENT)
         .set("Accept", "application/vnd.github+json")
         .call();

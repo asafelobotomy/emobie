@@ -40,6 +40,7 @@
     "allow-input-helper-set-options",
     "allow-input-helper-inject-paste",
     "allow-input-helper-ensure-started",
-    "allow-input-helper-run-access-setup"
+    "allow-input-helper-run-access-setup",
+    "allow-input-helper-set-keyboard-read"
   ]
 }

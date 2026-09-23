@@ -1,14 +1,26 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { errorMessage } from "../lib/errorMessage";
+import { customExpansionMatches, type MacroEntry } from "../lib/macroHelpers";
 import type { InputHelperStatus } from "../lib/inputHelper";
-import type { PasteChordOverride } from "../types/preferences";
+import type { Preferences } from "../types/preferences";
+
+export type HelperSyncPrefs = Pick<
+  Preferences,
+  | "expandAsYouType"
+  | "expandTriggerMode"
+  | "expandKeepTriggerSpace"
+  | "expandRestoreClipboard"
+  | "expandExcludedApps"
+  | "pasteChordOverride"
+>;
 
 type Options = {
   ready: boolean;
-  restoreClipboard: boolean;
-  pasteChord: PasteChordOverride;
-  /** Bump after Grant restarts the daemon to re-apply options (in-memory state is lost). */
+  prefs: HelperSyncPrefs;
+  /** Custom macros plus optional favorited-emoji macros. */
+  expansionMacros: MacroEntry[];
+  /** Bump after Grant restarts the daemon to re-apply state (in-memory state is lost). */
   reconcileNonce?: number;
   onStatus: (status: InputHelperStatus) => void;
   /** Called when sync/enable fails so settings can show a hard error. */
@@ -26,18 +38,15 @@ function enqueueHelperSync(work: () => Promise<void>): Promise<void> {
 }
 
 /**
- * Starts emobie-inputd on app ready and applies paste-related options.
- *
- * As-you-type text expansion (trigger listening + macro sync) is deferred
- * for now — see docs/MACROS.md "Known limitations". This hook only keeps
- * the daemon available for the "Auto-paste on copy" preference, and makes
- * sure listening stays off regardless of any stale saved preference from a
- * version where expansion was enabled.
+ * Starts emobie-inputd, applies options and — when Expand as you type is on —
+ * syncs matches then enables listening. Enabling always goes
+ * disable → sync → enable so a daemon already enabled at login can never
+ * expand stale rules.
  */
 export function useInputHelperSync({
   ready,
-  restoreClipboard,
-  pasteChord,
+  prefs,
+  expansionMacros,
   reconcileNonce = 0,
   onStatus,
   onSyncError,
@@ -47,30 +56,49 @@ export function useInputHelperSync({
   onStatusRef.current = onStatus;
   onSyncErrorRef.current = onSyncError;
 
+  const {
+    expandAsYouType,
+    expandTriggerMode,
+    expandKeepTriggerSpace,
+    expandRestoreClipboard,
+    expandExcludedApps,
+    pasteChordOverride,
+  } = prefs;
+
+  const matches = useMemo(
+    () =>
+      customExpansionMatches(
+        expansionMacros,
+        expandTriggerMode,
+        expandKeepTriggerSpace,
+      ),
+    [expansionMacros, expandTriggerMode, expandKeepTriggerSpace],
+  );
+  const matchesKey = JSON.stringify(matches);
+  const excludedKey = JSON.stringify(expandExcludedApps);
+
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
-
     const isCurrent = () => !cancelled;
 
     const pushStatus = (status: InputHelperStatus) => {
-      if (!isCurrent()) return;
-      onStatusRef.current(status);
+      if (isCurrent()) onStatusRef.current(status);
     };
-
     const fail = (error: unknown, fallback: string) => {
-      if (!isCurrent()) return;
-      onSyncErrorRef.current?.(errorMessage(error, fallback));
+      if (isCurrent()) onSyncErrorRef.current?.(errorMessage(error, fallback));
+    };
+    const call = async (cmd: string, args?: Record<string, unknown>) => {
+      const status = await invoke<InputHelperStatus>(cmd, args);
+      pushStatus(status);
+      return status;
     };
 
     void enqueueHelperSync(async () => {
       if (!isCurrent()) return;
-
+      let started: InputHelperStatus;
       try {
-        const status = await invoke<InputHelperStatus>(
-          "input_helper_ensure_started",
-        );
-        pushStatus(status);
+        started = await call("input_helper_ensure_started");
       } catch (error) {
         fail(error, "Could not start emobie-inputd.");
         return;
@@ -78,34 +106,58 @@ export function useInputHelperSync({
       if (!isCurrent()) return;
 
       try {
-        const status = await invoke<InputHelperStatus>(
-          "input_helper_set_options",
-          { restoreClipboard, pasteChord },
-        );
-        pushStatus(status);
+        await call("input_helper_set_options", {
+          restoreClipboard: expandRestoreClipboard,
+          pasteChord: pasteChordOverride,
+          excludeApps: JSON.parse(excludedKey) as string[],
+        });
       } catch (error) {
         // Options are best-effort; older helpers may lack set_options.
-        if (isCurrent()) {
-          console.warn("input_helper_set_options failed", error);
-        }
+        if (isCurrent()) console.warn("input_helper_set_options failed", error);
       }
       if (!isCurrent()) return;
 
-      // Text expansion is deferred — always keep listening off, even if a
-      // preference file saved from an older version still says otherwise.
       try {
-        const status = await invoke<InputHelperStatus>(
-          "input_helper_set_enabled",
-          { enabled: false },
-        );
-        pushStatus(status);
+        await call("input_helper_set_enabled", { enabled: false });
       } catch (error) {
-        fail(error, "Could not disable text expansion on the helper.");
+        fail(error, "Could not pause text expansion on the helper.");
+        return;
+      }
+      if (!expandAsYouType || !isCurrent()) return;
+      // The opt-in read rule is the consent record: a preference saved by an
+      // older release must not start keyboard reading on its own.
+      if (!started.keyboardReadConfigured) {
+        fail(null, "Expand as you type needs keyboard access — turn it off and on in Settings to grant it.");
+        return;
+      }
+
+      try {
+        await call("input_helper_sync_matches", {
+          matches: JSON.parse(matchesKey),
+        });
+      } catch (error) {
+        fail(error, "Could not send your macros to the helper — Expand stays off.");
+        return;
+      }
+      if (!isCurrent()) return;
+
+      try {
+        await call("input_helper_set_enabled", { enabled: true });
+      } catch (error) {
+        fail(error, "Could not turn on text expansion.");
       }
     });
 
     return () => {
       cancelled = true;
     };
-  }, [ready, restoreClipboard, pasteChord, reconcileNonce]);
+  }, [
+    ready,
+    expandAsYouType,
+    expandRestoreClipboard,
+    pasteChordOverride,
+    excludedKey,
+    matchesKey,
+    reconcileNonce,
+  ]);
 }

@@ -30,6 +30,9 @@ pub enum Request {
         /// "shift_insert", or "ctrl_shift_v". See crate::paste_chord.
         #[serde(default)]
         paste_chord: Option<String>,
+        /// App classes (substring, case-insensitive) where expansion never fires.
+        #[serde(default)]
+        exclude_apps: Option<Vec<String>>,
     },
     InjectPaste,
     /// Sends the fixed Ctrl+Alt+Super+F12 chord bound to GNOME's
@@ -57,6 +60,8 @@ pub struct Response {
     pub last_inject_backend: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub paste_chord: Option<String>,
+    /// Lets the app notice a running helper that is older than its bundle.
+    pub version: &'static str,
 }
 
 impl Response {
@@ -73,6 +78,7 @@ impl Response {
             restore_clipboard: Some(crate::inject::restore_clipboard_enabled()),
             last_inject_backend: crate::inject::last_inject_backend().map(|s| s.to_string()),
             paste_chord: Some(crate::paste_chord::override_label().to_string()),
+            version: env!("CARGO_PKG_VERSION"),
         }
     }
 
@@ -95,6 +101,7 @@ impl Response {
             restore_clipboard: Some(crate::inject::restore_clipboard_enabled()),
             last_inject_backend: crate::inject::last_inject_backend().map(|s| s.to_string()),
             paste_chord: Some(crate::paste_chord::override_label().to_string()),
+            version: env!("CARGO_PKG_VERSION"),
         }
     }
 }

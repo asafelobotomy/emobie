@@ -228,8 +228,16 @@ pub fn is_launch_on_startup() -> Result<bool, String> {
     desktop_file_enabled()
 }
 
+/// Async so the Background portal request (which may wait on a permission
+/// dialog) never blocks the main thread.
 #[tauri::command]
-pub fn set_launch_on_startup(enabled: bool) -> Result<(), String> {
+pub async fn set_launch_on_startup(enabled: bool) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || set_launch_on_startup_blocking(enabled))
+        .await
+        .map_err(|err| format!("autostart task failed: {err}"))?
+}
+
+fn set_launch_on_startup_blocking(enabled: bool) -> Result<(), String> {
     if is_flatpak() {
         match set_via_background_portal(enabled) {
             Ok(()) => {

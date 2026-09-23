@@ -115,6 +115,14 @@ if [[ -f /etc/udev/rules.d/99-emobie-input.rules ]]; then
 else
   fail "Missing /etc/udev/rules.d/99-emobie-input.rules — run setup-input-access.sh"
 fi
+if [[ -f /etc/udev/rules.d/98-emobie-keyboard-read.rules ]]; then
+  pass "Keyboard read rule installed (Expand as you type)"
+  if ! command -v setfacl >/dev/null; then
+    fail "Keyboard read rule needs setfacl — install the acl package"
+  fi
+else
+  warn "No keyboard read rule — Expand as you type is off (turn it on in Settings to grant)"
+fi
 
 # Ephemeral listen must not hide broken permanent config
 if [[ -S "$SOCK" ]] && command -v python3 >/dev/null; then

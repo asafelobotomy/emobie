@@ -24,6 +24,9 @@ pub struct DaemonResponse {
     pub last_inject_backend: Option<String>,
     #[serde(default)]
     pub paste_chord: Option<String>,
+    /// Absent on helpers older than 0.6.28.
+    #[serde(default)]
+    pub version: Option<String>,
 }
 
 pub(super) fn current_uid() -> u32 {

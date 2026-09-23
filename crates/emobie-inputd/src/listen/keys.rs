@@ -1,7 +1,7 @@
 //! Key-event handling for the match buffer and pending expands.
 
 use evdev::Key;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -36,6 +36,58 @@ fn is_modifier(key: Key) -> bool {
             | Key::KEY_SCROLLLOCK
             | Key::KEY_FN
     )
+}
+
+/// Mouse, touchpad and touchscreen presses move the caret or focus.
+fn is_pointer_button(key: Key) -> bool {
+    matches!(
+        key,
+        Key::BTN_LEFT | Key::BTN_RIGHT | Key::BTN_MIDDLE | Key::BTN_SIDE | Key::BTN_EXTRA | Key::BTN_TOUCH
+    )
+}
+
+/// Keyboard keys live below `BTN_MISC`; codes above are buttons and touchpad
+/// tool reports (`BTN_TOOL_FINGER`…), which must never touch the buffer.
+const FIRST_BUTTON_CODE: u16 = 0x100;
+/// Like libinput's disable-while-typing: a palm resting on the touchpad while
+/// typing reports raw touches the desktop ignores. Only a touch after a pause
+/// in typing is a real tap that may have moved the caret.
+const TOUCH_AFTER_TYPING_GRACE_MS: u64 = 1_000;
+static LAST_KEY_PRESS_MS: AtomicU64 = AtomicU64::new(0);
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// True when a pointer press should reset the typed buffer.
+fn pointer_press_moves_caret(key: Key, now: u64, last_key_press: u64) -> bool {
+    key != Key::BTN_TOUCH || now.saturating_sub(last_key_press) >= TOUCH_AFTER_TYPING_GRACE_MS
+}
+
+/// `EMOBIE_INPUTD_DEBUG=1`: log why the buffer resets and when triggers match.
+/// Never logs typed text — only reasons and lengths.
+fn debug(msg: impl FnOnce() -> String) {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    if *ON.get_or_init(|| std::env::var_os("EMOBIE_INPUTD_DEBUG").is_some()) {
+        eprintln!("emobie-inputd[debug]: {}", msg());
+    }
+}
+
+/// The caret may have moved: forget typed text and any pending expand.
+fn reset_buffer(pending: &Mutex<Option<PendingExpand>>, buffer: &Mutex<String>, reason: &str) {
+    debug(|| {
+        let held = buffer.lock().map(|b| b.chars().count()).unwrap_or(0);
+        format!("buffer reset ({reason}, {held} chars dropped)")
+    });
+    if let Ok(mut guard) = pending.lock() {
+        *guard = None;
+    }
+    if let Ok(mut guard) = buffer.lock() {
+        guard.clear();
+    }
 }
 
 fn is_edit_or_nav(key: Key) -> bool {
@@ -145,8 +197,27 @@ pub(super) fn handle_key(
     trie: &Mutex<TriggerTrie>,
     pending: &Mutex<Option<PendingExpand>>,
 ) {
+    if is_pointer_button(key) {
+        if value == 1
+            && pointer_press_moves_caret(key, now_ms(), LAST_KEY_PRESS_MS.load(Ordering::Relaxed))
+        {
+            reset_buffer(pending, buffer, "pointer press");
+        }
+        return;
+    }
+    if key.code() >= FIRST_BUTTON_CODE {
+        return;
+    }
+    if value == 1 {
+        LAST_KEY_PRESS_MS.store(now_ms(), Ordering::Relaxed);
+    }
     let pressed = value != 0;
     keymap.update_key(key.code(), pressed);
+    // Keys typed on the lock screen are the user's password.
+    if crate::guard::session_locked() {
+        reset_buffer(pending, buffer, "session locked");
+        return;
+    }
 
     // Completing-key release must fire even while inject suppress is active.
     // Otherwise a concurrent emoji paste can swallow the release and leave
@@ -209,6 +280,12 @@ pub(super) fn handle_key(
         }
         return;
     }
+    // Ctrl/Alt/Super + key is a shortcut (paste, undo, workspace switch…):
+    // whatever it did, the buffer no longer mirrors the text before the caret.
+    if keymap.shortcut_modifier_held() {
+        reset_buffer(pending, buffer, "shortcut modifier");
+        return;
+    }
     if key == Key::KEY_BACKSPACE {
         if let Ok(mut guard) = buffer.lock() {
             guard.pop();
@@ -267,6 +344,7 @@ pub(super) fn handle_key(
     };
 
     if let Some((len, expansion, trigger)) = hit {
+        debug(|| format!("trigger matched ({len} chars), waiting for key release"));
         if let Ok(mut guard) = pending.lock() {
             *guard = Some(PendingExpand {
                 erase: len,
@@ -276,5 +354,29 @@ pub(super) fn handle_key(
                 created_at: Instant::now(),
             });
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn palm_touch_while_typing_keeps_buffer() {
+        assert!(!pointer_press_moves_caret(Key::BTN_TOUCH, 10_500, 10_000));
+        assert!(pointer_press_moves_caret(Key::BTN_TOUCH, 12_000, 10_000));
+    }
+
+    #[test]
+    fn clicks_always_reset() {
+        assert!(pointer_press_moves_caret(Key::BTN_LEFT, 10_100, 10_000));
+        assert!(pointer_press_moves_caret(Key::BTN_RIGHT, 10_100, 10_000));
+    }
+
+    #[test]
+    fn touchpad_tool_codes_are_not_keyboard_keys() {
+        assert!(Key::BTN_TOOL_FINGER.code() >= FIRST_BUTTON_CODE);
+        assert!(Key::BTN_TOUCH.code() >= FIRST_BUTTON_CODE);
+        assert!(Key::KEY_MICMUTE.code() < FIRST_BUTTON_CODE);
     }
 }

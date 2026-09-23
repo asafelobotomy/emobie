@@ -18,34 +18,38 @@ export function runInputHelperAccessSetup(): Promise<InputHelperStatus> {
   return invoke<InputHelperStatus>("input_helper_run_access_setup");
 }
 
+/** Add or remove the opt-in keyboard read tier (one Polkit prompt). */
+export function setInputHelperKeyboardRead(
+  enabled: boolean,
+): Promise<InputHelperStatus> {
+  return invoke<InputHelperStatus>("input_helper_set_keyboard_read", { enabled });
+}
+
+/** Ready for Expand as you type: listening, injecting and permanently set up. */
+export function expandReady(status: InputHelperStatus | null): boolean {
+  return Boolean(
+    status?.daemon &&
+      status.canListen &&
+      status.canInject &&
+      status.accessConfigured !== false &&
+      status.keyboardReadConfigured,
+  );
+}
+
 /**
- * Ensure helper is running with listen + inject, granting access when needed.
- * Does not toggle the expand preference — caller updates prefs; useInputHelperSync
- * applies set_enabled from the pref.
- *
- * Runs Grant when listen fails, inject fails (Wayland needs /dev/uinput), or
- * permanent group/udev config is missing (ACL-only / orphaned-GID must not skip Polkit).
- *
- * Unused while as-you-type text expansion is deferred — see
- * prepareInputHelperForPaste for the paste-only path currently in use.
+ * Ensure helper is running with listen + inject for Expand as you type. One
+ * Grant (with the keyboard-read tier) covers every missing piece. Does not
+ * toggle the preference — useInputHelperSync applies it.
  */
 export async function prepareInputHelperForExpand(): Promise<InputHelperStatus> {
-  let status = await ensureInputHelperStarted();
-  const needsGrant =
-    !status.canListen ||
-    !status.canInject ||
-    status.accessConfigured === false;
-  if (needsGrant) {
-    status = await runInputHelperAccessSetup();
-  }
-  return status;
+  const status = await ensureInputHelperStarted();
+  return expandReady(status) ? status : setInputHelperKeyboardRead(true);
 }
 
 /**
  * Ensure helper is running with inject access for "Auto-paste on copy",
- * granting access when needed. Unlike prepareInputHelperForExpand, this does
- * not care about listen capability — as-you-type expansion is deferred, so
- * only the paste-injection half of Grant matters here.
+ * granting access when needed. Unlike prepareInputHelperForExpand, this never
+ * asks for keyboard read access.
  */
 export async function prepareInputHelperForPaste(): Promise<InputHelperStatus> {
   let status = await ensureInputHelperStarted();

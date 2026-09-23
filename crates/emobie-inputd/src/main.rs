@@ -1,4 +1,5 @@
 mod focused_window;
+mod guard;
 mod inject;
 mod keymap;
 mod listen;
@@ -103,6 +104,7 @@ fn main() {
     if !from_disk && prefs_bootstrap::apply_if_empty(&mut persisted) {
         state::save(persisted.enabled, &persisted.matches);
     }
+    guard::set_excluded_apps(persisted.excluded_apps.clone());
     let enabled = Arc::new(AtomicBool::new(persisted.enabled));
     inject::set_expand_enabled(persisted.enabled);
     let trie = Arc::new(Mutex::new(TriggerTrie::default()));
@@ -123,6 +125,7 @@ fn main() {
         listen::ensure_running();
     }
     sleep_watch::spawn();
+    guard::spawn_lock_watch();
 
     // Restrict socket mode at creation time (avoid a brief wider window).
     let prev_umask = umask(Mode::from_bits_truncate(0o177));
