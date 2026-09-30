@@ -1,3 +1,4 @@
+import { isFontStyleId } from "./fontStyles.ts";
 import {
   DEFAULT_PREFERENCES,
   type Macro,
@@ -76,6 +77,7 @@ function normalizeMacro(raw: unknown): Macro | null {
     expansion,
     hotkey,
     enabled: item.enabled !== false,
+    ...(isFontStyleId(item.fontStyle) ? { fontStyle: item.fontStyle } : {}),
   };
 }
 

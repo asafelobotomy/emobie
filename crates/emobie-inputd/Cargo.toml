@@ -1,6 +1,6 @@
 [package]
 name = "emobie-inputd"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
 description = "Privileged input helper for emobie text expansion"
 license = "MIT"

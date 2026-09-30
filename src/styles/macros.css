@@ -386,3 +386,14 @@
 .first-run-backdrop {
   z-index: 50;
 }
+
+.macro-font-preview {
+  margin: 6px 0 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--surface-2, rgba(127, 127, 127, 0.12));
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 6.5em;
+  overflow: auto;
+}

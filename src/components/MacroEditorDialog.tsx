@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { HotkeyCapture } from "./HotkeyCapture";
 import type { Macro } from "../types/preferences";
+import { FONT_STYLES, applyFontStyle, type FontStyleId } from "../lib/fontStyles";
 import {
   findHotkeyConflict,
   findTriggerConflict,
@@ -27,6 +28,7 @@ type Draft = {
   trigger: string;
   expansion: string;
   hotkey: string | null;
+  fontStyle: FontStyleId | null;
 };
 
 function toDraft(macro: Macro | null): Draft {
@@ -36,6 +38,7 @@ function toDraft(macro: Macro | null): Draft {
       trigger: "",
       expansion: "",
       hotkey: null,
+      fontStyle: null,
     };
   }
   return {
@@ -43,6 +46,7 @@ function toDraft(macro: Macro | null): Draft {
     trigger: macro.trigger,
     expansion: macro.expansion,
     hotkey: macro.hotkey,
+    fontStyle: macro.fontStyle ?? null,
   };
 }
 
@@ -145,6 +149,7 @@ export function MacroEditorDialog({
       hotkey: draft.hotkey,
       // Expansion on/off is global (Settings → Text expansion).
       enabled: initial?.enabled ?? true,
+      ...(draft.fontStyle ? { fontStyle: draft.fontStyle } : {}),
     });
   };
 
@@ -190,6 +195,36 @@ export function MacroEditorDialog({
           <p className="settings-hint settings-hint-block">
             Markdown-style markup (e.g. <code>**bold**</code>) — how it
             renders depends on where you paste it.
+          </p>
+        </div>
+        <div className="settings-row">
+          <label htmlFor="macro-dialog-font">Font style</label>
+          <select
+            id="macro-dialog-font"
+            value={draft.fontStyle ?? ""}
+            onChange={(event) =>
+              setDraft({
+                ...draft,
+                fontStyle: (event.target.value || null) as FontStyleId | null,
+              })
+            }
+          >
+            <option value="">Plain text</option>
+            {FONT_STYLES.map((style) => (
+              <option key={style.id} value={style.id}>
+                {applyFontStyle("Abc", style.id)} — {style.label}
+              </option>
+            ))}
+          </select>
+          {draft.fontStyle && draft.expansion ? (
+            <p className="macro-font-preview" aria-live="polite">
+              {applyFontStyle(draft.expansion, draft.fontStyle)}
+            </p>
+          ) : null}
+          <p className="settings-hint settings-hint-block">
+            Applied when the macro expands or is copied. These are Unicode
+            look-alike characters, not real fonts — they work anywhere you
+            paste, but screen readers may read them oddly.
           </p>
         </div>
         <div className="settings-row">

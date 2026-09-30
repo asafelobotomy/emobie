@@ -249,3 +249,27 @@ describe("importMacrosYaml daemon-compat validation", () => {
     assert.deepEqual(result.macros.map((m) => m.trigger), [":ok"]);
   });
 });
+
+describe("font styles", () => {
+  it("maps letters, keeps the rest, and handles reserved-hole letters", async () => {
+    const { applyFontStyle } = await import("./fontStyles.ts");
+    assert.equal(applyFontStyle("Hi 1!", "bold"), "𝐇𝐢 𝟏!");
+    assert.equal(applyFontStyle("h", "italic"), "ℎ");
+    assert.equal(applyFontStyle("CR", "doubleStruck"), "ℂℝ");
+    assert.equal(applyFontStyle("ab", "circled"), "ⓐⓑ");
+    assert.equal(applyFontStyle("ab1", "upsideDown"), "Ɩqɐ");
+    assert.equal(applyFontStyle("x", null), "x");
+  });
+
+  it("applies the style to expansion matches and survives normalize + yaml", () => {
+    const macros = normalizeMacros([
+      { id: "1", trigger: ".b", expansion: "go", hotkey: null, enabled: true, fontStyle: "bold" },
+      { id: "2", trigger: ".x", expansion: "go", hotkey: null, enabled: true, fontStyle: "nope" },
+    ]);
+    assert.equal(macros[1].fontStyle, undefined);
+    const entries = macros.map((m) => ({ ...m, source: "custom" as const }));
+    assert.equal(customExpansionMatches(entries, "space")[0].expansion, "𝐠𝐨");
+    const round = importMacrosYaml(exportMacrosYaml(macros), []);
+    assert.equal(round.macros.find((m) => m.trigger === ".b")?.fontStyle, "bold");
+  });
+});

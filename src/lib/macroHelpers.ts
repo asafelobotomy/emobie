@@ -1,4 +1,5 @@
 import type { Macro, MacroTriggerMode } from "../types/preferences.ts";
+import { applyFontStyle } from "./fontStyles.ts";
 
 export type MacroEntry = Macro & {
   source: "custom" | "favorite";
@@ -6,6 +7,11 @@ export type MacroEntry = Macro & {
   /** Emojibase group id for favorite emoji macros. */
   group?: number;
 };
+
+/** The text a macro actually outputs: its expansion with its font style applied. */
+export function macroOutput(macro: Pick<Macro, "expansion" | "fontStyle">): string {
+  return applyFontStyle(macro.expansion, macro.fontStyle);
+}
 
 export function shortcodeTrigger(code: string): string {
   const trimmed = code.trim();
@@ -33,10 +39,11 @@ export function expansionMatches(
   return macros
     .filter((macro) => macro.enabled)
     .map((macro) => {
+      const output = macroOutput(macro);
       const expansion =
-        mode === "space" && keepTriggerSpace && !macro.expansion.endsWith(" ")
-          ? `${macro.expansion} `
-          : macro.expansion;
+        mode === "space" && keepTriggerSpace && !output.endsWith(" ")
+          ? `${output} `
+          : output;
       return {
         trigger: macro.trigger,
         expansion,

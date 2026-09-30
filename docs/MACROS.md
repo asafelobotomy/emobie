@@ -141,6 +141,12 @@ cannot find the bundled host tarball.
 **Pin:** always-on-top uses GTK keep-above (works on X11) and, on Plasma
 Wayland, KWin `keepAbove`. Other Wayland compositors may ignore pin.
 
+**Font style:** the macro editor's **Font style** menu re-renders the output in
+a Unicode style (𝐛𝐨𝐥𝐝, 𝓼𝓬𝓻𝓲𝓹𝓽, ⓒⓘⓡⓒⓛⓔⓓ, …) with a live preview. The stored expansion stays
+plain; the style is applied when the macro is expanded, copied or fired by its
+hotkey. Styled text is not typeable on a keyboard layout, so as-you-type
+expansion pastes it. In YAML it is the `font:` key.
+
 Favorite emoji macros (when enabled) stay in **collapsed** sections on the Macros page.
 
 ## Build the helper manually

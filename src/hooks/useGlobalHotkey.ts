@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
 import type { Macro } from "../types/preferences";
+import { macroOutput } from "../lib/macroHelpers";
 
 async function toggleVisibility(pinned: boolean) {
   const window = getCurrentWindow();
@@ -58,7 +59,7 @@ export function useGlobalHotkeys(options: {
     .filter((macro) => macro.enabled && macro.hotkey)
     .map((macro) => ({
       hotkey: macro.hotkey as string,
-      expansion: macro.expansion,
+      expansion: macroOutput(macro),
     }));
 
   const bindingKey = macroBindings

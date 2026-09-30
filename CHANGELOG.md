@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-30
+
+### Added
+
+- **Font style for macros.** Each macro can now output its text in a Unicode
+  font style (bold, italic, script, fraktur, double-struck, sans, monospace,
+  circled, squared, fullwidth, small caps, superscript, upside down,
+  strikethrough, underline). Pick it in the macro editor with a live preview;
+  it applies on expand-as-you-type, copy and per-macro hotkeys. Stored as
+  `fontStyle` and exported to YAML as `font:` (emobie extension). These are
+  look-alike Unicode characters, not real fonts.
+
 ## [0.7.0] - 2026-09-23
 
 ### Added

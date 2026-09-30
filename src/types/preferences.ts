@@ -1,3 +1,4 @@
+import type { FontStyleId } from "../lib/fontStyles.ts";
 import type { SkinTone } from "../data/loadEmojis";
 
 export type ThemeMode = "system" | "light" | "dark";
@@ -29,6 +30,8 @@ export type Macro = {
   expansion: string;
   hotkey: string | null;
   enabled: boolean;
+  /** Unicode font style applied to the expansion when it is output. */
+  fontStyle?: FontStyleId;
 };
 
 export type Preferences = {

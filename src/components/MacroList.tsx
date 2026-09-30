@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CATEGORIES, type Category } from "../data/loadEmojis";
+import { macroOutput } from "../lib/macroHelpers";
 import type { MacroEntry } from "../lib/macros";
 import type { Macro } from "../types/preferences";
 import { MacroEditorDialog } from "./MacroEditorDialog";
@@ -79,7 +80,7 @@ function MacroCard({
       type="button"
       role="listitem"
       className={flashKey === macro.id ? "macro-card flash" : "macro-card"}
-      onClick={() => onCopy(macro.expansion, macro.id)}
+      onClick={() => onCopy(macroOutput(macro), macro.id)}
       onContextMenu={(event) => {
         if (!custom || !onEdit) return;
         event.preventDefault();
@@ -90,7 +91,7 @@ function MacroCard({
       }
     >
       <span className="macro-card-output">
-        {previewExpansion(macro.expansion)}
+        {previewExpansion(macroOutput(macro))}
       </span>
       <span className="macro-card-trigger">{macro.trigger}</span>
       {custom && macro.hotkey ? (

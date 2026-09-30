@@ -1,3 +1,4 @@
+import { isFontStyleId } from "./fontStyles.ts";
 import { parse, stringify } from "yaml";
 import type { Macro } from "../types/preferences.ts";
 import { macroTextIsValid, normalizeMacros } from "./normalizePreferences.ts";
@@ -15,6 +16,7 @@ type YamlMatch = {
   replace?: unknown;
   hotkey?: unknown;
   enabled?: unknown;
+  font?: unknown;
 };
 
 function asStringList(value: unknown): string[] {
@@ -35,6 +37,7 @@ export function exportMacrosYaml(macros: Macro[]): string {
       replace: macro.expansion,
     };
     if (macro.hotkey) entry.hotkey = macro.hotkey;
+    if (macro.fontStyle) entry.font = macro.fontStyle; // emobie extension
     if (!macro.enabled) entry.enabled = false;
     return entry;
   });
@@ -108,6 +111,7 @@ export function importMacrosYaml(
       typeof item.hotkey === "string" && item.hotkey.trim()
         ? item.hotkey.trim()
         : null;
+    const fontStyle = isFontStyleId(item.font) ? item.font : undefined;
     const enabledFromYaml =
       item.enabled === undefined
         ? undefined
@@ -133,6 +137,9 @@ export function importMacrosYaml(
         expansion,
         hotkey: hotkey ?? previous?.hotkey ?? null,
         enabled: enabledFromYaml ?? previous?.enabled ?? true,
+        ...((fontStyle ?? previous?.fontStyle)
+          ? { fontStyle: fontStyle ?? previous?.fontStyle }
+          : {}),
       });
       imported += 1;
     }
