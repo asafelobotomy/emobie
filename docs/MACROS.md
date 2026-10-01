@@ -177,13 +177,17 @@ devices. Do not run `emobie-inputd` as root or expose a world-writable socket.
 | Boundary | Protection | Residual risk |
 |----------|------------|---------------|
 | Cross-user | Socket mode `0600`, directory `0700`, `SO_PEERCRED` rejects foreign UIDs on the daemon side; the app only connects to sockets in directories owned by you (or root, not group/other-writable) and owned by you itself | Stale sockets — prefer `$XDG_RUNTIME_DIR/emobie` |
-| Same-user session | Any process running as **you** may call `InjectPaste`, `SyncMatches`, and `SetEnabled` on the Unix socket | Malware or a compromised app in your session can inject keystrokes — same trust as any input helper |
+| Same-user session | None beyond your user account: the device grants below go to your user and group, not to emobie-inputd alone | Once Grant has run, **any unsandboxed process running as you** can write `/dev/uinput` (inject keys anywhere) and — with Expand as you type on — read every keyboard and pointer directly, without using the socket. Malware in your session becomes a system-wide keylogger and key injector |
+| Other users / login screen | None: the device ACLs are not tied to the active seat or session | While the grants are in place, your processes can read keys typed in another user's session or at the login screen on the same machine, and inject into them. Turn Expand as you type off (removes the read grant) on shared machines |
 | Remote | No network listener; JSON line protocol on a local socket only | None without local code execution |
 | Webview → helper | emobie talks to inputd via Tauri IPC; daemon enforces match/trigger caps | XSS in emobie could sync macros or request paste — treat the webview as trusted UI |
 
 **Same-UID trust:** inputd is a session helper, not a privilege boundary against other
-processes owned by your user. Do not run untrusted binaries alongside emobie
-when relying on Auto-paste.
+processes owned by your user — and Grant widens what those processes can do,
+because the input-device access it sets up belongs to your user and the
+`emobie-input` group, not to the helper. Do not run untrusted binaries
+alongside emobie after granting access, and prefer leaving Expand as you type
+off on machines other people log in to.
 
 **Polkit / root:** paste access setup runs once via `pkexec`, and only ever runs
 root-owned inputs: either the package's `/usr/share/emobie/setup-input-access.sh`

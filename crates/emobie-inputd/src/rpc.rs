@@ -110,17 +110,22 @@ pub(crate) fn handle_client(
         let can_listen = listen::can_listen();
         let enabled_now = enabled.load(Ordering::Relaxed);
         let response = match serde_json::from_str::<Request>(&trimmed) {
-            Ok(Request::Status) => Response::status(
-                can_inject,
-                can_listen,
-                enabled_now,
-                if can_listen {
-                    "emobie-inputd running"
+            Ok(Request::Status) => {
+                let mut detail = if can_listen {
+                    "emobie-inputd running".to_string()
                 } else {
                     "running, but keyboard access missing — run setup-input-access.sh \
 (ACLs usually avoid logout; otherwise log out/in once)"
-                },
-            ),
+                        .to_string()
+                };
+                if enabled_now && crate::guard::lock_watch_failed() {
+                    detail.push_str(
+                        " — screen-lock pause unavailable (no logind LockedHint), \
+so expansion keeps matching on the lock screen",
+                    );
+                }
+                Response::status(can_inject, can_listen, enabled_now, &detail)
+            }
             Ok(Request::SetEnabled { enabled: value }) => {
                 enabled.store(value, Ordering::Relaxed);
                 inject::set_expand_enabled(value);

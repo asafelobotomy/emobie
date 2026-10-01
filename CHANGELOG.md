@@ -15,6 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   manager. Sessions that can never identify apps are unchanged.
 - Removed the unused `is_tray_available` command and its permission from the
   app's IPC surface.
+- **Grant script checks the whole path.** When running as root,
+  `setup-input-access.sh` now uses a script, udev rule, polkit policy or
+  SELinux module only if it and every directory above it are root-owned and
+  not writable by other users (group write allowed for `root`/`staff`). It
+  previously checked only the script and its own directory, and searched a
+  couple of sibling paths without checking them at all.
+- **Lock-screen pause failures are visible.** If the logind lock watch cannot
+  start or stops, the helper status in Settings now says the lock-screen pause
+  is unavailable instead of only logging it once.
+- **Threat model corrected** (docs/MACROS.md): the device access Grant sets up
+  belongs to your user and the `emobie-input` group, so any unsandboxed
+  process running as you can inject keys and, with Expand as you type on, read
+  every keyboard — including on other sessions on the same machine.
 
 ## [0.8.0] - 2026-09-30
 

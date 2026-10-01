@@ -58,6 +58,29 @@ acl_package_hint() {
   fi
 }
 
+# Root phase only: a file may be read or installed only if it and every
+# directory above it are root-owned and writable by no one else — otherwise a
+# non-root user could swap it (or a parent directory) under us. Group write is
+# tolerated for group root and Debian's `staff` (/usr/local is 2775 root:staff
+# there; staff is root-equivalent by design). Always true in the non-root
+# phase, and with EMOBIE_ALLOW_UNOWNED_SCRIPT=1.
+root_trusted() {
+  [[ "$(id -u)" -ne 0 || "${EMOBIE_ALLOW_UNOWNED_SCRIPT:-}" == "1" ]] && return 0
+  local path mode
+  path="$(readlink -f "$1" 2>/dev/null)" || return 1
+  [[ -e "$path" ]] || return 1
+  while :; do
+    [[ "$(stat -c %u "$path")" == "0" ]] || return 1
+    mode="8#$(stat -c %a "$path")"
+    (( (mode & 8#002) == 0 )) || return 1
+    if (( (mode & 8#020) != 0 )); then
+      case "$(stat -c %G "$path")" in root|staff) ;; *) return 1 ;; esac
+    fi
+    [[ "$path" == "/" ]] && return 0
+    path="$(dirname "$path")"
+  done
+}
+
 script_path() {
   readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}"
 }
@@ -79,7 +102,7 @@ resolve_rules_src() {
     "${SCRIPT_DIR}/udev/${RULES_NAME}" \
     "${SCRIPT_DIR}/../packaging/udev/${RULES_NAME}" \
     "${user_home:+$user_home/.local/share/emobie/${RULES_NAME}}"; do
-    [[ -n "$candidate" && -f "$candidate" ]] || continue
+    [[ -n "$candidate" && -f "$candidate" ]] && root_trusted "$candidate" || continue
     printf '%s\n' "$candidate"
     return 0
   done
@@ -95,7 +118,7 @@ resolve_read_rules_src() {
     "${LOCAL_DIR}/${READ_RULES_NAME}" \
     "${SCRIPT_DIR}/${READ_RULES_NAME}" \
     "${SCRIPT_DIR}/udev/${READ_RULES_NAME}"; do
-    [[ -f "$candidate" ]] || continue
+    [[ -f "$candidate" ]] && root_trusted "$candidate" || continue
     printf '%s\n' "$candidate"
     return 0
   done
@@ -118,7 +141,7 @@ resolve_policy_src() {
     "${user_home:+$user_home/.local/share/emobie/${POLICY_NAME}}" \
     "${SCRIPT_DIR}/polkit/${POLICY_NAME}" \
     "${SCRIPT_DIR}/../packaging/polkit/${POLICY_NAME}"; do
-    [[ -n "$candidate" && -f "$candidate" ]] || continue
+    [[ -n "$candidate" && -f "$candidate" ]] && root_trusted "$candidate" || continue
     printf '%s\n' "$candidate"
     return 0
   done
@@ -139,11 +162,11 @@ stage_user_assets_to_local() {
     install -m 644 "$policy_src" "$LOCAL_DIR/${POLICY_NAME}"
   fi
   local read_rules="$(dirname "$src_script")/udev/${READ_RULES_NAME}"
-  if [[ -f "$read_rules" ]]; then
+  if [[ -f "$read_rules" ]] && root_trusted "$read_rules"; then
     install -m 644 "$read_rules" "$LOCAL_DIR/${READ_RULES_NAME}"
   fi
   local te="$(dirname "$src_script")/selinux/emobie-inputd.te"
-  if [[ -f "$te" ]]; then
+  if [[ -f "$te" ]] && root_trusted "$te"; then
     install -m 644 "$te" "$LOCAL_DIR/selinux/emobie-inputd.te"
   fi
 }
@@ -191,9 +214,8 @@ fi
 # root-owned inputs: refuse a script that a non-root user could have modified,
 # and never read rules/policy/SELinux files out of a user's home directory.
 SELF_REAL="$(script_path)"
-if [[ "${EMOBIE_ALLOW_UNOWNED_SCRIPT:-}" != "1" ]] \
-  && { [[ "$(stat -c %u "$SELF_REAL")" != "0" ]] || [[ "$(stat -c %u "$(dirname "$SELF_REAL")")" != "0" ]]; }; then
-  echo "Refusing to run as root: $SELF_REAL (or its directory) is not root-owned." >&2
+if ! root_trusted "$SELF_REAL"; then
+  echo "Refusing to run as root: $SELF_REAL (or a directory above it) is not root-owned, or is group/other-writable." >&2
   echo "Run it as your normal user (it stages a root-owned copy), or set EMOBIE_ALLOW_UNOWNED_SCRIPT=1 if you trust this checkout." >&2
   exit 1
 fi
@@ -404,7 +426,7 @@ try_load_selinux_module() {
     "$SCRIPT_DIR/selinux/emobie-inputd.te" \
     "$LOCAL_DIR/selinux/emobie-inputd.te" \
     "/usr/share/emobie/selinux/emobie-inputd.te"; do
-    if [[ -f "$candidate" ]]; then
+    if [[ -f "$candidate" ]] && root_trusted "$candidate"; then
       te="$candidate"
       break
     fi

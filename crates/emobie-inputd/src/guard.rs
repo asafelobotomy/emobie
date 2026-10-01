@@ -9,10 +9,19 @@ use zbus::blocking::Connection;
 use zbus::zvariant::OwnedObjectPath;
 
 static SESSION_LOCKED: AtomicBool = AtomicBool::new(false);
+/// Set once the lock watch has stopped (never started, or logind's signal
+/// stream ended). Not set while it is still connecting at startup.
+static LOCK_WATCH_FAILED: AtomicBool = AtomicBool::new(false);
 static EXCLUDED_APPS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 pub fn session_locked() -> bool {
     SESSION_LOCKED.load(Ordering::Acquire)
+}
+
+/// True when the lock-screen pause is not protecting typed passwords, so the
+/// app can say so instead of the failure living only in the journal.
+pub fn lock_watch_failed() -> bool {
+    LOCK_WATCH_FAILED.load(Ordering::Acquire)
 }
 
 /// Case-insensitive; an entry matches when the app class contains it, so
@@ -63,12 +72,15 @@ trait LoginSession {
 }
 
 /// Best-effort: without logind (or a desktop that sets LockedHint) this
-/// thread exits and only the excluded-apps list applies.
+/// thread exits, `lock_watch_failed` turns true, and only the excluded-apps
+/// list applies.
 pub fn spawn_lock_watch() {
     std::thread::spawn(|| {
-        if let Err(err) = watch_lock() {
-            eprintln!("emobie-inputd: screen-lock watch unavailable ({err})");
+        match watch_lock() {
+            Ok(()) => eprintln!("emobie-inputd: screen-lock watch ended (logind signal stream closed)"),
+            Err(err) => eprintln!("emobie-inputd: screen-lock watch unavailable ({err})"),
         }
+        LOCK_WATCH_FAILED.store(true, Ordering::Release);
     });
 }
 
