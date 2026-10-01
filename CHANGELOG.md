@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Excluded apps fail closed.** When the focused-app lookup times out (or an
+  earlier lookup is still stuck), Expand as you type now skips the expansion
+  instead of firing — previously it could expand inside an excluded password
+  manager. Sessions that can never identify apps are unchanged.
+- Removed the unused `is_tray_available` command and its permission from the
+  app's IPC surface.
+
 ## [0.8.0] - 2026-09-30
 
 ### Added

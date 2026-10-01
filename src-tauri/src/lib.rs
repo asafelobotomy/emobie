@@ -12,11 +12,6 @@ const FLATPAK_APP_ID: &str = "io.github.asafelobotomy.emobie";
 pub struct TrayAvailable(pub tray::TrayStatus);
 
 #[tauri::command]
-fn is_tray_available(tray: State<'_, TrayAvailable>) -> bool {
-    tray.0.available
-}
-
-#[tauri::command]
 fn tray_status(tray: State<'_, TrayAvailable>) -> tray::TrayStatus {
     tray.0.clone()
 }
@@ -111,7 +106,6 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             autostart::set_launch_on_startup,
             autostart::is_launch_on_startup,
-            is_tray_available,
             tray_status,
             release_single_instance_lock,
             quit_app,

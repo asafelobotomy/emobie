@@ -9,11 +9,6 @@ description = "Allows checking whether launch on startup is enabled"
 commands.allow = ["is_launch_on_startup"]
 
 [[permission]]
-identifier = "allow-is-tray-available"
-description = "Allows checking whether the system tray was set up"
-commands.allow = ["is_tray_available"]
-
-[[permission]]
 identifier = "allow-tray-status"
 description = "Allows reading tray availability diagnostics"
 commands.allow = ["tray_status"]

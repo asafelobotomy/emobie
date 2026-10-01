@@ -86,6 +86,28 @@ fn recover_backend_after_paste_failure(uinput: &mut Option<UInputKeyboard>, enig
     }
 }
 
+/// Whether the excluded-apps list blocks this expansion. A lookup that did not
+/// answer fails closed — the focused app could be an excluded password
+/// manager. Sessions that can never identify apps stay open (documented in
+/// docs/MACROS.md), otherwise expansion would never fire there.
+fn expand_blocked_by_exclusion() -> bool {
+    use crate::focused_window::{lookup_class, ClassLookup};
+    match lookup_class() {
+        ClassLookup::Class(class) => {
+            let excluded = crate::guard::app_excluded(Some(&class));
+            if excluded {
+                eprintln!("emobie-inputd: expand skipped (focused app is excluded)");
+            }
+            excluded
+        }
+        ClassLookup::Undetectable => false,
+        ClassLookup::NoAnswer => {
+            eprintln!("emobie-inputd: expand skipped (focused app lookup did not answer)");
+            true
+        }
+    }
+}
+
 pub(super) fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
     // Prefer uinput: reaches native Wayland (Cursor, Plasma apps). Enigo is
     // fallback when /dev/uinput is unavailable (no Grant / missing udev).
@@ -156,13 +178,7 @@ pub(super) fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
                 // Refresh watchdog per job so a slow-but-healthy queue does not
                 // trip force-open from the first job's start time.
                 SUPPRESS_STARTED_MS.store(now_ms(), Ordering::Release);
-                let excluded = crate::guard::has_excluded_apps()
-                    && crate::guard::app_excluded(
-                        crate::focused_window::detect_class().as_deref(),
-                    );
-                if excluded {
-                    eprintln!("emobie-inputd: expand skipped (focused app is excluded)");
-                }
+                let excluded = crate::guard::has_excluded_apps() && expand_blocked_by_exclusion();
                 if !EXPAND_ENABLED.load(Ordering::Relaxed) || excluded {
                     // Nothing was erased: the trigger stays as typed.
                     listen::restore_to_buffer(&trigger);

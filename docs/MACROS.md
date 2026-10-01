@@ -242,7 +242,8 @@ SELinux the module allows reading `event_device_t`.
   authentication prompts): matched against the focused app's class. Detection
   works for X11/XWayland apps everywhere and for native Wayland apps on GNOME
   with the Focused Window D-Bus extension; native Plasma Wayland apps cannot
-  be identified yet, so the list does not apply to them.
+  be identified yet, so the list does not apply to them. If a lookup that
+  could answer times out, the expansion is skipped (fails closed).
 - **Suspend/resume:** input devices are reopened in place on resume
   (logind `PrepareForSleep`); the helper no longer restarts itself.
 

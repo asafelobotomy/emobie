@@ -22,7 +22,6 @@
     "clipboard-manager:allow-read-text",
     "allow-set-launch-on-startup",
     "allow-is-launch-on-startup",
-    "allow-is-tray-available",
     "allow-tray-status",
     "allow-check-for-updates",
     "allow-open-release-page",

@@ -16,6 +16,19 @@ use std::time::Duration;
 const LOOKUP_TIMEOUT: Duration = Duration::from_millis(300);
 static LOOKUP_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 
+/// Result of one focused-window lookup. Exclusion checks must tell "this
+/// session cannot identify windows" apart from "the lookup did not answer in
+/// time" — the latter fails closed (see `inject::worker`).
+pub enum ClassLookup {
+    Class(String),
+    /// No detection method answered for this session (e.g. native Plasma
+    /// Wayland apps, or GNOME Wayland without the extension).
+    Undetectable,
+    /// Timed out, a previous lookup is still hung, or the lookup thread could
+    /// not start — the focused app is unknown, not known to be undetectable.
+    NoAnswer,
+}
+
 /// On a Wayland session, tries the optional "Focused Window D-Bus" GNOME
 /// Shell extension (https://extensions.gnome.org/extension/5592/) first —
 /// it's authoritative for native-Wayland clients, whereas XWayland's
@@ -25,15 +38,14 @@ static LOOKUP_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 /// X11 sessions and XWayland-backed apps that the extension path can't see —
 /// the same X11-first fallback Espanso's own X11AppInfoProvider uses there.
 /// Neither is a hard dependency: without a GNOME extension installed and
-/// without an X server, this returns `None` and paste_chord::decide falls
-/// back to its pre-existing default.
-pub fn detect_class() -> Option<String> {
+/// without an X server, this returns `Undetectable`.
+pub fn lookup_class() -> ClassLookup {
     // The D-Bus / X11 calls below have no timeout of their own, and this runs
     // on the single inject worker — a wedged Shell or X server must not stall
     // every paste. Bound the lookup, and skip it entirely while a previous
     // (hung) lookup is still outstanding.
     if LOOKUP_IN_FLIGHT.swap(true, Ordering::AcqRel) {
-        return None;
+        return ClassLookup::NoAnswer;
     }
     let (tx, rx) = mpsc::channel();
     let spawned = thread::Builder::new()
@@ -45,9 +57,21 @@ pub fn detect_class() -> Option<String> {
         });
     if spawned.is_err() {
         LOOKUP_IN_FLIGHT.store(false, Ordering::Release);
-        return None;
+        return ClassLookup::NoAnswer;
     }
-    rx.recv_timeout(LOOKUP_TIMEOUT).ok().flatten()
+    match rx.recv_timeout(LOOKUP_TIMEOUT) {
+        Ok(Some(class)) => ClassLookup::Class(class),
+        Ok(None) => ClassLookup::Undetectable,
+        Err(_) => ClassLookup::NoAnswer,
+    }
+}
+
+/// Best-effort class for picking a paste chord; `None` falls back to Ctrl+V.
+pub fn detect_class() -> Option<String> {
+    match lookup_class() {
+        ClassLookup::Class(class) => Some(class),
+        ClassLookup::Undetectable | ClassLookup::NoAnswer => None,
+    }
 }
 
 fn detect_class_blocking() -> Option<String> {
