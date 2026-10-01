@@ -25,8 +25,8 @@ finish-args:
   - --talk-name=org.x.StatusNotifierWatcher
   - --talk-name=org.kde.KWin
   # Enables `flatpak-spawn --host`: bootstraps/restarts the host emobie-inputd
-  # helper, checks/repairs the udev+group permanent-access setup, the optional
-  # KWin pin-on-top qdbus call, and self-update. Every call site uses a
+  # helper, checks/repairs the udev+group permanent-access setup, and
+  # self-update. (KWin pin talks to org.kde.KWin directly.) Every call site uses a
   # hardcoded argv, never shell-interpolated user input. See "Remaining before
   # Flathub" in docs/FLATHUB.md for the full audit of this permission.
   - --talk-name=org.freedesktop.Flatpak

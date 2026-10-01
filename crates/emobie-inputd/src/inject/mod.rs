@@ -230,6 +230,11 @@ pub fn expand_trigger(
 
 /// Queue Ctrl+V on the inject worker and wait for completion (serialized with expands).
 pub fn inject_ctrl_v() -> Result<(), String> {
+    // /dev/uinput is global: while another session owns the seat, the keys
+    // would be delivered to it, not to ours.
+    if !crate::guard::session_active() {
+        return Err("this session is not the active one — not injecting".into());
+    }
     let (reply_tx, reply_rx) = mpsc::sync_channel(1);
     let cancel = Arc::new(AtomicBool::new(false));
     // Suppress listen briefly so synthetic Ctrl+V does not pollute the match buffer.
@@ -263,6 +268,11 @@ pub fn inject_ctrl_v() -> Result<(), String> {
 /// this fires at whatever window is currently focused, same as any other
 /// synthetic keychord here.
 pub fn inject_pin_toggle() -> Result<(), String> {
+    // /dev/uinput is global: while another session owns the seat, the keys
+    // would be delivered to it, not to ours.
+    if !crate::guard::session_active() {
+        return Err("this session is not the active one — not injecting".into());
+    }
     let (reply_tx, reply_rx) = mpsc::sync_channel(1);
     let cancel = Arc::new(AtomicBool::new(false));
     let prev_jobs = LISTEN_SUPPRESS_JOBS.fetch_add(1, Ordering::AcqRel);

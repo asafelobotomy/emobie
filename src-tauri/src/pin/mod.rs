@@ -46,7 +46,8 @@ pub async fn apply_window_pin(app: AppHandle, pinned: bool) -> Result<PinApplyRe
     .map_err(|err| err.to_string())?
 }
 
-/// Async: probing the compositor shells out (gsettings / qdbus via flatpak-spawn).
+/// Async: probing the compositor shells out (gsettings, via flatpak-spawn in
+/// Flatpak) or makes D-Bus calls to KWin.
 #[tauri::command]
 pub async fn pin_capability() -> PinCapability {
     tauri::async_runtime::spawn_blocking(pin_capability_blocking)

@@ -178,7 +178,10 @@ pub(super) fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
                 // Refresh watchdog per job so a slow-but-healthy queue does not
                 // trip force-open from the first job's start time.
                 SUPPRESS_STARTED_MS.store(now_ms(), Ordering::Release);
-                let excluded = crate::guard::has_excluded_apps() && expand_blocked_by_exclusion();
+                // Another session took the seat between match and inject:
+                // typing into it would land in someone else's session.
+                let excluded = crate::guard::session_paused()
+                    || (crate::guard::has_excluded_apps() && expand_blocked_by_exclusion());
                 if !EXPAND_ENABLED.load(Ordering::Relaxed) || excluded {
                     // Nothing was erased: the trigger stays as typed.
                     listen::restore_to_buffer(&trigger);

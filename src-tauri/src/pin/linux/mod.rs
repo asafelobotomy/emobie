@@ -3,7 +3,6 @@ use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 use tauri::WebviewWindow;
-use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
@@ -222,12 +221,9 @@ Works on X11 and Plasma."
 }
 
 fn kwin_reachable() -> bool {
-    dbus_call(&[
-        "org.kde.KWin",
-        "/KWin",
-        "org.freedesktop.DBus.Peer.Ping",
-    ])
-    .is_ok()
+    kwin_bus()
+        .and_then(|conn| kwin_call::<_, ()>(&conn, "/KWin", "org.freedesktop.DBus.Peer", "Ping", &()))
+        .is_ok()
 }
 
 fn plasma_keep_above(pinned: bool) -> Result<(), String> {
@@ -271,57 +267,41 @@ for (const w of wins) {{
     }
 
     // Flatpak sandbox: script must be readable by host KWin — use a path under
-    // XDG_RUNTIME_DIR which is shared; invoke qdbus on the host.
+    // XDG_RUNTIME_DIR which is shared. KWin is called over the session bus
+    // directly (the Flatpak has --talk-name=org.kde.KWin), so no host qdbus.
     let plugin = "emobie-pin";
     let path_str = path.to_string_lossy().to_string();
-    let _ = dbus_call(&[
-        "org.kde.KWin",
+    let conn = kwin_bus()?;
+    let _ = kwin_call::<_, bool>(&conn, "/Scripting", "org.kde.kwin.Scripting", "unloadScript", &(plugin,));
+    let id: i32 = kwin_call(
+        &conn,
         "/Scripting",
-        "org.kde.kwin.Scripting.unloadScript",
-        plugin,
-    ]);
-    let id = dbus_call(&[
-        "org.kde.KWin",
-        "/Scripting",
-        "org.kde.kwin.Scripting.loadScript",
-        &path_str,
-        plugin,
-    ])?;
+        "org.kde.kwin.Scripting",
+        "loadScript",
+        &(path_str.as_str(), plugin),
+    )?;
     let script_path = format!("/Scripting/Script{id}");
-    dbus_call(&["org.kde.KWin", &script_path, "org.kde.kwin.Script.run"])?;
-    let _ = dbus_call(&[
-        "org.kde.KWin",
-        "/Scripting",
-        "org.kde.kwin.Scripting.unloadScript",
-        plugin,
-    ]);
+    kwin_call::<_, ()>(&conn, &script_path, "org.kde.kwin.Script", "run", &())?;
+    let _ = kwin_call::<_, bool>(&conn, "/Scripting", "org.kde.kwin.Scripting", "unloadScript", &(plugin,));
     Ok(())
 }
 
-fn dbus_call(args: &[&str]) -> Result<String, String> {
-    // Prefer host tools inside Flatpak (GNOME Platform rarely ships qdbus).
-    if in_flatpak() {
-        for bin in ["qdbus6", "qdbus"] {
-            let output = Command::new("flatpak-spawn")
-                .arg("--host")
-                .arg(bin)
-                .args(args)
-                .output();
-            if let Ok(out) = output {
-                if out.status.success() {
-                    return Ok(String::from_utf8_lossy(&out.stdout).trim().to_string());
-                }
-            }
-        }
-    }
-    for bin in ["qdbus6", "qdbus"] {
-        let output = Command::new(bin).args(args).output();
-        match output {
-            Ok(out) if out.status.success() => {
-                return Ok(String::from_utf8_lossy(&out.stdout).trim().to_string());
-            }
-            _ => continue,
-        }
-    }
-    Err("qdbus unavailable (install qt6-tools / qdbus; Flatpak uses host via flatpak-spawn)".into())
+fn kwin_bus() -> Result<zbus::blocking::Connection, String> {
+    zbus::blocking::Connection::session().map_err(|e| format!("session bus unavailable ({e})"))
+}
+
+fn kwin_call<B, R>(
+    conn: &zbus::blocking::Connection,
+    path: &str,
+    interface: &str,
+    method: &str,
+    body: &B,
+) -> Result<R, String>
+where
+    B: serde::Serialize + zbus::zvariant::DynamicType,
+    R: for<'d> zbus::zvariant::DynamicDeserialize<'d>,
+{
+    conn.call_method(Some("org.kde.KWin"), path, Some(interface), method, body)
+        .and_then(|reply| reply.body().deserialize::<R>())
+        .map_err(|e| format!("KWin {method} failed ({e})"))
 }

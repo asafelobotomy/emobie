@@ -37,7 +37,7 @@ Settings shows a hint when the tray fails to start.
 | Session | Behavior |
 |---------|----------|
 | **X11** (any DE) | GTK keep-above — reliable |
-| **Plasma Wayland** | KWin `keepAbove` via `qdbus` (Flatpak calls **host** `qdbus6`/`qdbus`) |
+| **Plasma Wayland** | KWin `keepAbove` via a KWin script loaded over D-Bus (no `qdbus` needed; Flatpak uses `--talk-name=org.kde.KWin`) |
 | **Other Wayland** (GNOME, etc.) | Compositor may ignore pin; Settings warns when pin is limited |
 
 ### Launch on startup

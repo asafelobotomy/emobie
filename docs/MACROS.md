@@ -178,7 +178,7 @@ devices. Do not run `emobie-inputd` as root or expose a world-writable socket.
 |----------|------------|---------------|
 | Cross-user | Socket mode `0600`, directory `0700`, `SO_PEERCRED` rejects foreign UIDs on the daemon side; the app only connects to sockets in directories owned by you (or root, not group/other-writable) and owned by you itself | Stale sockets — prefer `$XDG_RUNTIME_DIR/emobie` |
 | Same-user session | None beyond your user account: the device grants below go to your user and group, not to emobie-inputd alone | Once Grant has run, **any unsandboxed process running as you** can write `/dev/uinput` (inject keys anywhere) and — with Expand as you type on — read every keyboard and pointer directly, without using the socket. Malware in your session becomes a system-wide keylogger and key injector |
-| Other users / login screen | None: the device ACLs are not tied to the active seat or session | While the grants are in place, your processes can read keys typed in another user's session or at the login screen on the same machine, and inject into them. Turn Expand as you type off (removes the read grant) on shared machines |
+| Other users / login screen | emobie-inputd stops matching and injecting while your session is not the active one | The device ACLs themselves are not tied to the active session: other processes running as you could still read keys typed in another user's session or at the login screen, and inject into them. Turn Expand as you type off (removes the read grant) on shared machines |
 | Remote | No network listener; JSON line protocol on a local socket only | None without local code execution |
 | Webview → helper | emobie talks to inputd via Tauri IPC; daemon enforces match/trigger caps | XSS in emobie could sync macros or request paste — treat the webview as trusted UI |
 
@@ -242,6 +242,10 @@ SELinux the module allows reading `event_device_t`.
 
 - **Lock screen:** matching pauses while logind reports the session locked
   (`LockedHint`), so an unlock password can never trigger an expansion.
+- **User switching:** matching and injection pause while your session is not
+  the seat's active one (logind `Active`) — keyboards are shared, so those
+  keys belong to another user or the login screen. If the logind watch is
+  unavailable, the helper status in Settings says so.
 - **Excluded apps** (Settings; defaults cover common password managers and
   authentication prompts): matched against the focused app's class. Detection
   works for X11/XWayland apps everywhere and for native Wayland apps on GNOME

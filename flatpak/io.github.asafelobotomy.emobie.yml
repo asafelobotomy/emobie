@@ -36,8 +36,9 @@ finish-args:
   # Plasma Wayland pin (KWin keepAbove); ignored on other compositors.
   - --talk-name=org.kde.KWin
   # Enables `flatpak-spawn --host`: bootstraps/restarts the host emobie-inputd
-  # helper, checks/repairs the udev+group permanent-access setup, the optional
-  # KWin pin-on-top qdbus call, and self-update. Every call site uses a
+  # helper and checks/repairs the udev+group permanent-access setup (Grant).
+  # Self-update is compiled out of this build and KWin pin uses the session
+  # bus directly, so neither needs the host. Every call site uses a
   # hardcoded argv, never shell-interpolated user input. See "Remaining before
   # Flathub" in docs/FLATHUB.md for the full audit of this permission.
   - --talk-name=org.freedesktop.Flatpak
@@ -58,6 +59,10 @@ modules:
     buildsystem: simple
     build-options:
       env:
+        # Flathub delivers updates: compiled in, this turns off self-update
+        # (src-tauri/src/updates/mod.rs), so emobie never installs a GitHub
+        # bundle over a Flathub install or spawns host flatpak for it.
+        EMOBIE_DISTRIBUTION: flathub
         CARGO_HOME: /run/build/emobie/cargo
         XDG_CACHE_HOME: /run/build/emobie/flatpak-node/cache
         npm_config_cache: /run/build/emobie/flatpak-node/npm-cache

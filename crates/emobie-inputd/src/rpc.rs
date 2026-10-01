@@ -118,10 +118,10 @@ pub(crate) fn handle_client(
 (ACLs usually avoid logout; otherwise log out/in once)"
                         .to_string()
                 };
-                if enabled_now && crate::guard::lock_watch_failed() {
+                if enabled_now && crate::guard::session_watch_failed() {
                     detail.push_str(
-                        " — screen-lock pause unavailable (no logind LockedHint), \
-so expansion keeps matching on the lock screen",
+                        " — screen-lock and user-switch pause unavailable (no logind \
+session watch), so expansion keeps matching on the lock screen",
                     );
                 }
                 Response::status(can_inject, can_listen, enabled_now, &detail)

@@ -22,7 +22,6 @@ depends=(
 )
 makedepends=('cargo' 'nodejs' 'npm' 'clang' 'lld' 'libxkbcommon')
 optdepends=(
-  'qt6-tools: qdbus6 for Plasma Wayland pin when using native build'
   'wl-clipboard: externally-verified Wayland clipboard for reliable Expand paste'
   'acl: setfacl for instant keyboard access after Grant without logout'
 )

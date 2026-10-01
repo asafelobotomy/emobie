@@ -39,12 +39,15 @@ Then bump `tag` / `commit` in the source manifest to the release being packaged.
 5. **`--talk-name=org.freedesktop.Flatpak`:** grants `flatpak-spawn --host`, which Flathub
    reviewers scrutinize closely since it can run arbitrary host commands. Every call site
    (`src-tauri/src/input_helper/bootstrap.rs`, `access/permanent.rs`, `access/stage.rs`,
-   `unix/lifecycle.rs`, `src-tauri/src/pin/linux/`, `src-tauri/src/updates/apply.rs`) passes a
-   hardcoded argv (no shell interpolation of untrusted data) and is used only to: install/
-   restart the host `emobie-inputd` helper, check/repair the udev+group permanent-access
-   setup, call `qdbus` for the optional KWin pin-on-top, and apply self-updates. Be ready to
+   `unix/lifecycle.rs`, and the GNOME `gsettings` calls in `src-tauri/src/pin/linux/gnome.rs`)
+   passes a hardcoded argv (no shell interpolation of untrusted data) and is used only to:
+   install/restart the host `emobie-inputd` helper, check/repair the udev+group
+   permanent-access setup, and read/set GNOME's `toggle-above` keybinding. In this source
+   (Flathub) build self-update is compiled out (`EMOBIE_DISTRIBUTION=flathub`), and KWin
+   pin-on-top calls `org.kde.KWin` over the session bus, so neither uses the host. Be ready to
    explain this scope to reviewers; do not broaden usage to accept dynamic/user-controlled
-   arguments.
+   arguments. Dropping the permission entirely would mean Flathub users install
+   `emobie-inputd` from a distro package and run Grant from a terminal.
 6. **Sustained releases / human PR:** See checklist below.
 
 ## Local validation

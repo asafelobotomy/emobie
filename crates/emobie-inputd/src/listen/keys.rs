@@ -213,9 +213,10 @@ pub(super) fn handle_key(
     }
     let pressed = value != 0;
     keymap.update_key(key.code(), pressed);
-    // Keys typed on the lock screen are the user's password.
-    if crate::guard::session_locked() {
-        reset_buffer(pending, buffer, "session locked");
+    // Keys typed on the lock screen are the user's password; while another
+    // session owns the seat they are someone else's keys.
+    if crate::guard::session_paused() {
+        reset_buffer(pending, buffer, "session locked or not active");
         return;
     }
 

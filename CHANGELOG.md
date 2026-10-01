@@ -24,6 +24,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Lock-screen pause failures are visible.** If the logind lock watch cannot
   start or stops, the helper status in Settings now says the lock-screen pause
   is unavailable instead of only logging it once.
+- **Signed updates.** One-click install now requires the release's
+  `SHA256SUMS` to carry a minisign signature from the emobie release key
+  (embedded in the app) whose trusted comment names that exact release.
+  Releases are signed in CI; see docs/RELEASING.md.
+- **User switching pauses Expand.** emobie-inputd stops matching typed keys and
+  refuses to inject while its session is not the seat's active one (logind
+  `Active`). Keyboards are shared, so after a fast user switch it previously
+  kept buffering the other user's keys (including at the login screen) and
+  could expand into their session.
+- **Less host access from the Flatpak.** KWin pin-on-top now talks to
+  `org.kde.KWin` over D-Bus instead of running host `qdbus` (also drops the
+  `qt6-tools` optional dependency), and the Flathub build no longer offers
+  self-update — Flathub delivers updates, and installing a GitHub bundle over
+  it would change the app's origin.
 - **Threat model corrected** (docs/MACROS.md): the device access Grant sets up
   belongs to your user and the `emobie-input` group, so any unsandboxed
   process running as you can inject keys and, with Expand as you type on, read
