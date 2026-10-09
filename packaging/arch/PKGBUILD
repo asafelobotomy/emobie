@@ -26,7 +26,7 @@ optdepends=(
   'acl: setfacl for instant keyboard access after Grant without logout'
 )
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('5363b9c1aab2f23aa9eb5ca2cd2380799d1706fc938d9b3504a28e453700a65d')
+sha256sums=('7fe1db51078d07d787c94a01a9c18af832b72a8ba87f1b22c9fdfaa1144bffc8')
 
 prepare() {
   cd "$pkgname-$pkgver"
