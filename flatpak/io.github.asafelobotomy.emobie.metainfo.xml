@@ -59,6 +59,15 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.8.1" date="2026-10-10">
+      <description>
+        <p>Security and reliability fixes. One-click updates now require a
+        release signed with the emobie key. Expand as you type pauses when you
+        switch users and skips excluded apps it cannot identify in time.
+        Editing a macro keeps its font style, and restoring the clipboard
+        works when wl-copy is installed.</p>
+      </description>
+    </release>
     <release version="0.8.0" date="2026-09-30">
       <description>
         <p>Macros can now output in a Unicode font style: bold, italic,

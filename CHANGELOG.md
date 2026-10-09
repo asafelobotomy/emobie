@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-10
+
 ### Security
 
 - **Excluded apps fail closed.** When the focused-app lookup times out (or an
@@ -716,7 +718,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Horizontal mouse-wheel scrolling in wide layouts
 - Tray icon temp path for Flatpak-friendly sandboxing
 
-[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.6.17...HEAD
+[Unreleased]: https://github.com/asafelobotomy/emobie/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/asafelobotomy/emobie/compare/v0.8.0...v0.8.1
 [0.6.17]: https://github.com/asafelobotomy/emobie/compare/v0.6.16...v0.6.17
 [0.6.16]: https://github.com/asafelobotomy/emobie/compare/v0.6.15...v0.6.16
 [0.6.15]: https://github.com/asafelobotomy/emobie/compare/v0.6.14...v0.6.15
