@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Grant asks for your password once.** Setting up keyboard access used to
+  prompt once per setup file (up to five) and again to run the setup. Staging
+  and setup now share one admin prompt, and when the staged files are already
+  current it runs emobie's own Polkit action directly.
+- **Turning on Expand as you type sticks after Grant.** The app checked
+  keyboard access while udev was still applying the new rules, saw none, left
+  the switch off, and the next try ran the whole setup again. The setup now
+  waits for udev, and the app gives the restarted helper a few seconds to
+  report access.
+
 ## [0.8.1] - 2026-10-10
 
 ### Security
