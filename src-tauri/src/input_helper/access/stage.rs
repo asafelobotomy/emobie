@@ -49,87 +49,112 @@ fn read_installed(path: &str, flatpak: bool) -> Option<Vec<u8>> {
     output.status.success().then_some(output.stdout)
 }
 
-/// `pkexec install -D -m MODE /dev/stdin DEST`, feeding `bytes` on stdin so the
-/// data root installs is exactly what we hold in memory (no path to swap).
-fn pkexec_install_bytes(flatpak: bool, mode: &str, bytes: &[u8], dest: &str) -> Result<(), String> {
-    let install_args = ["install", "-D", "-m", mode, "/dev/stdin", dest];
-    let mut cmd = if flatpak {
-        let mut c = Command::new("flatpak-spawn");
-        c.arg("--host").arg("pkexec").args(install_args);
-        c
-    } else {
-        let mut c = Command::new("pkexec");
-        c.args(install_args);
-        c
-    };
-    with_session_env(&mut cmd);
-    let mut child = cmd
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("Could not stage {dest} ({e}). {}", host_setup_hint()))?;
-    if let Some(mut stdin) = child.stdin.take() {
-        // Errors surface through the exit status below (e.g. auth cancelled).
-        let _ = stdin.write_all(bytes);
-    }
-    let output = child
-        .wait_with_output()
-        .map_err(|e| format!("Could not stage {dest} ({e}). {}", host_setup_hint()))?;
-    if output.status.success() {
-        return Ok(());
-    }
-    let detail = String::from_utf8_lossy(&output.stderr).trim().to_string();
-    Err(if detail.is_empty() {
-        format!("Could not install {dest}. {}", host_setup_hint())
-    } else {
-        format!("Keyboard access setup staging ({dest}): {detail}")
-    })
-}
+/// Root half of a Grant that has to (re)stage files: reads `REL MODE BASE64`
+/// lines on stdin, installs each into `LOCAL_DIR`, then runs the staged setup
+/// script with this command's arguments. Staging and setup share one `pkexec`
+/// call — one password prompt — and the bytes come straight from this
+/// process's memory (no path a user process could swap).
+const STAGE_AND_RUN: &str = r#"set -eu
+dir=/usr/local/share/emobie
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+while read -r rel mode data; do
+  case "$rel" in ''|/*|*..*) echo "emobie: refusing staged path '$rel'" >&2; exit 1 ;; esac
+  case "$mode" in 644|755) ;; *) echo "emobie: refusing mode '$mode'" >&2; exit 1 ;; esac
+  printf '%s' "$data" | base64 -d > "$tmp/file"
+  install -D -m "$mode" "$tmp/file" "$dir/$rel"
+done
+"$dir/setup-input-access.sh" "$@"
+"#;
 
-/// Stage every embedded asset that is missing or differs from the installed
-/// copy into `/usr/local/share/emobie/` (root-owned).
-fn stage_embedded_assets(flatpak: bool) -> Result<(), String> {
-    for (bytes, mode, rel) in STAGED_FILES {
-        let dest = format!("{LOCAL_DIR}/{rel}");
-        if read_installed(&dest, flatpak).as_deref() == Some(bytes) {
-            continue;
+/// Standard base64 (RFC 4648, padded) for the `STAGE_AND_RUN` payload.
+fn base64(bytes: &[u8]) -> String {
+    const ALPHABET: &[u8; 64] =
+        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let n = chunk
+            .iter()
+            .enumerate()
+            .fold(0u32, |acc, (i, &b)| acc | (u32::from(b) << (16 - 8 * i)));
+        for i in 0..4 {
+            if i <= chunk.len() {
+                out.push(ALPHABET[(n >> (18 - 6 * i) & 63) as usize] as char);
+            } else {
+                out.push('=');
+            }
         }
-        pkexec_install_bytes(flatpak, mode, bytes, &dest)?;
     }
-    Ok(())
+    out
 }
 
-pub(super) fn ensure_polkit_annotated_setup(script: &str, flatpak: bool) -> Result<String, String> {
+/// Embedded assets whose installed copy under `LOCAL_DIR` is missing or
+/// differs, as `STAGE_AND_RUN` input.
+fn stale_assets_payload(flatpak: bool) -> String {
+    STAGED_FILES
+        .iter()
+        .filter(|(bytes, _, rel)| {
+            read_installed(&format!("{LOCAL_DIR}/{rel}"), flatpak).as_deref() != Some(*bytes)
+        })
+        .map(|(bytes, mode, rel)| format!("{rel} {mode} {}\n", base64(bytes)))
+        .collect()
+}
+
+/// Run the setup script as root with `args`: the package's copy, or our
+/// embedded copy staged under `LOCAL_DIR` (staged in the same prompt when it
+/// is missing or out of date).
+pub(super) fn run_setup(args: &[&str]) -> Result<(), String> {
+    let (script, flatpak) = resolve_setup_script()?;
     if script == SYSTEM_SETUP {
         // Package-managed and root-owned: trusted as-is.
-        return Ok(script.to_string());
+        return run_pkexec(&[SYSTEM_SETUP], args, flatpak, None);
     }
-    stage_embedded_assets(flatpak)?;
-    Ok(LOCAL_SETUP.to_string())
+    let payload = stale_assets_payload(flatpak);
+    if payload.is_empty() {
+        // Already current: run it directly so Polkit shows emobie's own action.
+        return run_pkexec(&[LOCAL_SETUP], args, flatpak, None);
+    }
+    run_pkexec(
+        &["/bin/sh", "-c", STAGE_AND_RUN, "emobie-grant"],
+        args,
+        flatpak,
+        Some(payload.as_bytes()),
+    )
 }
 
-pub(super) fn run_pkexec(script: &str, flatpak: bool, args: &[&str]) -> Result<(), String> {
+fn run_pkexec(
+    command: &[&str],
+    args: &[&str],
+    flatpak: bool,
+    stdin: Option<&[u8]>,
+) -> Result<(), String> {
     let mut cmd = if flatpak {
         let mut c = Command::new("flatpak-spawn");
-        c.arg("--host").arg("pkexec").arg(script);
+        c.arg("--host").arg("pkexec");
         c
     } else {
-        let mut c = Command::new("pkexec");
-        c.arg(script);
-        c
+        Command::new("pkexec")
     };
-    cmd.args(args);
+    cmd.args(command).args(args);
     with_session_env(&mut cmd);
     // pkexec scrubs the environment; the script resolves the invoking user
     // from PKEXEC_UID.
-    let output = cmd.stdin(Stdio::null()).output().map_err(|e| {
+    cmd.stdin(if stdin.is_some() { Stdio::piped() } else { Stdio::null() })
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let launch_error = |e: std::io::Error| {
         if flatpak {
             format!("flatpak-spawn --host failed ({e}). {}", host_setup_hint())
         } else {
             format!("Could not launch pkexec ({e}). {}", host_setup_hint())
         }
-    })?;
+    };
+    let mut child = cmd.spawn().map_err(launch_error)?;
+    if let (Some(bytes), Some(mut pipe)) = (stdin, child.stdin.take()) {
+        // Errors surface through the exit status below (e.g. auth cancelled).
+        let _ = pipe.write_all(bytes);
+    }
+    let output = child.wait_with_output().map_err(launch_error)?;
 
     if output.status.success() {
         return Ok(());
@@ -165,8 +190,8 @@ fn system_rules_match(path: &str, flatpak: bool) -> bool {
 }
 
 /// Which script to run as root: the package's, if installed *and current*,
-/// otherwise our staged embedded copy (staged by `ensure_polkit_annotated_setup`).
-pub(super) fn resolve_setup_script() -> Result<(String, bool), String> {
+/// otherwise our staged embedded copy (staged by `run_setup`).
+fn resolve_setup_script() -> Result<(String, bool), String> {
     let flatpak = in_flatpak();
     let system_present = if flatpak {
         super::permanent::host_file_exists(SYSTEM_SETUP)
@@ -183,6 +208,82 @@ pub(super) fn resolve_setup_script() -> Result<(String, bool), String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn base64_matches_rfc4648_vectors() {
+        use super::base64;
+        for (raw, enc) in [
+            ("", ""),
+            ("f", "Zg=="),
+            ("fo", "Zm8="),
+            ("foo", "Zm9v"),
+            ("foob", "Zm9vYg=="),
+            ("fooba", "Zm9vYmE="),
+            ("foobar", "Zm9vYmFy"),
+        ] {
+            assert_eq!(base64(raw.as_bytes()), enc);
+        }
+    }
+
+    /// Run the real root-side staging script (pointed at a temp dir, with the
+    /// final setup call stubbed out) over the payload for every embedded asset,
+    /// and check each file lands byte-for-byte with its mode.
+    #[test]
+    fn stage_and_run_installs_exact_bytes() {
+        use super::{base64, STAGE_AND_RUN};
+        use std::io::Write;
+        use std::os::unix::fs::PermissionsExt;
+        use std::process::{Command, Stdio};
+
+        let dir = std::env::temp_dir().join(format!("emobie-stage-run-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let script = STAGE_AND_RUN
+            .replace("dir=/usr/local/share/emobie", &format!("dir='{}'", dir.display()))
+            .replace("\"$dir/setup-input-access.sh\" \"$@\"", "echo ran \"$@\"");
+        let payload: String = STAGED_FILES
+            .iter()
+            .map(|(bytes, mode, rel)| format!("{rel} {mode} {}\n", base64(bytes)))
+            .collect();
+        let mut child = Command::new("sh")
+            .args(["-c", &script, "emobie-grant", "--keyboard-read", "on"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child.stdin.take().unwrap().write_all(payload.as_bytes()).unwrap();
+        let out = child.wait_with_output().unwrap();
+        assert!(out.status.success());
+        assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "ran --keyboard-read on");
+        for (bytes, mode, rel) in STAGED_FILES {
+            let path = dir.join(rel);
+            assert_eq!(std::fs::read(&path).unwrap(), bytes, "{rel}");
+            let got = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+            assert_eq!(format!("{got:o}"), mode, "{rel}");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn stage_and_run_refuses_path_escapes() {
+        use super::STAGE_AND_RUN;
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+
+        let dir = std::env::temp_dir().join(format!("emobie-stage-esc-{}", std::process::id()));
+        let script = STAGE_AND_RUN
+            .replace("dir=/usr/local/share/emobie", &format!("dir='{}'", dir.display()));
+        for line in ["../evil 644 eA==\n", "/etc/evil 644 eA==\n", "ok 4755 eA==\n"] {
+            let mut child = Command::new("sh")
+                .args(["-c", &script, "emobie-grant"])
+                .stdin(Stdio::piped())
+                .stderr(Stdio::null())
+                .spawn()
+                .unwrap();
+            child.stdin.take().unwrap().write_all(line.as_bytes()).unwrap();
+            assert!(!child.wait().unwrap().success(), "{line:?} must be refused");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     use super::super::assets::{POLKIT_POLICY, SELINUX_TE, SETUP_SCRIPT, STAGED_FILES, UDEV_RULES};
 
     #[test]

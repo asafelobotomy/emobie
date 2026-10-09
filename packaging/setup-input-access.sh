@@ -304,6 +304,9 @@ fi
 udevadm control --reload-rules
 udevadm trigger --subsystem-match=input || true
 udevadm trigger --subsystem-match=misc || true
+# Wait for those events so the device ACLs exist before we return: the app
+# restarts the helper and checks keyboard access right after this script.
+udevadm settle --timeout=10 || true
 
 ACL_OK=0
 ACL_TRIED=0

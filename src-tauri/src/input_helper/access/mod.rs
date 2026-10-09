@@ -8,7 +8,7 @@ mod permanent;
 mod stage;
 
 use permanent::{in_flatpak, permanent_access_gap_detail};
-use stage::{ensure_polkit_annotated_setup, resolve_setup_script, run_pkexec};
+use stage::run_setup;
 
 use super::unix;
 use super::InputHelperStatus;
@@ -40,10 +40,8 @@ pub fn with_flatpak_flag(mut status: InputHelperStatus) -> InputHelperStatus {
 
 /// Polkit setup + restart helper; returns fresh status (can_listen after ACLs).
 pub fn run_access_setup() -> Result<InputHelperStatus, String> {
-    let (script, flatpak) = resolve_setup_script()?;
-    let script = ensure_polkit_annotated_setup(&script, flatpak)?;
-    run_pkexec(&script, flatpak, &[])?;
-    let mut status = with_flatpak_flag(unix::restart_helper());
+    run_setup(&[])?;
+    let mut status = with_flatpak_flag(restart_until_ready());
     if !status.access_configured {
         status.detail = format!(
             "Grant finished but {} — {}",
@@ -77,8 +75,21 @@ If session ACLs failed, log out/in once so the emobie-input group applies."
 /// Opt in/out of keyboard read access for "Expand as you type" (one Polkit
 /// prompt), then restart the helper so it reopens devices.
 pub fn set_keyboard_read(enabled: bool) -> Result<InputHelperStatus, String> {
-    let (script, flatpak) = resolve_setup_script()?;
-    let script = ensure_polkit_annotated_setup(&script, flatpak)?;
-    run_pkexec(&script, flatpak, &["--keyboard-read", if enabled { "on" } else { "off" }])?;
-    Ok(with_flatpak_flag(unix::restart_helper()))
+    run_setup(&["--keyboard-read", if enabled { "on" } else { "off" }])?;
+    Ok(with_flatpak_flag(restart_until_ready()))
+}
+
+/// Restart the helper, then give udev a moment to apply the new device ACLs:
+/// a status taken mid-way reports no keyboard access, and the app would then
+/// leave Expand off and ask for the password again on the next try.
+fn restart_until_ready() -> InputHelperStatus {
+    let mut status = unix::restart_helper();
+    for _ in 0..15 {
+        if !status.daemon || (status.can_listen && status.can_inject) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        status = unix::status();
+    }
+    status
 }
