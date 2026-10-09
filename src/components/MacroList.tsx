@@ -245,15 +245,7 @@ export function MacroList({
                 macro={macro}
                 flashKey={flashKey}
                 onCopy={onCopy}
-                onEdit={(entry) =>
-                  setEditor({
-                    id: entry.id,
-                    trigger: entry.trigger,
-                    expansion: entry.expansion,
-                    hotkey: entry.hotkey,
-                    enabled: entry.enabled,
-                  })
-                }
+                onEdit={(entry) => setEditor(entry)}
               />
             ))}
           </div>

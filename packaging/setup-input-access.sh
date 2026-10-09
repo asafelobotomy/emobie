@@ -2,7 +2,9 @@
 # One-time host setup: create emobie-input group, install udev rules, add user.
 # Run: pkexec /usr/share/emobie/setup-input-access.sh
 #   or: pkexec /usr/local/share/emobie/setup-input-access.sh
-#   or: packaging/setup-input-access.sh (self-elevates via pkexec)
+#   or: setup-input-access.sh from either of those paths (self-elevates via pkexec)
+# A copy anywhere else (source checkout, ~/.local/share/emobie) is refused unless
+# run as root with EMOBIE_ALLOW_UNOWNED_SCRIPT=1 — see the non-root phase below.
 #
 # Idempotent: safe to re-run when the group was deleted, udev rules were removed,
 # or paste inject still works via a temporary ACL / orphaned GID.
@@ -85,24 +87,18 @@ script_path() {
   readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}"
 }
 
-# Resolve udev rules from packaged, staged, or user bootstrap trees.
-# $1 = optional username whose ~/.local/share/emobie should be searched.
-#      ONLY pass it from the non-root phase (a user deliberately running this
-#      script from their own checkout). The root phase must pass "".
+# Resolve udev rules from the packaged or staged tree, or this script's own
+# checkout (which root_trusted only accepts when it is root-owned or the
+# caller opted in). Never from a user's home directory.
 resolve_rules_src() {
-  local user_home=""
-  if [[ -n "${1:-}" ]]; then
-    user_home="$(getent passwd "$1" | cut -d: -f6 || true)"
-  fi
   local candidate
   for candidate in \
     "/usr/share/emobie/${RULES_NAME}" \
     "${LOCAL_DIR}/${RULES_NAME}" \
     "${SCRIPT_DIR}/${RULES_NAME}" \
     "${SCRIPT_DIR}/udev/${RULES_NAME}" \
-    "${SCRIPT_DIR}/../packaging/udev/${RULES_NAME}" \
-    "${user_home:+$user_home/.local/share/emobie/${RULES_NAME}}"; do
-    [[ -n "$candidate" && -f "$candidate" ]] && root_trusted "$candidate" || continue
+    "${SCRIPT_DIR}/../packaging/udev/${RULES_NAME}"; do
+    [[ -f "$candidate" ]] && root_trusted "$candidate" || continue
     printf '%s\n' "$candidate"
     return 0
   done
@@ -126,10 +122,6 @@ resolve_read_rules_src() {
 }
 
 resolve_policy_src() {
-  local user_home=""
-  if [[ -n "${1:-}" ]]; then
-    user_home="$(getent passwd "$1" | cut -d: -f6 || true)"
-  fi
   # Empty POLICY_SRC means policy already installed system-wide.
   if [[ -f "$POLICY_DST" ]]; then
     return 0
@@ -138,10 +130,9 @@ resolve_policy_src() {
   for candidate in \
     "${SCRIPT_DIR}/${POLICY_NAME}" \
     "${LOCAL_DIR}/${POLICY_NAME}" \
-    "${user_home:+$user_home/.local/share/emobie/${POLICY_NAME}}" \
     "${SCRIPT_DIR}/polkit/${POLICY_NAME}" \
     "${SCRIPT_DIR}/../packaging/polkit/${POLICY_NAME}"; do
-    [[ -n "$candidate" && -f "$candidate" ]] && root_trusted "$candidate" || continue
+    [[ -f "$candidate" ]] && root_trusted "$candidate" || continue
     printf '%s\n' "$candidate"
     return 0
   done
@@ -171,43 +162,24 @@ stage_user_assets_to_local() {
   fi
 }
 
+# Non-root phase: only elevate the packaged or staged copy, both root-owned.
+# Copying a user-writable script or rule into the root-owned tree here would
+# let any process running as this user decide what root runs as soon as the
+# admin password is typed. Grant in emobie stages its own built-in copy.
 if [[ "$(id -u)" -ne 0 ]]; then
-  echo "Re-running with pkexec…"
   SELF="$(script_path)"
   INVOKING_USER="${SUDO_USER:-${USER:-}}"
-  RULES_FOR_STAGE="$(resolve_rules_src "$INVOKING_USER" || true)"
-  POLICY_FOR_STAGE="$(resolve_policy_src "$INVOKING_USER" || true)"
-
-  if [[ "$SELF" == "$(readlink -f "$SYSTEM_SETUP" 2>/dev/null || echo "$SYSTEM_SETUP")" ]]; then
-    exec pkexec env SUDO_USER="${INVOKING_USER}" "$SYSTEM_SETUP" "${FORWARD_ARGS[@]}"
-  fi
-  if [[ "$SELF" == "$(readlink -f "$LOCAL_SETUP" 2>/dev/null || echo "$LOCAL_SETUP")" ]]; then
-    # Ensure siblings exist beside the annotated script before elevation.
-    if [[ -n "$RULES_FOR_STAGE" && ! -f "$LOCAL_DIR/${RULES_NAME}" ]]; then
-      pkexec install -D -m 644 "$RULES_FOR_STAGE" "$LOCAL_DIR/${RULES_NAME}"
+  for trusted in "$SYSTEM_SETUP" "$LOCAL_SETUP"; do
+    if [[ "$SELF" == "$(readlink -f "$trusted" 2>/dev/null || echo __none__)" ]]; then
+      echo "Re-running with pkexec…"
+      exec pkexec env SUDO_USER="${INVOKING_USER}" "$trusted" "${FORWARD_ARGS[@]}"
     fi
-    exec pkexec env SUDO_USER="${INVOKING_USER}" "$LOCAL_SETUP" "${FORWARD_ARGS[@]}"
-  fi
-
-  # Stage full asset set, then run the annotated local script (one Polkit path).
-  if [[ -z "$RULES_FOR_STAGE" ]]; then
-    echo "Cannot find ${RULES_NAME} beside setup script or under ~/.local/share/emobie" >&2
-    exit 1
-  fi
-  pkexec install -D -m 755 "$SELF" "$LOCAL_SETUP"
-  pkexec install -D -m 644 "$RULES_FOR_STAGE" "$LOCAL_DIR/${RULES_NAME}"
-  if [[ -n "$POLICY_FOR_STAGE" ]]; then
-    pkexec install -D -m 644 "$POLICY_FOR_STAGE" "$LOCAL_DIR/${POLICY_NAME}" || true
-  fi
-  READ_FOR_STAGE="$(dirname "$SELF")/udev/${READ_RULES_NAME}"
-  if [[ -f "$READ_FOR_STAGE" ]]; then
-    pkexec install -D -m 644 "$READ_FOR_STAGE" "$LOCAL_DIR/${READ_RULES_NAME}" || true
-  fi
-  TE_SRC="$(dirname "$SELF")/selinux/emobie-inputd.te"
-  if [[ -f "$TE_SRC" ]]; then
-    pkexec install -D -m 644 "$TE_SRC" "$LOCAL_DIR/selinux/emobie-inputd.te" || true
-  fi
-  exec pkexec env SUDO_USER="${INVOKING_USER}" "$LOCAL_SETUP" "${FORWARD_ARGS[@]}"
+  done
+  echo "Refusing to elevate $SELF: only $SYSTEM_SETUP or $LOCAL_SETUP self-elevate." >&2
+  echo "Use Grant in emobie (it installs its own built-in copy), or: pkexec $SYSTEM_SETUP" >&2
+  echo "To run this copy as root anyway, if you trust every file beside it:" >&2
+  echo "  pkexec env SUDO_USER=\"\$USER\" EMOBIE_ALLOW_UNOWNED_SCRIPT=1 bash $SELF" >&2
+  exit 1
 fi
 
 # Root phase. Everything below runs with full privileges, so it may only use
@@ -235,12 +207,12 @@ fi
 TARGET_UID="$(id -u "$TARGET_USER")"
 TARGET_GID="$(id -g "$TARGET_USER")"
 
-RULES_SRC="$(resolve_rules_src "" || true)"
+RULES_SRC="$(resolve_rules_src || true)"
 if [[ -z "$RULES_SRC" ]]; then
   echo "Cannot find ${RULES_NAME} (looked in /usr/share/emobie and /usr/local/share/emobie)" >&2
   exit 1
 fi
-POLICY_SRC="$(resolve_policy_src "" || true)"
+POLICY_SRC="$(resolve_policy_src || true)"
 
 # Run a command as TARGET_USER without depending on sudo (we are already root).
 run_as_user() {
@@ -273,11 +245,14 @@ if [[ ! -w /etc/udev/rules.d ]]; then
   exit 1
 fi
 
-# User/AppImage installs: keep Polkit-annotated tree complete for future Grants.
+# Root-owned checkouts: keep the Polkit-annotated tree complete for future
+# Grants. Skipped for EMOBIE_ALLOW_UNOWNED_SCRIPT=1 runs — that opt-in covers
+# this run only, so its unverified files must not land in the trusted tree.
 SELF="$(script_path)"
 # Already running from the package or the staged copy: nothing to stage
 # (installing a file onto itself fails with "same file").
-if [[ "$SELF" != "$(readlink -f "$SYSTEM_SETUP" 2>/dev/null || echo __none__)" \
+if [[ "${EMOBIE_ALLOW_UNOWNED_SCRIPT:-}" != "1" \
+   && "$SELF" != "$(readlink -f "$SYSTEM_SETUP" 2>/dev/null || echo __none__)" \
    && "$SELF" != "$(readlink -f "$LOCAL_SETUP" 2>/dev/null || echo __none__)" ]]; then
   stage_user_assets_to_local "$SELF" "$RULES_SRC" "${POLICY_SRC:-}"
   echo "Installed $LOCAL_SETUP for future Grant prompts."
