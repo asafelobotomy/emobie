@@ -59,6 +59,13 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.8.2" date="2026-10-10">
+      <description>
+        <p>Setting up keyboard access asks for your password once instead of
+        once per file, and Expand as you type stays on after setup instead of
+        needing a second try.</p>
+      </description>
+    </release>
     <release version="0.8.1" date="2026-10-10">
       <description>
         <p>Security and reliability fixes. One-click updates now require a
