@@ -3,6 +3,7 @@ mod ei;
 mod enigo;
 mod keys_type;
 mod uinput;
+mod wl_clipboard;
 mod worker;
 
 use worker::{inject_worker_loop, InjectJob};

@@ -114,9 +114,14 @@ Manual host setup (same script):
 
 ```bash
 pkexec /usr/share/emobie/setup-input-access.sh
-# or from a source checkout:
-pkexec env SUDO_USER="$USER" bash packaging/setup-input-access.sh
+# or from a source checkout you trust (it runs this checkout's files as root,
+# and they are not staged for later Grants):
+pkexec env SUDO_USER="$USER" EMOBIE_ALLOW_UNOWNED_SCRIPT=1 bash packaging/setup-input-access.sh
 ```
+
+A copy outside `/usr/share/emobie` or `/usr/local/share/emobie` (a checkout,
+`~/.local/share/emobie`) never self-elevates: run as your user, it refuses
+instead of staging itself into the root-owned tree.
 
 Log out/in only if ACLs are unavailable, so new sessions inherit the group.
 Group membership grants `/dev/uinput` write access (paste injection).

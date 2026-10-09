@@ -42,6 +42,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   belongs to your user and the `emobie-input` group, so any unsandboxed
   process running as you can inject keys and, with Expand as you type on, read
   every keyboard — including on other sessions on the same machine.
+- **Setup script no longer stages user-writable files as root.** Run as your
+  user, `setup-input-access.sh` only self-elevates from `/usr/share/emobie` or
+  `/usr/local/share/emobie`. It previously copied itself and rules from a
+  checkout or `~/.local/share/emobie` into the root-owned tree, so anything
+  running as you could change what root ran at the next password prompt.
+  Running a checkout as root now needs `EMOBIE_ALLOW_UNOWNED_SCRIPT=1`, and
+  those files are not kept for later Grants.
+
+### Fixed
+
+- Editing a macro no longer drops its font style when you save.
+- "Restore clipboard" now works when `wl-copy` is installed; the original
+  clipboard was never saved on that path, so expansions stayed on the
+  clipboard.
 
 ## [0.8.0] - 2026-09-30
 

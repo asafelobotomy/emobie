@@ -1,4 +1,3 @@
-use std::io::Write;
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc;
@@ -6,12 +5,14 @@ use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use super::wl_clipboard::{read_via_wl_paste, set_via_wl_copy, wl_copy_available};
+
 /// Poll interval while waiting for the compositor to advertise clipboard text.
-const PASTE_SETTLE: Duration = Duration::from_millis(25);
+pub(super) const PASTE_SETTLE: Duration = Duration::from_millis(25);
 /// Cold Wayland/KDE clipboards often need hundreds of ms before Ctrl+V sees our offer.
-const CLIPBOARD_READY_TIMEOUT: Duration = Duration::from_millis(600);
+pub(super) const CLIPBOARD_READY_TIMEOUT: Duration = Duration::from_millis(600);
 /// Extra beat after read-back matches — KDE can echo get_text before paste works.
-const POST_CLIPBOARD_SETTLE: Duration = Duration::from_millis(40);
+pub(super) const POST_CLIPBOARD_SETTLE: Duration = Duration::from_millis(40);
 /// arboard's native Wayland path only proves *we* can read our own offer back —
 /// unlike wl-copy (verified externally via a separate wl-paste process), it gives
 /// no signal that the compositor has broadcast the new selection to the focused
@@ -83,68 +84,16 @@ fn clipboard_timeout<T: Send + 'static>(
     }
 }
 
-fn wl_copy_available() -> bool {
-    Command::new("wl-copy")
-        .arg("--version")
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
-}
-
-fn set_via_wl_copy(body: &str) -> Result<(), String> {
-    let mut child = Command::new("wl-copy")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|e| format!("wl-copy spawn: {e}"))?;
-    {
-        let mut stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| "wl-copy missing stdin".to_string())?;
-        stdin
-            .write_all(body.as_bytes())
-            .map_err(|e| format!("wl-copy write: {e}"))?;
-    }
-    let status = child
-        .wait()
-        .map_err(|e| format!("wl-copy wait: {e}"))?;
-    if !status.success() {
-        return Err(format!("wl-copy exit {status}"));
-    }
-    // Verify paste sees our offer when wl-paste exists.
-    if Command::new("wl-paste")
-        .arg("-n")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok()
-    {
-        let deadline = Instant::now() + CLIPBOARD_READY_TIMEOUT;
-        loop {
-            let out = Command::new("wl-paste")
-                .arg("-n")
-                .stdout(Stdio::piped())
-                .stderr(Stdio::null())
-                .output();
-            if let Ok(out) = out {
-                if out.stdout == body.as_bytes() {
-                    thread::sleep(POST_CLIPBOARD_SETTLE);
-                    return Ok(());
-                }
+/// Keep the first non-empty original across back-to-back expansions, so the
+/// restore puts back what the user had before any of them.
+fn remember_original(current: Option<String>) {
+    if let Ok(mut guard) = CLIPBOARD_ORIGINAL.lock() {
+        if guard.is_none() {
+            if let Some(cur) = current.filter(|s| !s.is_empty()) {
+                *guard = Some(cur);
             }
-            if Instant::now() >= deadline {
-                thread::sleep(POST_CLIPBOARD_SETTLE);
-                return Ok(());
-            }
-            thread::sleep(PASTE_SETTLE);
         }
     }
-    thread::sleep(POST_CLIPBOARD_SETTLE);
-    Ok(())
 }
 
 /// True when arboard picked its native Wayland data-control backend (same check
@@ -279,6 +228,11 @@ pub(super) fn set_clipboard_text(body: &str) -> Result<u64, String> {
         }
         // Prefer wl-copy on Wayland/KDE — often more reliable than arboard.
         if wl_copy_available() {
+            // Save the original first, or neither restore path has anything to
+            // put back and the expansion stays on the clipboard.
+            if RESTORE_CLIPBOARD.load(Ordering::Relaxed) {
+                remember_original(read_via_wl_paste());
+            }
             match set_via_wl_copy(&body) {
                 Ok(()) => {
                     note_backend("wl-copy");
@@ -293,14 +247,7 @@ pub(super) fn set_clipboard_text(body: &str) -> Result<u64, String> {
             return Err("clipboard op cancelled".into());
         }
         let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
-        let current = clipboard.get_text().ok();
-        if let Ok(mut guard) = CLIPBOARD_ORIGINAL.lock() {
-            if guard.is_none() {
-                if let Some(cur) = current.filter(|s| !s.is_empty()) {
-                    *guard = Some(cur);
-                }
-            }
-        }
+        remember_original(clipboard.get_text().ok());
         offer_text_until_ready(&mut clipboard, &body, seq)?;
         if !op_alive(seq) {
             return Err("clipboard op cancelled".into());
