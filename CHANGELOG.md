@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Flatpak keeps talking to the input helper after it restarts.** systemd
+  removed the helper's runtime directory on every stop, while the Flatpak
+  sandbox kept its mount of the deleted directory — so after Grant or a
+  helper update the app could no longer reach the new socket ("could not
+  restart emobie-inputd") and Expand as you type stayed off until emobie was
+  restarted. The unit now sets `RuntimeDirectoryPreserve=yes`, and the
+  Flatpak creates `xdg-run/emobie` at launch so it is shared even when the
+  helper starts after the app.
+
 ## [0.8.2] - 2026-10-10
 
 ### Fixed

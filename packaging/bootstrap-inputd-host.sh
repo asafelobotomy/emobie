@@ -62,6 +62,7 @@ PassEnvironment=WAYLAND_DISPLAY DISPLAY XAUTHORITY XDG_RUNTIME_DIR XKB_DEFAULT_L
 UMask=0077
 RuntimeDirectory=emobie
 RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
 PrivateDevices=no
 PrivateNetwork=yes
 ProtectSystem=strict

@@ -43,7 +43,7 @@ finish-args:
   # Flathub" in docs/FLATHUB.md for the full audit of this permission.
   - --talk-name=org.freedesktop.Flatpak
   # Optional host emobie-inputd socket (as-you-type / auto-paste). No --device=input.
-  - --filesystem=xdg-run/emobie
+  - --filesystem=xdg-run/emobie:create
   # Host-staged setup script + durable user prefs (~/.local/share/emobie).
   - --filesystem=xdg-data/emobie:create
   # Launch-on-startup uses the Autostart portal path long-term; do not grant

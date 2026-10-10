@@ -29,7 +29,7 @@ finish-args:
   # Flathub" in docs/FLATHUB.md for the full audit of this permission.
   - --talk-name=org.freedesktop.Flatpak
   # Optional host emobie-inputd socket (as-you-type / auto-paste). No --device=input.
-  - --filesystem=xdg-run/emobie
+  - --filesystem=xdg-run/emobie:create
   - --filesystem=xdg-data/emobie:create
   # GitHub Releases .deb wrap only: host autostart desktop entry.
   # Flathub-bound source manifest must not use this (Autostart portal instead).

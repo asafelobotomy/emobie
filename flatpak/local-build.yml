@@ -34,7 +34,7 @@ finish-args:
   # hardcoded argv, never shell-interpolated user input. See "Remaining before
   # Flathub" in docs/FLATHUB.md for the full audit of this permission.
   - --talk-name=org.freedesktop.Flatpak
-  - --filesystem=xdg-run/emobie
+  - --filesystem=xdg-run/emobie:create
   - --filesystem=xdg-data/emobie:create
 
 build-options:
