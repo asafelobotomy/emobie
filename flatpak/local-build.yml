@@ -1,6 +1,10 @@
 # Local-only build for installing the current commit as a Flatpak on this
 # machine. Not for Flathub (uses network during build instead of the
-# pre-vendored offline sources) and not committed to the repo.
+# pre-vendored offline sources).
+#
+# Needs org.flatpak.Builder, org.gnome.Sdk//50 and the rust-stable and node22
+# SDK extensions on branch 25.08 (what GNOME 50's Sdk asks for), plus
+# `git submodule update --init flatpak/shared-modules`. From the repo root:
 #
 #   flatpak run org.flatpak.Builder --force-clean --user --install \
 #     flatpak/build-dir-local flatpak/local-build.yml
@@ -52,10 +56,16 @@ modules:
         - --share=network
     sources:
       - type: dir
-        path: /home/solon/GitHub/emobie
+        # The checkout this manifest lives in (relative to this file).
+        path: ..
         skip:
           - .flatpak-builder
           - flatpak/build-dir-local
+          # Host build outputs: rebuilt inside the sandbox, and several GB.
+          - node_modules
+          - dist
+          - src-tauri/target
+          - crates/emobie-inputd/target
       - type: file
         path: io.github.asafelobotomy.emobie.metainfo.xml
       - type: file
