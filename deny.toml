@@ -1,0 +1,7 @@
+# cargo-deny: dependency advisories (CI runs `cargo deny check advisories` for both crates).
+[advisories]
+# Unmaintained, no vulnerability, no drop-in replacement yet:
+# - the zbus 5 family (zvariant, zvariant_derive, zbus_names): goes away with the move to zbus 6,
+#   which drops the blocking API emobie-inputd uses.
+# - proc-macro-error: comes in through Tauri's GTK stack.
+ignore = ["RUSTSEC-2026-0370", "RUSTSEC-2026-0371", "RUSTSEC-2026-0372", "RUSTSEC-2024-0370"]
