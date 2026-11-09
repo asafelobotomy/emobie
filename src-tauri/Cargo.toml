@@ -34,7 +34,7 @@ ksni = { version = "0.3", features = ["blocking"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 # Match emobie-inputd: skip libei (enigo 0.3 panics without RemoteDesktop portal).
 enigo = { version = "0.3", default-features = false, features = ["x11rb", "wayland"] }
-ashpd = { version = "0.11", features = ["tokio"] }
+ashpd = { version = "0.14", features = ["tokio"] }
 tokio = { version = "1", features = ["rt", "macros"] }
 # Same version Tauri already links; used to read GDK's live modifier state.
 gtk = "0.18"
