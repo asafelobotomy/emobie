@@ -1,0 +1,11 @@
+# Installed to /usr/share/uq/launcher/emobie.provider by emobie's package.
+# Typing ":" in Spotlight searches emoji: favourites and recents first, then by name and keyword.
+# Enter copies the emoji; Shift+Enter types it into the focused window through emobie-inputd
+# (or copies it when the helper isn't running). Served by /usr/bin/emobie-provider.
+[Launcher Provider]
+BusName=org.emobie.Provider
+Name=emobie
+Prefix=:
+# The bus starts emobie-provider when the launcher opens (org.emobie.Provider.service); it exits
+# after 60 s without a call.
+Activatable=true

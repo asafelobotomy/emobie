@@ -8,7 +8,9 @@ HOST_STAGE="$STAGE/host-bundle"
 mkdir -p "$STAGE" "$HOST_STAGE"
 
 cargo build --release --manifest-path "$ROOT/crates/emobie-inputd/Cargo.toml"
-install -m 755 "$ROOT/crates/emobie-inputd/target/release/emobie-inputd" "$STAGE/emobie-inputd"
+# Honour CARGO_TARGET_DIR (the Arch PKGBUILD sets it).
+install -m 755 "${CARGO_TARGET_DIR:-$ROOT/crates/emobie-inputd/target}/release/emobie-inputd" \
+  "$STAGE/emobie-inputd"
 install -m 644 "$ROOT/packaging/systemd/emobie-inputd.service" "$STAGE/emobie-inputd.service"
 install -m 755 "$ROOT/packaging/setup-input-access.sh" "$STAGE/setup-input-access.sh"
 install -m 644 "$ROOT/packaging/udev/99-emobie-input.rules" "$STAGE/99-emobie-input.rules"
@@ -19,6 +21,16 @@ install -m 644 "$ROOT/packaging/polkit/io.github.asafelobotomy.emobie.inputd.pol
 install -m 755 "$ROOT/packaging/bootstrap-inputd-host.sh" "$STAGE/bootstrap-inputd-host.sh"
 mkdir -p "$STAGE/selinux"
 install -m 644 "$ROOT/packaging/selinux/emobie-inputd.te" "$STAGE/selinux/emobie-inputd.te"
+
+# uQ integration for deb/rpm (inert without uQ; see uq/README.md): the launcher
+# provider, the emoji data it searches, and the uq/ files.
+cargo build --release --manifest-path "$ROOT/crates/emobie-provider/Cargo.toml"
+mkdir -p "$STAGE/uq"
+install -m 755 "${CARGO_TARGET_DIR:-$ROOT/crates/emobie-provider/target}/release/emobie-provider" \
+  "$STAGE/emobie-provider"
+install -m 644 "$ROOT/src/data/emoji.json" "$STAGE/emoji.json"
+install -m 644 "$ROOT/uq/launcher/emobie.provider" "$STAGE/uq/emobie.provider"
+install -m 644 "$ROOT/uq/dbus/org.emobie.Provider.service" "$STAGE/uq/org.emobie.Provider.service"
 
 # Keep in sync with src-tauri/src/input_helper/bootstrap.rs TAR_MEMBERS.
 HOST_MEMBERS=(

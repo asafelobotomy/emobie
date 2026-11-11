@@ -173,6 +173,10 @@ jobs:
             usr/share/emobie/98-emobie-keyboard-read.rules
             usr/share/emobie/selinux/emobie-inputd.te
             usr/share/polkit-1/actions/io.github.asafelobotomy.emobie.inputd.policy
+            usr/bin/emobie-provider
+            usr/share/emobie/emoji.json
+            usr/share/uq/launcher/emobie.provider
+            usr/share/dbus-1/services/org.emobie.Provider.service
           )
           DEB="$(find src-tauri/target/release/bundle/deb -name '*.deb' | head -n1)"
           RPM="$(find src-tauri/target/release/bundle/rpm -name '*.rpm' | head -n1)"

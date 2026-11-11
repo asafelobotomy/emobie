@@ -18,6 +18,11 @@ const need = [
   "/usr/share/emobie/98-emobie-keyboard-read.rules",
   "/usr/share/emobie/selinux/emobie-inputd.te",
   "/usr/share/polkit-1/actions/io.github.asafelobotomy.emobie.inputd.policy",
+  // uQ integration, staged by scripts/stage-inputd.sh (see uq/README.md).
+  "/usr/bin/emobie-provider",
+  "/usr/share/emobie/emoji.json",
+  "/usr/share/uq/launcher/emobie.provider",
+  "/usr/share/dbus-1/services/org.emobie.Provider.service",
 ];
 
 for (const bundle of ["deb", "rpm"]) {

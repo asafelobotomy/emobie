@@ -1,0 +1,18 @@
+/* uQ's theme. src/vendor/uq-tokens sets --uq-* and data-uq-variant on <html>
+ * from ~/.local/state/uq/theme/tokens.json when uQ is the desktop; while the
+ * theme setting is "System", emobie's own tokens follow them. Without uQ the
+ * attribute is never set and nothing here applies. */
+:root[data-uq-variant][data-theme-pref="system"] {
+  --bg: var(--uq-bg);
+  --bg-elevated: var(--uq-surface);
+  --bg-muted: var(--uq-surface-alt);
+  --ink: var(--uq-text);
+  --ink-muted: var(--uq-text-muted);
+  --accent: var(--uq-accent);
+  --accent-soft: var(--uq-overlay);
+  --border: var(--uq-border);
+  --danger: var(--uq-error);
+  --radius: var(--uq-radius);
+  --font-ui: var(--uq-font-ui), "Ubuntu", "Segoe UI", "Noto Sans", sans-serif;
+  --font-mono: var(--uq-font-mono), "Ubuntu Mono", ui-monospace, monospace;
+}
