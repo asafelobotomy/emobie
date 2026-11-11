@@ -65,6 +65,9 @@ jobs:
       - name: Check shared emoji data is up to date
         run: npm run emoji:check
 
+      - name: Check the vendored uq-tokens version
+        run: npm run check:uq-tokens
+
       - name: Typecheck and frontend build
         run: npm run build
 

@@ -15,6 +15,7 @@ import { useCopyEmoji, useCopyText } from "./hooks/useCopyEmoji";
 import { useAlwaysOnTop, usePinCapability } from "./hooks/useAlwaysOnTop";
 import { useGlobalHotkeys } from "./hooks/useGlobalHotkey";
 import { useUqDesktop } from "./hooks/useUqDesktop";
+import { useUqTokens } from "./hooks/useUqTokens";
 import { summonHotkeyEnabled } from "./lib/uqDesktop";
 import { useTheme } from "./hooks/useTheme";
 import { useWindowDecorations } from "./hooks/useWindowDecorations";
@@ -121,6 +122,7 @@ function App() {
   const pinnedRef = useRef(prefs.pinned);
   pinnedRef.current = prefs.pinned;
 
+  useUqTokens();
   useTheme(prefs.theme);
   const pinNotice = useAlwaysOnTop(prefs.pinned, ready);
   const { capability: pinCapability, refresh: refreshPinCapability } =

@@ -41,6 +41,7 @@
     "allow-input-helper-ensure-started",
     "allow-input-helper-run-access-setup",
     "allow-input-helper-set-keyboard-read",
-    "allow-uq-desktop-active"
+    "allow-uq-desktop-active",
+    "allow-uq-tokens"
   ]
 }

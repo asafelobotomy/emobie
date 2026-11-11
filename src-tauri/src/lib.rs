@@ -7,6 +7,7 @@ mod prefs;
 mod tray;
 mod updates;
 mod uq_desktop;
+mod uq_tokens;
 
 const FLATPAK_APP_ID: &str = "io.github.asafelobotomy.emobie";
 
@@ -74,6 +75,7 @@ pub fn run() {
         .setup(move |app| {
             #[cfg(desktop)]
             {
+                uq_tokens::watch_tokens(app.handle());
                 let status = tray::setup(app, allow_multiple);
                 let tray_ok = status.available;
                 app.manage(TrayAvailable(status));
@@ -127,6 +129,7 @@ pub fn run() {
             prefs::load_preference_snapshots,
             prefs::save_durable_preferences,
             uq_desktop::uq_desktop_active,
+            uq_tokens::uq_tokens,
         ])
         .run(tauri::generate_context!())
         .expect("error while running emobie");
