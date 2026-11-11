@@ -72,6 +72,7 @@ Linux tray, pin, startup, and SELinux notes: [`docs/LINUX.md`](docs/LINUX.md).
 | **Pin** | Always-on-top from the toolbar or tray (X11, Plasma Wayland, and GNOME Wayland after a one-time shortcut setup in Settings; other Wayland compositors may ignore) |
 | **Look** | Light / dark / system theme, emoji size, and skin tone defaults |
 | **Sort** | Default order, name, type, first used, or number of uses |
+| **uQ** | On the [uQ](https://github.com/asafelobotomy/uq) desktop: type `:` in Spotlight to search emoji (favourites and recents first; Enter copies, Shift+Enter types), and emobie follows uQ's theme — see [uq/README.md](uq/README.md) |
 
 **Tray:** left-click shows emobie · right-click for Show / Hide / Pin / Quit  
 **Close:** hides to tray — quit from Settings or the tray menu
@@ -120,7 +121,19 @@ npm run tauri dev
 ```bash
 npm test          # unit smoke tests
 npm run build     # frontend typecheck + Vite build
+npm run test:provider   # emobie-provider (uQ launcher), incl. a private D-Bus test
 ```
+
+**Emoji data.** `src/data/emoji.json` is generated from emojibase by
+`npm run emoji:build` and committed; the app imports it and packages install it
+as `/usr/share/emobie/emoji.json` for `emobie-provider`. After bumping
+`emojibase-data` or editing `src/data/extraEmoticons.ts`, run `npm run emoji:build`
+(CI's `npm run emoji:check` fails on a stale file).
+
+**uq-tokens.** `src/vendor/uq-tokens/` is vendored from uQ's `web/uq-tokens`
+(`uq-tokens.js` unchanged; `uq-tokens.css` holds emobie's palette as fallbacks).
+To update, copy the new `uq-tokens.js` over it and bump the version pinned in
+`package.json`'s `check:uq-tokens` script.
 
 ---
 
@@ -190,6 +203,11 @@ Or run the **Release** workflow from the Actions tab.
   `~/.local/share/io.github.asafelobotomy.emobie/…` (older native builds used
   `com.emobie.app`). A durable mirror at
   `~/.local/share/emobie/preferences.json` keeps favorites/macros across both.
+- Under **uQ**, Super+. opens uQ's emoji search, so emobie's own summon hotkey stays off
+  (emobie checks for `org.uq.Desktop1` on the session bus when it starts; macro hotkeys still
+  work). emobie's look follows uQ's theme while Settings → Theme is "System". Native packages
+  only: the Flatpak sandbox does not see uQ's bus name or theme file, so it keeps its own
+  hotkey and theme.
 - Pin is reliable on X11 and Plasma Wayland. On GNOME Wayland it needs a one-time shortcut
   setup (Settings → "Set up GNOME pin shortcut") since Mutter has no external always-on-top
   API — emobie binds GNOME's own unused `toggle-above` keybinding instead. Other Wayland

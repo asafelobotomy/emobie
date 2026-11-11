@@ -22,7 +22,8 @@ depends=(
 )
 makedepends=('cargo' 'nodejs' 'npm' 'clang' 'lld' 'libxkbcommon')
 optdepends=(
-  'wl-clipboard: externally-verified Wayland clipboard for reliable Expand paste'
+  'wl-clipboard: externally-verified Wayland clipboard for reliable Expand paste; copying emoji from uQ'"'"'s Spotlight'
+  'uq: emoji search in uQ'"'"'s Spotlight (type :) and following uQ'"'"'s theme'
   'acl: setfacl for instant keyboard access after Grant without logout'
 )
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
@@ -38,6 +39,7 @@ build() {
   export CARGO_TARGET_DIR="$srcdir/target"
   npm run tauri build -- --no-bundle
   cargo build --release --manifest-path crates/emobie-inputd/Cargo.toml
+  cargo build --release --manifest-path crates/emobie-provider/Cargo.toml
 }
 
 package() {
@@ -45,6 +47,14 @@ package() {
   install -Dm755 "$srcdir/target/release/emobie" "$pkgdir/usr/bin/emobie"
   install -Dm755 "$srcdir/target/release/emobie-inputd" \
     "$pkgdir/usr/bin/emobie-inputd"
+  # uQ integration (inert without uQ): the launcher provider, its data and its files.
+  install -Dm755 "$srcdir/target/release/emobie-provider" \
+    "$pkgdir/usr/bin/emobie-provider"
+  install -Dm644 src/data/emoji.json "$pkgdir/usr/share/emobie/emoji.json"
+  install -Dm644 uq/launcher/emobie.provider \
+    "$pkgdir/usr/share/uq/launcher/emobie.provider"
+  install -Dm644 uq/dbus/org.emobie.Provider.service \
+    "$pkgdir/usr/share/dbus-1/services/org.emobie.Provider.service"
   install -Dm644 packaging/systemd/emobie-inputd.service \
     "$pkgdir/usr/lib/systemd/user/emobie-inputd.service"
   install -Dm755 packaging/setup-input-access.sh \
