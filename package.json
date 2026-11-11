@@ -8,6 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "node --experimental-strip-types --test src/lib/*.test.ts",
+    "emoji:build": "node --experimental-strip-types scripts/build-emoji-json.ts",
+    "emoji:check": "node --experimental-strip-types scripts/build-emoji-json.ts --check",
     "test:inputd": "cargo test --manifest-path crates/emobie-inputd/Cargo.toml",
     "verify:expand": "bash scripts/verify-expand-setup.sh",
     "smoke:expand": "python3 scripts/smoke-expand-e2e.py",

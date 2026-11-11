@@ -62,6 +62,9 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: Check shared emoji data is up to date
+        run: npm run emoji:check
+
       - name: Typecheck and frontend build
         run: npm run build
 
