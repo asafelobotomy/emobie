@@ -12,6 +12,7 @@ import {
 } from "../types/preferences";
 import { SkinTonePicker } from "./SkinTonePicker";
 import { HotkeyCapture } from "./HotkeyCapture";
+import { useUqDesktop } from "../hooks/useUqDesktop";
 
 type SettingsGeneralSectionProps = {
   prefs: Preferences;
@@ -44,6 +45,7 @@ export function SettingsGeneralSection({
   onSortBy,
   onEmoticonStyle,
 }: SettingsGeneralSectionProps) {
+  const uqDesktop = useUqDesktop();
   return (
     <>
       <div className="settings-row">
@@ -181,6 +183,12 @@ export function SettingsGeneralSection({
         error={hotkeyError}
         onChange={onHotkey}
       />
+      {uqDesktop ? (
+        <p className="settings-hint settings-hint-block">
+          uQ is your desktop, so this hotkey is off: press Super+. to search
+          emoji in uQ&apos;s launcher, or open emobie from the app menu.
+        </p>
+      ) : null}
     </>
   );
 }

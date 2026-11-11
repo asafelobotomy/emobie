@@ -6,6 +6,7 @@ mod pin;
 mod prefs;
 mod tray;
 mod updates;
+mod uq_desktop;
 
 const FLATPAK_APP_ID: &str = "io.github.asafelobotomy.emobie";
 
@@ -125,6 +126,7 @@ pub fn run() {
             updates::apply_update,
             prefs::load_preference_snapshots,
             prefs::save_durable_preferences,
+            uq_desktop::uq_desktop_active,
         ])
         .run(tauri::generate_context!())
         .expect("error while running emobie");

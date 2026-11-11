@@ -14,6 +14,8 @@ import { useLayoutMode } from "./hooks/useLayoutMode";
 import { useCopyEmoji, useCopyText } from "./hooks/useCopyEmoji";
 import { useAlwaysOnTop, usePinCapability } from "./hooks/useAlwaysOnTop";
 import { useGlobalHotkeys } from "./hooks/useGlobalHotkey";
+import { useUqDesktop } from "./hooks/useUqDesktop";
+import { summonHotkeyEnabled } from "./lib/uqDesktop";
 import { useTheme } from "./hooks/useTheme";
 import { useWindowDecorations } from "./hooks/useWindowDecorations";
 import { useAutostart } from "./hooks/useAutostart";
@@ -175,9 +177,14 @@ function App() {
     [copyEmoji, autoPasteOpts],
   );
 
+  const uqDesktop = useUqDesktop();
   const hotkeyError = useGlobalHotkeys({
     summonHotkey: prefs.hotkey,
-    summonEnabled: ready && !prefs.allowMultipleInstances,
+    summonEnabled: summonHotkeyEnabled({
+      ready,
+      allowMultipleInstances: prefs.allowMultipleInstances,
+      uqDesktop,
+    }),
     pinned: prefs.pinned,
     macros: prefs.macros,
     onMacroHotkey: copyMacro,
