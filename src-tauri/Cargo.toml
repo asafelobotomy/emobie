@@ -35,7 +35,7 @@ arboard = { version = "3", features = ["wayland-data-control"] }
 ksni = { version = "0.3", features = ["blocking"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 # Match emobie-inputd: skip libei (enigo 0.3 panics without RemoteDesktop portal).
-enigo = { version = "0.3", default-features = false, features = ["x11rb", "wayland"] }
+enigo = { version = "0.6", default-features = false, features = ["x11rb", "wayland"] }
 ashpd = { version = "0.11", features = ["tokio"] }
 tokio = { version = "1", features = ["rt", "macros"] }
 # Same version Tauri already links; used to read GDK's live modifier state.
