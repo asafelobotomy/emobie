@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Emoji search in uQ.** On the uQ desktop, typing `:` in Spotlight searches
+  emoji: favourites and recents first, then by name, keyword, shortcode or
+  emoticon, in your skin tone. Enter copies the emoji; Shift+Enter types it
+  into the focused window through emobie-inputd (or copies it when the
+  helper isn't running). This is the new `emobie-provider`, a small service
+  the session bus starts on demand and that exits after a minute idle; the
+  emobie app doesn't need to be running. Native packages install it with
+  its `uq/` files, which do nothing without uQ.
+- **emobie follows uQ's theme.** While Settings → Theme is "System", emobie
+  takes its colours, corner radius and fonts from uQ's theme and follows it
+  live.
+
+### Changed
+
+- **The summon hotkey stays off under uQ.** uQ binds Super+. to its emoji
+  search, so emobie no longer registers its own summon hotkey there (macro
+  hotkeys are unaffected). Settings says so.
+- **One emoji data file.** The emoji list is generated once from emojibase
+  into `src/data/emoji.json` (installed as `/usr/share/emobie/emoji.json`), so
+  the app and uQ's search find the same emoji. The list itself is unchanged.
+
 ### Fixed
 
 - **Flatpak keeps talking to the input helper after it restarts.** systemd

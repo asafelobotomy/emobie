@@ -1,0 +1,5 @@
+# Installed to /usr/share/dbus-1/services/org.emobie.Provider.service by emobie's package.
+# Lets the session bus start emobie's uQ launcher provider on demand.
+[D-BUS Service]
+Name=org.emobie.Provider
+Exec=/usr/bin/emobie-provider

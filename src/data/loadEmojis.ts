@@ -1,11 +1,5 @@
-import type { Emoji as EmojibaseEmoji } from "emojibase";
-import { EMOJI } from "emojibase";
-import data from "emojibase-data/en/data.json";
-import messages from "emojibase-data/en/messages.json";
-import shortcodesEmojibase from "emojibase-data/en/shortcodes/emojibase.json";
-import shortcodesGithub from "emojibase-data/en/shortcodes/github.json";
-import shortcodesLegacy from "emojibase-data/en/shortcodes/emojibase-legacy.json";
-import { extraEmoticonsFor } from "./extraEmoticons";
+import emojiData from "./emoji.json";
+import type { EmojiData } from "../lib/buildEmojiData";
 
 export type SkinTone = 0 | 1 | 2 | 3 | 4 | 5;
 
@@ -40,82 +34,33 @@ const CATEGORY_ICONS: Record<string, string> = {
   flags: "🏁",
 };
 
-const SKIP_GROUPS = new Set(["component"]);
-
-function asStringList(value: string | string[] | undefined): string[] {
-  if (!value) return [];
-  return Array.isArray(value) ? value : [value];
-}
-
-function mergeShortcodes(hexcode: string): string[] {
-  const packs = [
-    shortcodesEmojibase,
-    shortcodesGithub,
-    shortcodesLegacy,
-  ] as Record<string, string | string[]>[];
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const pack of packs) {
-    for (const code of asStringList(pack[hexcode])) {
-      const key = code.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      result.push(code);
-    }
-  }
-  return result;
-}
-
-function mergeEmoticons(
-  emoji: string,
-  base: string | string[] | undefined,
-): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const item of [...asStringList(base), ...extraEmoticonsFor(emoji)]) {
-    if (!item || seen.has(item)) continue;
-    seen.add(item);
-    result.push(item);
-  }
-  return result;
-}
+// Generated from emojibase by scripts/build-emoji-json.ts and shared with
+// emobie-provider (installed as /usr/share/emobie/emoji.json), so the app and
+// uQ's `:` search use the same data. Component groups are already left out.
+const DATA = emojiData as EmojiData;
 
 function buildEmojis(): emobieEmoji[] {
-  const emojiData = data as EmojibaseEmoji[];
-
-  return emojiData
-    .filter((item) => item.type === EMOJI && item.group !== undefined)
-    .filter((item) => {
-      const groupMeta = messages.groups.find((g) => g.order === item.group);
-      return groupMeta && !SKIP_GROUPS.has(groupMeta.key);
-    })
-    .map((item) => ({
-      emoji: item.emoji,
-      label: item.label,
-      hexcode: item.hexcode,
-      group: item.group as number,
-      tags: item.tags ?? [],
-      shortcodes: mergeShortcodes(item.hexcode),
-      emoticons: mergeEmoticons(item.emoji, item.emoticon),
-      skins: item.skins?.map((skin) => ({
-        emoji: skin.emoji,
-        tone: skin.tone as number | number[],
-      })),
-      order: item.order ?? 0,
-    }))
-    .sort((a, b) => a.order - b.order);
+  return DATA.emojis.map((item) => ({
+    emoji: item.emoji,
+    label: item.name,
+    hexcode: item.hexcode,
+    group: item.group,
+    tags: item.keywords,
+    shortcodes: item.shortcodes,
+    emoticons: item.emoticons,
+    skins: item.skins,
+    order: item.order,
+  }));
 }
 
 export const EMOJIS: emobieEmoji[] = buildEmojis();
 
-export const CATEGORIES: Category[] = messages.groups
-  .filter((group) => !SKIP_GROUPS.has(group.key))
-  .map((group) => ({
-    id: group.order,
-    key: group.key,
-    label: group.message.replace(/\b\w/g, (c) => c.toUpperCase()),
-    icon: CATEGORY_ICONS[group.key] ?? "✨",
-  }));
+export const CATEGORIES: Category[] = DATA.groups.map((group) => ({
+  id: group.id,
+  key: group.key,
+  label: group.name.replace(/\b\w/g, (c) => c.toUpperCase()),
+  icon: CATEGORY_ICONS[group.key] ?? "✨",
+}));
 
 export function applySkinTone(emoji: emobieEmoji, tone: SkinTone): string {
   if (tone === 0 || !emoji.skins?.length) {

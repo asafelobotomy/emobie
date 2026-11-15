@@ -61,7 +61,11 @@
           "/usr/share/emobie/99-emobie-input.rules": "inputd-bundle/99-emobie-input.rules",
           "/usr/share/emobie/98-emobie-keyboard-read.rules": "inputd-bundle/98-emobie-keyboard-read.rules",
           "/usr/share/emobie/selinux/emobie-inputd.te": "inputd-bundle/selinux/emobie-inputd.te",
-          "/usr/share/polkit-1/actions/io.github.asafelobotomy.emobie.inputd.policy": "inputd-bundle/io.github.asafelobotomy.emobie.inputd.policy"
+          "/usr/share/polkit-1/actions/io.github.asafelobotomy.emobie.inputd.policy": "inputd-bundle/io.github.asafelobotomy.emobie.inputd.policy",
+          "/usr/bin/emobie-provider": "inputd-bundle/emobie-provider",
+          "/usr/share/emobie/emoji.json": "inputd-bundle/emoji.json",
+          "/usr/share/uq/launcher/emobie.provider": "inputd-bundle/uq/emobie.provider",
+          "/usr/share/dbus-1/services/org.emobie.Provider.service": "inputd-bundle/uq/org.emobie.Provider.service"
         }
       },
       "rpm": {
@@ -84,7 +88,11 @@
           "/usr/share/emobie/99-emobie-input.rules": "inputd-bundle/99-emobie-input.rules",
           "/usr/share/emobie/98-emobie-keyboard-read.rules": "inputd-bundle/98-emobie-keyboard-read.rules",
           "/usr/share/emobie/selinux/emobie-inputd.te": "inputd-bundle/selinux/emobie-inputd.te",
-          "/usr/share/polkit-1/actions/io.github.asafelobotomy.emobie.inputd.policy": "inputd-bundle/io.github.asafelobotomy.emobie.inputd.policy"
+          "/usr/share/polkit-1/actions/io.github.asafelobotomy.emobie.inputd.policy": "inputd-bundle/io.github.asafelobotomy.emobie.inputd.policy",
+          "/usr/bin/emobie-provider": "inputd-bundle/emobie-provider",
+          "/usr/share/emobie/emoji.json": "inputd-bundle/emoji.json",
+          "/usr/share/uq/launcher/emobie.provider": "inputd-bundle/uq/emobie.provider",
+          "/usr/share/dbus-1/services/org.emobie.Provider.service": "inputd-bundle/uq/org.emobie.Provider.service"
         }
       }
     }
