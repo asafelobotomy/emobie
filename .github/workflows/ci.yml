@@ -62,6 +62,12 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: Check shared emoji data is up to date
+        run: npm run emoji:check
+
+      - name: Check the vendored uq-tokens version
+        run: npm run check:uq-tokens
+
       - name: Typecheck and frontend build
         run: npm run build
 
@@ -74,18 +80,25 @@ jobs:
       - name: Clippy (input helper)
         run: cargo clippy --manifest-path crates/emobie-inputd/Cargo.toml --all-targets -- -D warnings
 
+      - name: Clippy (uQ launcher provider)
+        run: cargo clippy --manifest-path crates/emobie-provider/Cargo.toml --all-targets -- -D warnings
+
       - name: App unit tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
       - name: Input helper unit tests
         run: cargo test --manifest-path crates/emobie-inputd/Cargo.toml
 
+      # Includes a private dbus-daemon test (bus activation, Search, Activate).
+      - name: uQ launcher provider tests
+        run: cargo test --manifest-path crates/emobie-provider/Cargo.toml
+
   deny:
     name: Dependency advisories
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        manifest: [src-tauri/Cargo.toml, crates/emobie-inputd/Cargo.toml]
+        manifest: [src-tauri/Cargo.toml, crates/emobie-inputd/Cargo.toml, crates/emobie-provider/Cargo.toml]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2

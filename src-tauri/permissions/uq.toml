@@ -1,0 +1,9 @@
+[[permission]]
+identifier = "allow-uq-desktop-active"
+description = "Allows checking whether uQ is the running desktop (org.uq.Desktop1 on the session bus)"
+commands.allow = ["uq_desktop_active"]
+
+[[permission]]
+identifier = "allow-uq-tokens"
+description = "Allows reading uQ's theme tokens (~/.local/state/uq/theme/tokens.json)"
+commands.allow = ["uq_tokens"]
