@@ -4,11 +4,16 @@
 
 const UQ_DESKTOP_NAME: &str = "org.uq.Desktop1";
 
+/// zbus 6 has no blocking API: `zbus::block_on` drives the connection on this thread (callers are
+/// on `spawn_blocking`, never inside an async task).
 fn desktop_active() -> Result<bool, String> {
-    let conn = zbus::blocking::Connection::session().map_err(|e| e.to_string())?;
-    let dbus = zbus::blocking::fdo::DBusProxy::new(&conn).map_err(|e| e.to_string())?;
-    let name = zbus::names::BusName::try_from(UQ_DESKTOP_NAME).map_err(|e| e.to_string())?;
-    dbus.name_has_owner(name).map_err(|e| e.to_string())
+    zbus::block_on(async {
+        let conn = zbus::Connection::session().await?;
+        let dbus = zbus::fdo::DBusProxy::new(&conn).await?;
+        let name = zbus::names::BusName::try_from(UQ_DESKTOP_NAME)?;
+        Ok::<_, zbus::Error>(dbus.name_has_owner(name).await?)
+    })
+    .map_err(|e| e.to_string())
 }
 
 /// False when there is no session bus (or inside a sandbox that hides the name).
