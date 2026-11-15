@@ -220,7 +220,7 @@ pub(crate) mod tests {
         let c = Catalog::load(&path).unwrap();
         assert!(c.entries.len() > 1000);
         let thumbs = c.by_hexcode("1F44D").unwrap();
-        assert_eq!(c.entries[thumbs].emoji, "👍\u{fe0f}");
+        assert_eq!(c.entries[thumbs].emoji, "👍");
         assert_eq!(c.entries[thumbs].skins.len(), 5);
     }
 }

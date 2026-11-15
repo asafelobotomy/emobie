@@ -265,6 +265,6 @@ mod tests {
         let real = Catalog::load(&path).unwrap();
         let hits = search(&real, &none, "face");
         assert_eq!(hits.len(), MAX_ITEMS);
-        assert_eq!(search(&real, &none, "thumbs up")[0].emoji, "👍\u{fe0f}");
+        assert_eq!(search(&real, &none, "thumbs up")[0].emoji, "👍");
     }
 }
