@@ -34,7 +34,8 @@ notify = { version = "8", default-features = false }
 arboard = { version = "3", features = ["wayland-data-control"] }
 ksni = { version = "0.3", features = ["blocking"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
-# Match emobie-inputd: skip libei (enigo 0.3 panics without RemoteDesktop portal).
+# Match emobie-inputd: skip libei (enigo 0.3 panics without RemoteDesktop portal;
+# 0.6 splits it into libei_tokio/libei_smol, neither enabled here).
 enigo = { version = "0.6", default-features = false, features = ["x11rb", "wayland"] }
 ashpd = { version = "0.11", features = ["tokio"] }
 tokio = { version = "1", features = ["rt", "macros"] }
