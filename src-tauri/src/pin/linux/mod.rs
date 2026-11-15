@@ -221,9 +221,11 @@ Works on X11 and Plasma."
 }
 
 fn kwin_reachable() -> bool {
-    kwin_bus()
-        .and_then(|conn| kwin_call::<_, ()>(&conn, "/KWin", "org.freedesktop.DBus.Peer", "Ping", &()))
-        .is_ok()
+    zbus::block_on(async {
+        let conn = kwin_bus().await?;
+        kwin_call::<_, ()>(&conn, "/KWin", "org.freedesktop.DBus.Peer", "Ping", &()).await
+    })
+    .is_ok()
 }
 
 fn plasma_keep_above(pinned: bool) -> Result<(), String> {
@@ -271,37 +273,46 @@ for (const w of wins) {{
     // directly (the Flatpak has --talk-name=org.kde.KWin), so no host qdbus.
     let plugin = "emobie-pin";
     let path_str = path.to_string_lossy().to_string();
-    let conn = kwin_bus()?;
-    let _ = kwin_call::<_, bool>(&conn, "/Scripting", "org.kde.kwin.Scripting", "unloadScript", &(plugin,));
-    let id: i32 = kwin_call(
-        &conn,
-        "/Scripting",
-        "org.kde.kwin.Scripting",
-        "loadScript",
-        &(path_str.as_str(), plugin),
-    )?;
-    let script_path = format!("/Scripting/Script{id}");
-    kwin_call::<_, ()>(&conn, &script_path, "org.kde.kwin.Script", "run", &())?;
-    let _ = kwin_call::<_, bool>(&conn, "/Scripting", "org.kde.kwin.Scripting", "unloadScript", &(plugin,));
-    Ok(())
+    zbus::block_on(async {
+        let conn = kwin_bus().await?;
+        let unload = &(plugin,);
+        let _ = kwin_call::<_, bool>(&conn, "/Scripting", "org.kde.kwin.Scripting", "unloadScript", unload).await;
+        let id: i32 = kwin_call(
+            &conn,
+            "/Scripting",
+            "org.kde.kwin.Scripting",
+            "loadScript",
+            &(path_str.as_str(), plugin),
+        )
+        .await?;
+        let script_path = format!("/Scripting/Script{id}");
+        kwin_call::<_, ()>(&conn, &script_path, "org.kde.kwin.Script", "run", &()).await?;
+        let _ = kwin_call::<_, bool>(&conn, "/Scripting", "org.kde.kwin.Scripting", "unloadScript", unload).await;
+        Ok(())
+    })
 }
 
-fn kwin_bus() -> Result<zbus::blocking::Connection, String> {
-    zbus::blocking::Connection::session().map_err(|e| format!("session bus unavailable ({e})"))
+// zbus 6 has no blocking API: `zbus::block_on` drives the connection on the calling thread.
+// Pin code runs on `spawn_blocking` threads (see `pin/mod.rs`), never inside an async task.
+async fn kwin_bus() -> Result<zbus::Connection, String> {
+    zbus::Connection::session()
+        .await
+        .map_err(|e| format!("session bus unavailable ({e})"))
 }
 
-fn kwin_call<B, R>(
-    conn: &zbus::blocking::Connection,
+async fn kwin_call<B, R>(
+    conn: &zbus::Connection,
     path: &str,
     interface: &str,
     method: &str,
     body: &B,
 ) -> Result<R, String>
 where
-    B: serde::Serialize + zbus::zvariant::DynamicType,
-    R: for<'d> zbus::zvariant::DynamicDeserialize<'d>,
+    B: serde::Serialize + zbus::DynamicType,
+    R: for<'d> zbus::wire::DynamicDeserialize<'d>,
 {
     conn.call_method(Some("org.kde.KWin"), path, Some(interface), method, body)
+        .await
         .and_then(|reply| reply.body().deserialize::<R>())
         .map_err(|e| format!("KWin {method} failed ({e})"))
 }
