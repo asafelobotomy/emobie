@@ -90,10 +90,7 @@ pub(super) fn trusted_socket_path(path: &Path) -> bool {
         }
     }
     let tmp_fallback = PathBuf::from(format!("/tmp/emobie-{}", current_uid()));
-    if parent == tmp_fallback.as_path() {
-        return true;
-    }
-    false
+    parent == tmp_fallback.as_path()
 }
 
 fn socket_parent_dir_safe(path: &Path) -> bool {
