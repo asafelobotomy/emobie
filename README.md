@@ -72,7 +72,7 @@ Linux tray, pin, startup, and SELinux notes: [`docs/LINUX.md`](docs/LINUX.md).
 | **Pin** | Always-on-top from the toolbar or tray (X11, Plasma Wayland, and GNOME Wayland after a one-time shortcut setup in Settings; other Wayland compositors may ignore) |
 | **Look** | Light / dark / system theme, emoji size, and skin tone defaults |
 | **Sort** | Default order, name, type, first used, or number of uses |
-| **uQ** | On the [uQ](https://github.com/asafelobotomy/uq) desktop: type `:` in Spotlight to search emoji (favourites and recents first; Enter copies, Shift+Enter types), and emobie follows uQ's theme — see [uq/README.md](uq/README.md) |
+| **uQ** | On the [uQ](https://github.com/asafelobotomy/uq) desktop: type `:` in look=see>do_ to search emoji (favourites and recents first; Enter copies, Shift+Enter types), and emobie follows uQ's theme — see [uq/README.md](uq/README.md) |
 
 **Tray:** left-click shows emobie · right-click for Show / Hide / Pin / Quit  
 **Close:** hides to tray — quit from Settings or the tray menu

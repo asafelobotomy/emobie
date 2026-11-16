@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Emoji search in uQ.** On the uQ desktop, typing `:` in Spotlight searches
+- **Emoji search in uQ.** On the uQ desktop, typing `:` in look=see>do_ searches
   emoji: favourites and recents first, then by name, keyword, shortcode or
   emoticon, in your skin tone. Enter copies the emoji; Shift+Enter types it
   into the focused window through emobie-inputd (or copies it when the
