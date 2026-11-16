@@ -63,7 +63,7 @@ Linux tray, pin, startup, and SELinux notes: [`docs/LINUX.md`](docs/LINUX.md).
 |---|---|
 | **Catalog** | Full Unicode emoji set via emojibase, with categories and search (name, tags, shortcodes) |
 | **Favorites & recents** | Right-click to favorite; recent history with configurable size |
-| **Macros** | Custom trigger → expansion cards (+ to add), optional favorited-emoji shortcodes/emoticons, per-macro hotkeys, YAML import/export |
+| **Macros** | Custom trigger → expansion cards (+ to add), optional favorited-emoji shortcodes/emoticons, per-macro hotkeys, YAML import/export; deleted macros can be restored. `emobie macro …` from the command line |
 | **Updates** | Optional startup check; Settings can download and install the matching release asset (deb/rpm/AppImage/Flatpak) |
 | **Copy** | One-click clipboard copy; optional auto-paste when the host input helper is available |
 | **Expand** | Opt-in as-you-type text expansion: type a trigger anywhere to replace it (one admin prompt for keyboard access — see [docs/MACROS.md](docs/MACROS.md)) |
@@ -72,7 +72,7 @@ Linux tray, pin, startup, and SELinux notes: [`docs/LINUX.md`](docs/LINUX.md).
 | **Pin** | Always-on-top from the toolbar or tray (X11, Plasma Wayland, and GNOME Wayland after a one-time shortcut setup in Settings; other Wayland compositors may ignore) |
 | **Look** | Light / dark / system theme, emoji size, and skin tone defaults |
 | **Sort** | Default order, name, type, first used, or number of uses |
-| **uQ** | On the [uQ](https://github.com/asafelobotomy/uq) desktop: type `:` in look=see>do_ to search emoji (favourites and recents first; Enter copies, Shift+Enter types), and emobie follows uQ's theme — see [uq/README.md](uq/README.md) |
+| **uQ** | On the [uQ](https://github.com/asafelobotomy/uq) desktop: type `:` in look=see>do_ to search emoji (favourites and recents first; Enter copies, Shift+Enter types), emobie follows uQ's theme, and Settings → Apps has an Emoji and macros page — see [uq/README.md](uq/README.md) |
 
 **Tray:** left-click shows emobie · right-click for Show / Hide / Pin / Quit  
 **Close:** hides to tray — quit from Settings or the tray menu

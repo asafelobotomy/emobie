@@ -1,9 +1,11 @@
 use tauri::{AppHandle, Manager, State, WindowEvent};
 
+pub mod cli;
 mod autostart;
 mod input_helper;
 mod pin;
 mod prefs;
+mod prefs_watch;
 mod tray;
 mod updates;
 mod uq_desktop;
@@ -76,6 +78,7 @@ pub fn run() {
             #[cfg(desktop)]
             {
                 uq_tokens::watch_tokens(app.handle());
+                prefs_watch::watch(app.handle());
                 let status = tray::setup(app, allow_multiple);
                 let tray_ok = status.available;
                 app.manage(TrayAvailable(status));

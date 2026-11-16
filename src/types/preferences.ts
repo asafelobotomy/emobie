@@ -34,6 +34,12 @@ export type Macro = {
   fontStyle?: FontStyleId;
 };
 
+/** A macro that was deleted, kept so it can be restored (newest first, at most 50). */
+export type DeletedMacro = Macro & {
+  /** When it was deleted, ms since the epoch. */
+  deletedAt: number;
+};
+
 export type Preferences = {
   theme: ThemeMode;
   pinned: boolean;
@@ -54,6 +60,8 @@ export type Preferences = {
   recents: string[];
   favorites: string[];
   macros: Macro[];
+  /** Recently deleted macros, newest first. Restore them or remove them for good. */
+  deletedMacros: DeletedMacro[];
   /** When on, shortcodes/emoticons for favorited emojis appear under Macros. */
   favoriteEmojiMacros: boolean;
   /** Prefer :) / :D or :-) / :-D style emoticon triggers. */
@@ -108,6 +116,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   recents: [],
   favorites: [],
   macros: [],
+  deletedMacros: [],
   favoriteEmojiMacros: false,
   emoticonStyle: "minimal",
   autoPasteOnCopy: false,

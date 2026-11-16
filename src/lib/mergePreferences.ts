@@ -1,5 +1,5 @@
-import type { Macro, Preferences } from "../types/preferences";
-import { normalizeMacros } from "./normalizePreferences.ts";
+import type { DeletedMacro, Macro, Preferences } from "../types/preferences";
+import { normalizeDeletedMacros, normalizeMacros } from "./normalizePreferences.ts";
 
 /**
  * Combine the active store with the other on-disk snapshots.
@@ -42,6 +42,15 @@ export function mergePreferencePartials(
     : mergeMacros(
         recovery.flatMap((source) =>
           Array.isArray(source.macros) ? source.macros : [],
+        ),
+      );
+  // Deleted macros follow the primary store like live ones: an empty list there means they
+  // were removed for good, so a stale snapshot must not bring them back.
+  base.deletedMacros = Array.isArray(own.deletedMacros)
+    ? normalizeDeletedMacros(own.deletedMacros)
+    : normalizeDeletedMacros(
+        recovery.flatMap((source) =>
+          Array.isArray(source.deletedMacros) ? source.deletedMacros : [],
         ),
       );
   base.favorites = Array.isArray(own.favorites)
@@ -120,6 +129,7 @@ function mergeMinMaps(
 
 export function userDataFingerprint(prefs: {
   macros?: Macro[];
+  deletedMacros?: DeletedMacro[];
   favorites?: string[];
   recents?: string[];
   usageCounts?: Record<string, number>;
@@ -132,6 +142,7 @@ export function userDataFingerprint(prefs: {
 }): string {
   return JSON.stringify({
     macros: prefs.macros ?? [],
+    deletedMacros: prefs.deletedMacros ?? [],
     favorites: prefs.favorites ?? [],
     recents: prefs.recents ?? [],
     usageCounts: prefs.usageCounts ?? {},

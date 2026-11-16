@@ -1,5 +1,6 @@
 import { useState } from "react";
-import type { Macro } from "../types/preferences";
+import type { DeletedMacro, Macro } from "../types/preferences";
+import { DeletedMacros } from "./DeletedMacros";
 import {
   exportMacrosYaml,
   importMacrosYaml,
@@ -8,6 +9,9 @@ import { errorMessage } from "../lib/errorMessage";
 
 type MacrosSettingsProps = {
   macros: Macro[];
+  deleted: DeletedMacro[];
+  summonHotkey: string;
+  onChange: (patch: { macros?: Macro[]; deletedMacros?: DeletedMacro[] }) => void;
   favorites: string[];
   favoriteEmojiMacros: boolean;
   onFavoriteEmojiMacros: (value: boolean) => void;
@@ -16,6 +20,9 @@ type MacrosSettingsProps = {
 
 export function MacrosSettings({
   macros,
+  deleted,
+  summonHotkey,
+  onChange,
   favorites,
   favoriteEmojiMacros,
   onFavoriteEmojiMacros,
@@ -104,6 +111,12 @@ export function MacrosSettings({
           {macros.length} custom macro{macros.length === 1 ? "" : "s"} saved.
         </p>
       ) : null}
+      <DeletedMacros
+        macros={macros}
+        deleted={deleted}
+        summonHotkey={summonHotkey}
+        onChange={onChange}
+      />
     </div>
   );
 }

@@ -1,0 +1,19 @@
+{
+  "changes": [
+    {
+      "detail": "Thank you!",
+      "group": "Deleted macros",
+      "label": ".thanks",
+      "reversible": false
+    },
+    {
+      "detail": "an old one",
+      "group": "Deleted macros",
+      "label": ".old",
+      "reversible": false
+    }
+  ],
+  "reason": "",
+  "summary": "2 deleted macros removed for good",
+  "would_refuse": false
+}

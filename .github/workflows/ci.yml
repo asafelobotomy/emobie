@@ -93,6 +93,50 @@ jobs:
       - name: uQ launcher provider tests
         run: cargo test --manifest-path crates/emobie-provider/Cargo.toml
 
+  uq:
+    name: uQ Settings page
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Qt Quick and qmltestrunner
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qt6-declarative-dev-tools \
+            qml6-module-qtquick qml6-module-qtquick-layouts qml6-module-qtquick-controls \
+            qml6-module-qttest qml6-module-qtqml-workerscript \
+            qml6-module-qtquick-window qml6-module-qtquick-templates
+
+      # The shell expands the glob, so any Node the runner has will do.
+      - name: Page logic and manifest tests (Node)
+        run: node --test tests/uq/*.test.mjs
+
+      # The fixtures are the real output of the emobie commands; src-tauri/src/cli/tests.rs
+      # (the app unit tests above) fails when they drift.
+      - name: Page test (QML)
+        run: QML_XHR_ALLOW_FILE_READ=1 QT_QPA_PLATFORM=offscreen /usr/lib/qt6/bin/qmltestrunner -import tests/uq/stub -input tests/uq
+
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+
+      # The uQ release whose `uqctl` and settings page test kit this page follows: uq_api 3.
+      - name: Cache uqctl
+        id: uqctl
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.uq
+          key: uqctl-v0.3.0
+      - name: Build uqctl
+        if: steps.uqctl.outputs.cache-hit != 'true'
+        run: cargo install --locked --git https://github.com/asafelobotomy/uq --tag v0.3.0 uqctl --root "$HOME/.uq"
+
+      # `--no-programs` skips only the "program exists" check: emobie isn't installed here.
+      # Paths and everything else are still checked.
+      - name: Check the page with uqctl
+        run: ~/.uq/bin/uqctl integrations check --no-programs uq/
+
   deny:
     name: Dependency advisories
     runs-on: ubuntu-latest

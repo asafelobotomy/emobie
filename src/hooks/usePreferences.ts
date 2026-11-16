@@ -11,7 +11,10 @@ import {
   type PasteChordOverride,
 } from "../types/preferences";
 import { findEmojiByChar, type SkinTone } from "../data/loadEmojis";
+import { listen } from "@tauri-apps/api/event";
 import { readPreferences, writePreferences } from "../lib/preferencesIo";
+import { samePreferences } from "../lib/samePreferences";
+import { trashMacro } from "../lib/deletedMacros";
 
 export function usePreferences() {
   const [prefs, setPrefs] = useState<Preferences>(DEFAULT_PREFERENCES);
@@ -19,6 +22,8 @@ export function usePreferences() {
   const [prefsError, setPrefsError] = useState<string | null>(null);
   const writeGeneration = useRef(0);
   const pendingWrite = useRef(Promise.resolve());
+  /** Writes started and not finished: a reload in the middle would drop their changes. */
+  const writesInFlight = useRef(0);
   // Latest committed preferences. Updates are computed from this ref rather
   // than inside a `setPrefs` updater, so persisting (a side effect) never runs
   // from a function React may invoke twice (StrictMode) or replay.
@@ -55,12 +60,49 @@ export function usePreferences() {
     // at 1 would have every write of a later session silently discarded.
     const generation = Math.max(writeGeneration.current + 1, Date.now());
     writeGeneration.current = generation;
+    writesInFlight.current += 1;
     pendingWrite.current = pendingWrite.current.then(async () => {
-      const ok = await writePreferences(next, generation);
-      if (generation !== writeGeneration.current) return;
-      setPrefsError(ok ? null : "Could not save preferences.");
+      try {
+        const ok = await writePreferences(next, generation);
+        if (generation !== writeGeneration.current) return;
+        setPrefsError(ok ? null : "Could not save preferences.");
+      } finally {
+        writesInFlight.current -= 1;
+      }
     });
   }, []);
+
+  /** Takes in a change made outside the window; does nothing when it matches or a save is under way. */
+  const reloadFromDisk = useCallback(async () => {
+    if (writesInFlight.current > 0) return;
+    try {
+      const loaded = await readPreferences(true);
+      if (writesInFlight.current > 0) return;
+      if (samePreferences(loaded, prefsRef.current)) return;
+      prefsRef.current = loaded;
+      setPrefs(loaded);
+    } catch (error) {
+      console.warn("Could not reload preferences", error);
+    }
+  }, []);
+
+  // The command line and uQ's Settings page change the same file: follow it (src-tauri
+  // prefs_watch.rs), and look again when the window comes back to the front.
+  useEffect(() => {
+    if (!ready) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const soon = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => void reloadFromDisk(), 250);
+    };
+    const unlisten = listen("preferences-changed", soon);
+    window.addEventListener("focus", soon);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("focus", soon);
+      void unlisten.then((off) => off()).catch(() => undefined);
+    };
+  }, [ready, reloadFromDisk]);
 
   const commit = useCallback(
     (next: Preferences) => {
@@ -192,12 +234,13 @@ export function usePreferences() {
     [mutate],
   );
 
+  /** Deleting keeps the macro in the deleted list, where it can be restored. */
   const removeMacro = useCallback(
     (id: string) =>
-      mutate((current) => ({
-        ...current,
-        macros: current.macros.filter((item) => item.id !== id),
-      })),
+      mutate((current) => {
+        const bin = trashMacro(current.macros, current.deletedMacros, id, Date.now());
+        return bin.macros === current.macros ? current : { ...current, ...bin };
+      }),
     [mutate],
   );
 

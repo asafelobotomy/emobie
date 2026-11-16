@@ -65,7 +65,18 @@
           "/usr/bin/emobie-provider": "inputd-bundle/emobie-provider",
           "/usr/share/emobie/emoji.json": "inputd-bundle/emoji.json",
           "/usr/share/uq/launcher/emobie.provider": "inputd-bundle/uq/emobie.provider",
-          "/usr/share/dbus-1/services/org.emobie.Provider.service": "inputd-bundle/uq/org.emobie.Provider.service"
+          "/usr/share/dbus-1/services/org.emobie.Provider.service": "inputd-bundle/uq/org.emobie.Provider.service",
+          "/usr/share/uq/settings/pages/emobie/Banner.qml": "inputd-bundle/uq/pages/emobie/Banner.qml",
+          "/usr/share/uq/settings/pages/emobie/ChoiceBox.qml": "inputd-bundle/uq/pages/emobie/ChoiceBox.qml",
+          "/usr/share/uq/settings/pages/emobie/DeletedTab.qml": "inputd-bundle/uq/pages/emobie/DeletedTab.qml",
+          "/usr/share/uq/settings/pages/emobie/Loading.qml": "inputd-bundle/uq/pages/emobie/Loading.qml",
+          "/usr/share/uq/settings/pages/emobie/MacroRow.qml": "inputd-bundle/uq/pages/emobie/MacroRow.qml",
+          "/usr/share/uq/settings/pages/emobie/MacrosTab.qml": "inputd-bundle/uq/pages/emobie/MacrosTab.qml",
+          "/usr/share/uq/settings/pages/emobie/Page.qml": "inputd-bundle/uq/pages/emobie/Page.qml",
+          "/usr/share/uq/settings/pages/emobie/PrefsTab.qml": "inputd-bundle/uq/pages/emobie/PrefsTab.qml",
+          "/usr/share/uq/settings/pages/emobie/SettingLine.qml": "inputd-bundle/uq/pages/emobie/SettingLine.qml",
+          "/usr/share/uq/settings/pages/emobie/logic.js": "inputd-bundle/uq/pages/emobie/logic.js",
+          "/usr/share/uq/settings/pages/emobie/page.toml": "inputd-bundle/uq/pages/emobie/page.toml"
         }
       },
       "rpm": {
@@ -92,7 +103,18 @@
           "/usr/bin/emobie-provider": "inputd-bundle/emobie-provider",
           "/usr/share/emobie/emoji.json": "inputd-bundle/emoji.json",
           "/usr/share/uq/launcher/emobie.provider": "inputd-bundle/uq/emobie.provider",
-          "/usr/share/dbus-1/services/org.emobie.Provider.service": "inputd-bundle/uq/org.emobie.Provider.service"
+          "/usr/share/dbus-1/services/org.emobie.Provider.service": "inputd-bundle/uq/org.emobie.Provider.service",
+          "/usr/share/uq/settings/pages/emobie/Banner.qml": "inputd-bundle/uq/pages/emobie/Banner.qml",
+          "/usr/share/uq/settings/pages/emobie/ChoiceBox.qml": "inputd-bundle/uq/pages/emobie/ChoiceBox.qml",
+          "/usr/share/uq/settings/pages/emobie/DeletedTab.qml": "inputd-bundle/uq/pages/emobie/DeletedTab.qml",
+          "/usr/share/uq/settings/pages/emobie/Loading.qml": "inputd-bundle/uq/pages/emobie/Loading.qml",
+          "/usr/share/uq/settings/pages/emobie/MacroRow.qml": "inputd-bundle/uq/pages/emobie/MacroRow.qml",
+          "/usr/share/uq/settings/pages/emobie/MacrosTab.qml": "inputd-bundle/uq/pages/emobie/MacrosTab.qml",
+          "/usr/share/uq/settings/pages/emobie/Page.qml": "inputd-bundle/uq/pages/emobie/Page.qml",
+          "/usr/share/uq/settings/pages/emobie/PrefsTab.qml": "inputd-bundle/uq/pages/emobie/PrefsTab.qml",
+          "/usr/share/uq/settings/pages/emobie/SettingLine.qml": "inputd-bundle/uq/pages/emobie/SettingLine.qml",
+          "/usr/share/uq/settings/pages/emobie/logic.js": "inputd-bundle/uq/pages/emobie/logic.js",
+          "/usr/share/uq/settings/pages/emobie/page.toml": "inputd-bundle/uq/pages/emobie/page.toml"
         }
       }
     }

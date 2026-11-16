@@ -1,0 +1,208 @@
+{
+  "app": {
+    "deleted_max": 50,
+    "path": null,
+    "saved": false,
+    "version": "0.0.0"
+  },
+  "config": {
+    "allowMultipleInstances": {
+      "default": false,
+      "readonly": false,
+      "saved": false,
+      "type": "bool",
+      "value": false
+    },
+    "autoPasteOnCopy": {
+      "default": false,
+      "readonly": true,
+      "reason": "Needs a one-time permission, so it is turned on in emobie itself.",
+      "saved": false,
+      "type": "bool",
+      "value": false
+    },
+    "checkUpdatesOnStartup": {
+      "default": true,
+      "readonly": false,
+      "saved": false,
+      "type": "bool",
+      "value": true
+    },
+    "emojiSize": {
+      "allowed": [
+        "sm",
+        "md",
+        "lg"
+      ],
+      "default": "md",
+      "readonly": false,
+      "saved": false,
+      "type": "enum",
+      "value": "md"
+    },
+    "emoticonStyle": {
+      "allowed": [
+        "minimal",
+        "classic"
+      ],
+      "default": "minimal",
+      "readonly": false,
+      "saved": false,
+      "type": "enum",
+      "value": "minimal"
+    },
+    "expandAsYouType": {
+      "default": false,
+      "readonly": true,
+      "reason": "Needs a one-time permission, so it is turned on in emobie itself.",
+      "saved": false,
+      "type": "bool",
+      "value": false
+    },
+    "expandExcludedApps": {
+      "default": [
+        "keepassxc",
+        "bitwarden",
+        "1password",
+        "org.gnome.seahorse",
+        "pinentry",
+        "gcr-prompter",
+        "polkit",
+        "ksshaskpass"
+      ],
+      "max": 64,
+      "readonly": false,
+      "saved": false,
+      "type": "apps",
+      "value": [
+        "keepassxc",
+        "bitwarden",
+        "1password",
+        "org.gnome.seahorse",
+        "pinentry",
+        "gcr-prompter",
+        "polkit",
+        "ksshaskpass"
+      ]
+    },
+    "expandKeepTriggerSpace": {
+      "default": false,
+      "readonly": false,
+      "saved": false,
+      "type": "bool",
+      "value": false
+    },
+    "expandRestoreClipboard": {
+      "default": false,
+      "readonly": false,
+      "saved": false,
+      "type": "bool",
+      "value": false
+    },
+    "expandTriggerMode": {
+      "allowed": [
+        "immediate",
+        "space"
+      ],
+      "default": "space",
+      "readonly": false,
+      "saved": false,
+      "type": "enum",
+      "value": "space"
+    },
+    "favoriteEmojiMacros": {
+      "default": false,
+      "readonly": false,
+      "saved": false,
+      "type": "bool",
+      "value": false
+    },
+    "hotkey": {
+      "default": "Control+Shift+Space",
+      "readonly": false,
+      "saved": false,
+      "type": "hotkey",
+      "value": "Control+Shift+Space"
+    },
+    "launchOnStartup": {
+      "default": false,
+      "readonly": false,
+      "saved": false,
+      "type": "bool",
+      "value": false
+    },
+    "pasteChordOverride": {
+      "allowed": [
+        "auto",
+        "ctrl_v",
+        "shift_insert",
+        "ctrl_shift_v"
+      ],
+      "default": "auto",
+      "readonly": false,
+      "saved": false,
+      "type": "enum",
+      "value": "auto"
+    },
+    "recentMax": {
+      "default": 32,
+      "max": 96,
+      "min": 8,
+      "readonly": false,
+      "saved": false,
+      "type": "int",
+      "value": 32
+    },
+    "showTitleBar": {
+      "default": false,
+      "readonly": false,
+      "saved": false,
+      "type": "bool",
+      "value": false
+    },
+    "skinTone": {
+      "default": 0,
+      "max": 5,
+      "min": 0,
+      "readonly": false,
+      "saved": false,
+      "type": "int",
+      "value": 0
+    },
+    "sortBy": {
+      "allowed": [
+        "default",
+        "name",
+        "type",
+        "dateAdded",
+        "uses"
+      ],
+      "default": "default",
+      "readonly": false,
+      "saved": false,
+      "type": "enum",
+      "value": "default"
+    },
+    "startMinimizedToTray": {
+      "default": false,
+      "readonly": false,
+      "saved": false,
+      "type": "bool",
+      "value": false
+    },
+    "theme": {
+      "allowed": [
+        "system",
+        "light",
+        "dark"
+      ],
+      "default": "system",
+      "readonly": false,
+      "saved": false,
+      "type": "enum",
+      "value": "system"
+    }
+  },
+  "deleted": [],
+  "macros": []
+}

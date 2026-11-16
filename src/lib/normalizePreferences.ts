@@ -1,6 +1,8 @@
 import { isFontStyleId } from "./fontStyles.ts";
+import { DELETED_MACROS_MAX } from "./deletedMacros.ts";
 import {
   DEFAULT_PREFERENCES,
+  type DeletedMacro,
   type Macro,
   type MacroTriggerMode,
   type EmoticonStyle,
@@ -97,6 +99,22 @@ export function normalizeMacros(value: unknown): Macro[] {
   return macros;
 }
 
+/** Deleted macros: valid ones with a deletion time, newest first, at most DELETED_MACROS_MAX.
+ * Unlike live macros two of them may share a trigger (restoring checks for a clash). */
+export function normalizeDeletedMacros(value: unknown): DeletedMacro[] {
+  if (!Array.isArray(value)) return [];
+  const seenIds = new Set<string>();
+  const out: DeletedMacro[] = [];
+  for (const entry of value) {
+    const macro = normalizeMacro(entry);
+    if (!macro || seenIds.has(macro.id)) continue;
+    seenIds.add(macro.id);
+    const at = Number((entry as Record<string, unknown>).deletedAt);
+    out.push({ ...macro, deletedAt: Number.isFinite(at) && at > 0 ? Math.floor(at) : 0 });
+  }
+  return out.sort((a, b) => b.deletedAt - a.deletedAt).slice(0, DELETED_MACROS_MAX);
+}
+
 const THEME_VALUES = new Set<ThemeMode>(["system", "light", "dark"]);
 const EMOJI_SIZE_VALUES = new Set<EmojiSize>(["sm", "md", "lg"]);
 const SORT_VALUES = new Set<SortBy>([
@@ -169,6 +187,7 @@ export function normalizePreferences(
       ? merged.favorites.filter(Boolean)
       : [],
     macros: normalizeMacros(merged.macros),
+    deletedMacros: normalizeDeletedMacros(merged.deletedMacros),
     favoriteEmojiMacros: Boolean(merged.favoriteEmojiMacros),
     emoticonStyle: normalizeEmoticonStyle(merged.emoticonStyle),
     autoPasteOnCopy: Boolean(merged.autoPasteOnCopy),

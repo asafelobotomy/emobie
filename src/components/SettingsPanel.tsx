@@ -269,6 +269,9 @@ export function SettingsPanel({
 
         <MacrosSettings
           macros={prefs.macros}
+          deleted={prefs.deletedMacros}
+          summonHotkey={prefs.hotkey}
+          onChange={updatePrefs}
           favorites={prefs.favorites}
           favoriteEmojiMacros={prefs.favoriteEmojiMacros}
           onFavoriteEmojiMacros={onFavoriteEmojiMacros}
