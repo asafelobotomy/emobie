@@ -59,6 +59,12 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.9.1" date="2026-11-16">
+      <description>
+        <p>Fixes the release build: the clipboard and store plugins now match
+        between the app and its Rust side.</p>
+      </description>
+    </release>
     <release version="0.9.0" date="2026-11-16">
       <description>
         <p>An Emoji and macros page in uQ Settings, an emobie command line
