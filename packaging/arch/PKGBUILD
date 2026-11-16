@@ -22,8 +22,8 @@ depends=(
 )
 makedepends=('cargo' 'nodejs' 'npm' 'clang' 'lld' 'libxkbcommon')
 optdepends=(
-  'wl-clipboard: externally-verified Wayland clipboard for reliable Expand paste; copying emoji from uQ'"'"'s Spotlight'
-  'uq: emoji search in uQ'"'"'s Spotlight (type :) and following uQ'"'"'s theme'
+  'wl-clipboard: externally-verified Wayland clipboard for reliable Expand paste; copying emoji from uQ'"'"'s look=see>do_'
+  'uq: emoji search in uQ'"'"'s look=see>do_ (type :) and following uQ'"'"'s theme'
   'acl: setfacl for instant keyboard access after Grant without logout'
 )
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")

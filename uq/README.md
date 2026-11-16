@@ -5,7 +5,7 @@ installs it unconditionally; without uQ nothing reads it.
 
 | File | Installed to | What it does |
 | --- | --- | --- |
-| `launcher/emobie.provider` | `/usr/share/uq/launcher/` | Typing `:` in Spotlight searches emoji. Enter copies the emoji; Shift+Enter types it into the focused window |
+| `launcher/emobie.provider` | `/usr/share/uq/launcher/` | Typing `:` in look=see>do_ searches emoji. Enter copies the emoji; Shift+Enter types it into the focused window |
 | `dbus/org.emobie.Provider.service` | `/usr/share/dbus-1/services/` | Lets the session bus start `/usr/bin/emobie-provider` when uQ's launcher opens |
 
 The package also installs `/usr/bin/emobie-provider` (from `crates/emobie-provider`) and
@@ -15,7 +15,7 @@ The package also installs `/usr/bin/emobie-provider` (from `crates/emobie-provid
 
 `emobie-provider` is a small session-bus service on `org.emobie.Provider` that serves
 `org.uq.Launcher1.Provider` at `/org/uq/Launcher1`. It is activatable: uQ asks the bus to start
-it when Spotlight or the app menu opens (at most once every 30 s), and it exits after 60 s
+it when look=see>do_ or the app menu opens (at most once every 30 s), and it exits after 60 s
 without a call. The emobie app does not need to be running.
 
 - **Search.** uQ strips the `:` and sends the rest. It is matched against each emoji's name,
@@ -34,12 +34,12 @@ without a call. The emobie app does not need to be running.
   `wl-clipboard`. The provider gets its environment (`WAYLAND_DISPLAY`) from the session bus's
   activation environment, which uQ's session sets.
 - **Type** (`type`, Shift+Enter) copies the emoji, then asks `emobie-inputd` to paste it into the
-  window that had focus before Spotlight. When the helper isn't running it stays a copy.
+  window that had focus before look=see>do_. When the helper isn't running it stays a copy.
 - **Input checks.** Queries over 256 bytes or with control characters get no rows. `Activate`
   takes only an emoji that is in the data and only the `copy` and `type` actions; anything else
   is `InvalidArgs`.
 
-uQ binds Super+. to open Spotlight with `:`. emobie's own summon hotkey stays off while uQ is the
+uQ binds Super+. to open look=see>do_ with `:`. emobie's own summon hotkey stays off while uQ is the
 desktop (the app checks whether `org.uq.Desktop1` has an owner on the session bus when it starts),
 so the two never fight over a key. Macro hotkeys are unaffected.
 

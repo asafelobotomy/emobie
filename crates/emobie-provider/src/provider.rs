@@ -17,7 +17,7 @@ pub const PATH: &str = "/org/uq/Launcher1";
 pub const INTERFACE: &str = "org.uq.Launcher1.Provider";
 /// emobie's icon, installed by its package.
 pub const ICON: &str = "io.github.asafelobotomy.emobie";
-/// Let uQ close Spotlight and focus return to the previous window before pasting.
+/// Let uQ close look=see>do_ and focus return to the previous window before pasting.
 pub const PASTE_DELAY: Duration = Duration::from_millis(250);
 
 /// `(id, title, subtitle, icon, actions as a JSON list, score)`.

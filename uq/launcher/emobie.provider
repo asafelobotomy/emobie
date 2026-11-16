@@ -1,5 +1,5 @@
 # Installed to /usr/share/uq/launcher/emobie.provider by emobie's package.
-# Typing ":" in Spotlight searches emoji: favourites and recents first, then by name and keyword.
+# Typing ":" in look=see>do_ searches emoji: favourites and recents first, then by name and keyword.
 # Enter copies the emoji; Shift+Enter types it into the focused window through emobie-inputd
 # (or copies it when the helper isn't running). Served by /usr/bin/emobie-provider.
 [Launcher Provider]
