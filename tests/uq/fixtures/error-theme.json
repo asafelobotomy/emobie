@@ -1,0 +1,4 @@
+{
+  "error": "theme is one of system, light, dark, not \"blue\"",
+  "ok": false
+}

@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Emoji and macros page in uQ Settings.** On the uQ desktop, Settings → Apps →
+  Emoji and macros lists your macros (switch one off, delete it, add one),
+  your deleted macros (restore one, or delete it for good, with a preview) and
+  every setting emobie keeps, followed live from emobie's preferences. It shows
+  no emoji, and the two settings that need a one-time permission (auto-paste,
+  expand as you type) are turned on in emobie. Native packages install it with
+  the other `uq/` files.
+- **Deleted macros can be restored.** Deleting a macro moves it to Settings →
+  Macros → Recently deleted (the newest 50 are kept) instead of dropping it.
+  Restore it, or delete it for good.
+- **`emobie status`, `emobie config` and `emobie macro`.** The settings and
+  macros from the command line, every command with `--json`, and `--dry-run`
+  on the ones that change something (the plan uQ's confirmation sheet shows).
+  They edit the same preferences file as the window, and a running emobie
+  follows the change at once. See [uq/README.md](uq/README.md). Any other
+  command line starts the window as before.
 - **Emoji search in uQ.** On the uQ desktop, typing `:` in look=see>do_ searches
   emoji: favourites and recents first, then by name, keyword, shortcode or
   emoticon, in your skin tone. Enter copies the emoji; Shift+Enter types it

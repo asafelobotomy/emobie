@@ -55,6 +55,7 @@ package() {
     "$pkgdir/usr/share/uq/launcher/emobie.provider"
   install -Dm644 uq/dbus/org.emobie.Provider.service \
     "$pkgdir/usr/share/dbus-1/services/org.emobie.Provider.service"
+  install -Dm644 -t "$pkgdir/usr/share/uq/settings/pages/emobie" uq/pages/emobie/*
   install -Dm644 packaging/systemd/emobie-inputd.service \
     "$pkgdir/usr/lib/systemd/user/emobie-inputd.service"
   install -Dm755 packaging/setup-input-access.sh \

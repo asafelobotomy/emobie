@@ -20,6 +20,14 @@ emojis in your **Favorites** only. Choose **:) style** or **:-) style** under
 Settings → Emoticon style. Right-click emojis in the grid to favorite them.
 YAML import/export remains in Settings.
 
+## Deleted macros
+
+Deleting a macro keeps it in Settings → Macros → **Recently deleted** (the newest 50). **Restore**
+puts it back with its hotkey and font style; if another macro has taken its trigger, it says so
+and nothing moves, and if its hotkey was taken the macro comes back without it. **Delete for
+good** removes one, or all of them. The same lists are on the uQ Settings page and in
+`emobie macro deleted | restore | purge` (see [uq/README.md](../uq/README.md)).
+
 ## Layers
 
 | Layer | What | Flatpak |

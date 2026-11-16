@@ -8,6 +8,8 @@ installs it unconditionally; without uQ nothing reads it.
 | `launcher/emobie.provider` | `/usr/share/uq/launcher/` | Typing `:` in look=see>do_ searches emoji. Enter copies the emoji; Shift+Enter types it into the focused window |
 | `dbus/org.emobie.Provider.service` | `/usr/share/dbus-1/services/` | Lets the session bus start `/usr/bin/emobie-provider` when uQ's launcher opens |
 
+| `pages/emobie/` | `/usr/share/uq/settings/pages/emobie/` | The **Emoji and macros** page of uQ Settings (under Apps): macros, deleted macros and settings |
+
 The package also installs `/usr/bin/emobie-provider` (from `crates/emobie-provider`) and
 `/usr/share/emobie/emoji.json`, the emoji data the provider searches.
 
@@ -60,3 +62,47 @@ By hand, with emobie installed:
 busctl --user call org.emobie.Provider /org/uq/Launcher1 org.uq.Launcher1.Provider Search s smile
 busctl --user call org.emobie.Provider /org/uq/Launcher1 org.uq.Launcher1.Provider Activate ss 🙂 copy
 ```
+
+## The Settings page
+
+Settings → Apps → **Emoji and macros** (`pages/emobie`, `uq_api = 3`) has three tabs and shows no emoji:
+
+- **Macros.** Your macros, each with a switch and Delete; a form to add one (a trigger and a
+  single-line expansion; hotkeys, fonts and longer text are set in emobie); and where Expand as
+  you type stands.
+- **Deleted.** Macros you deleted, kept so they can be restored. **Restore** puts one back as it
+  was (refused if another macro took its trigger meanwhile); **Delete for good** and **Delete all
+  for good** show what goes first. The newest 50 are kept.
+- **Settings.** Window, starting and opening (the summon shortcut, autostart), macros and pasting
+  (when macros expand, the paste key), the apps where macros never expand, and the palette's size,
+  order, skin tone and recents. Auto-paste and Expand as you type are shown, and turned on in
+  emobie: they need a one-time permission to type into other apps.
+
+Everything the page reads or changes goes through the `emobie` command line, so it follows the
+same preferences file as the window and the two stay in step (the window notices a change by
+itself). The page shows only while `/usr/bin/emobie` exists.
+
+## The command line
+
+`emobie` with no command starts the window. These commands answer on the terminal and exit
+without opening one; each takes `--json` (a failure is then `{"ok": false, "error": …}` with exit
+code 1), and the ones that change something take `--dry-run`, which prints the plan uQ's
+confirmation sheet shows (`{summary, changes[{group, label, detail, reversible}], would_refuse,
+reason}`).
+
+```
+emobie status [--json]                       settings, macros and deleted macros in one document
+emobie config show [--json]                  every setting: value, default, type, allowed values
+emobie config set <key> <value> [--dry-run]  change a setting (checked like the app checks it)
+emobie config add|remove expandExcludedApps <app>
+emobie config reset <key> [--dry-run]        back to the default
+emobie macro list | deleted [--json]
+emobie macro add <trigger> <expansion> [--hotkey <keys>] [--dry-run]
+emobie macro set <id|trigger> [--enabled true|false] [--trigger t] [--expansion e] [--hotkey keys]
+emobie macro remove <id|trigger> [--dry-run]       moves it to Deleted
+emobie macro restore <id|trigger>
+emobie macro purge <id|trigger> | --all [--dry-run]  removes deleted macros for good
+```
+
+`autoPasteOnCopy` and `expandAsYouType` can't be changed here: turning them on needs a one-time
+permission that only the window asks for.

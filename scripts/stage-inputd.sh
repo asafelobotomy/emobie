@@ -23,7 +23,7 @@ mkdir -p "$STAGE/selinux"
 install -m 644 "$ROOT/packaging/selinux/emobie-inputd.te" "$STAGE/selinux/emobie-inputd.te"
 
 # uQ integration for deb/rpm (inert without uQ; see uq/README.md): the launcher
-# provider, the emoji data it searches, and the uq/ files.
+# provider, the emoji data it searches, the Settings page, and the uq/ files.
 cargo build --release --manifest-path "$ROOT/crates/emobie-provider/Cargo.toml"
 mkdir -p "$STAGE/uq"
 install -m 755 "${CARGO_TARGET_DIR:-$ROOT/crates/emobie-provider/target}/release/emobie-provider" \
@@ -31,6 +31,9 @@ install -m 755 "${CARGO_TARGET_DIR:-$ROOT/crates/emobie-provider/target}/release
 install -m 644 "$ROOT/src/data/emoji.json" "$STAGE/emoji.json"
 install -m 644 "$ROOT/uq/launcher/emobie.provider" "$STAGE/uq/emobie.provider"
 install -m 644 "$ROOT/uq/dbus/org.emobie.Provider.service" "$STAGE/uq/org.emobie.Provider.service"
+# The uQ Settings page (Emoji and macros): the whole folder, as /usr/share/uq/settings/pages/emobie/.
+mkdir -p "$STAGE/uq/pages/emobie"
+install -m 644 "$ROOT"/uq/pages/emobie/* "$STAGE/uq/pages/emobie/"
 
 # Keep in sync with src-tauri/src/input_helper/bootstrap.rs TAR_MEMBERS.
 HOST_MEMBERS=(

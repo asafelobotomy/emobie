@@ -45,7 +45,7 @@ pub fn durable_path() -> Option<PathBuf> {
     Some(data_home.join("emobie").join(DURABLE_FILE))
 }
 
-fn host_store_path() -> Option<PathBuf> {
+pub(crate) fn host_store_path() -> Option<PathBuf> {
     let home = std::env::var_os("HOME")?;
     Some(
         PathBuf::from(home)
@@ -67,7 +67,7 @@ fn legacy_host_store_path() -> Option<PathBuf> {
     )
 }
 
-fn flatpak_store_path() -> Option<PathBuf> {
+pub(crate) fn flatpak_store_path() -> Option<PathBuf> {
     let home = std::env::var_os("HOME")?;
     Some(
         PathBuf::from(home)

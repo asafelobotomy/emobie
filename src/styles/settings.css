@@ -180,3 +180,32 @@
   resize: vertical;
   font-family: var(--font-mono);
 }
+
+.deleted-macro-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.deleted-macro {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.deleted-macro-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.deleted-macro-text .settings-hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

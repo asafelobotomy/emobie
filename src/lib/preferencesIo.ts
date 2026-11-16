@@ -40,11 +40,16 @@ async function loadSnapshots(): Promise<{
   }
 }
 
-export async function readPreferences(): Promise<Preferences> {
+/**
+ * `fresh` re-reads the store file first: the plugin keeps its own copy in memory, so a change
+ * made by something else (the `emobie` command line, the uQ Settings page) is not seen otherwise.
+ */
+export async function readPreferences(fresh = false): Promise<Preferences> {
   let primary: Partial<Preferences> | undefined;
   let primaryLoaded = false;
   try {
     const store = await getStore();
+    if (fresh) await store.reload({ ignoreDefaults: true });
     primary = (await store.get<Partial<Preferences>>("preferences")) ?? {};
     primaryLoaded = true;
   } catch (error) {
@@ -63,7 +68,7 @@ export async function readPreferences(): Promise<Preferences> {
   // Persist recovered macros/favorites/recents back into the active store.
   if (mergedFp !== primaryFp) {
     await writePreferences(merged);
-  } else if (primaryLoaded && snapshotsOk) {
+  } else if (primaryLoaded && snapshotsOk && !fresh) {
     // Refresh durable mirror only when we successfully read every source.
     await writeDurableOnly(merged);
   }

@@ -1,0 +1,12 @@
+module org.uq.settings
+UqLabel 1.0 UqLabel.qml
+UqComboBox 1.0 UqComboBox.qml
+SettingRow 1.0 SettingRow.qml
+SwitchRow 1.0 SwitchRow.qml
+ValueSlider 1.0 ValueSlider.qml
+ErrorCard 1.0 ErrorCard.qml
+SettingsPage 2.0 SettingsPage.qml
+SettingsTab 2.0 SettingsTab.qml
+SettingsCard 2.0 SettingsCard.qml
+HelpTip 2.0 HelpTip.qml
+UqAppIcon 2.0 UqAppIcon.qml

@@ -1,0 +1,13 @@
+{
+  "changes": [
+    {
+      "detail": "Best regards, Sam — can be restored",
+      "group": "Macros",
+      "label": ".sig",
+      "reversible": true
+    }
+  ],
+  "reason": "",
+  "summary": "1 macro moves to Deleted",
+  "would_refuse": false
+}

@@ -1,0 +1,180 @@
+# The "Emoji and macros" page of uQ Settings. Installed by emobie's packages to
+# /usr/share/uq/settings/pages/emobie/. Everything it reads or changes goes through the emobie
+# command line (`emobie status | config | macro`); see uq/README.md. No emoji are shown here: the
+# page holds the settings, the macros and the deleted macros.
+uq_api = 3
+id = "emobie"
+name = "Emoji and macros"
+icon = "face-smile"
+qml = "Page.qml"
+keywords = ["emobie", "emoji", "macro", "snippet", "expand", "text expansion", "shortcut", "hotkey"]
+
+[requires]
+bins = ["emobie"]
+
+[[setting]]
+id = "macros"
+label = "Macros"
+keywords = ["snippet", "trigger", "expansion", "text", "shortcut"]
+
+[[setting]]
+id = "add-macro"
+label = "Add a macro"
+keywords = ["new", "trigger", "snippet"]
+
+[[setting]]
+id = "deleted"
+label = "Deleted macros"
+keywords = ["restore", "undelete", "trash", "bin", "recover"]
+
+[[setting]]
+id = "theme"
+label = "Theme"
+keywords = ["dark", "light", "appearance"]
+
+[[setting]]
+id = "hotkey"
+label = "Summon shortcut"
+keywords = ["keyboard", "shortcut", "open", "show"]
+
+[[setting]]
+id = "launchOnStartup"
+label = "Start with the desktop"
+keywords = ["autostart", "login", "startup"]
+
+[[setting]]
+id = "expandTriggerMode"
+label = "When macros expand"
+keywords = ["space", "immediately", "trigger", "expand as you type"]
+
+[[setting]]
+id = "pasteChordOverride"
+label = "Paste key"
+keywords = ["ctrl v", "shift insert", "paste", "terminal"]
+
+[[setting]]
+id = "excluded"
+label = "Apps where macros never expand"
+keywords = ["password", "exclude", "ignore", "terminal"]
+
+[[setting]]
+id = "permissions"
+label = "Typing for you"
+keywords = ["auto paste", "expand as you type", "permission", "uinput", "keyboard access"]
+
+# Reads. One document: the settings, the macros and the deleted ones. emobie's window follows
+# the same file, so both stay in step.
+[[command]]
+id = "status"
+argv = ["/usr/bin/emobie", "status", "--json"]
+output = "json"
+timeout_ms = 15000
+watch = { files = ["~/.local/share/io.github.asafelobotomy.emobie/emobie-preferences.json", "~/.var/app/io.github.asafelobotomy.emobie/data/io.github.asafelobotomy.emobie/emobie-preferences.json", "~/.local/share/emobie/preferences.json"] }
+
+# What deleting or removing would do: reads, so they don't ask. Each takes the same arguments as
+# the command it belongs to.
+[[command]]
+id = "macro-remove-plan"
+argv = ["/usr/bin/emobie", "macro", "remove", "--dry-run", "--json"]
+output = "json"
+timeout_ms = 15000
+args = [{ name = "id", pattern = '^[A-Za-z0-9._:][A-Za-z0-9._:-]{0,79}$' }]
+
+[[command]]
+id = "macro-purge-plan"
+argv = ["/usr/bin/emobie", "macro", "purge", "--dry-run", "--json"]
+output = "json"
+timeout_ms = 15000
+args = [{ name = "id", pattern = '^[A-Za-z0-9._:][A-Za-z0-9._:-]{0,79}$' }]
+
+[[command]]
+id = "macro-purge-all-plan"
+argv = ["/usr/bin/emobie", "macro", "purge", "--all", "--dry-run", "--json"]
+output = "json"
+timeout_ms = 15000
+
+# Settings: `emobie config` checks every value and refuses what the app wouldn't keep. The two
+# that need a one-time permission (auto-paste, expand as you type) are turned on in emobie itself.
+[[command]]
+id = "config-set"
+argv = ["/usr/bin/emobie", "config", "set", "--json"]
+output = "json"
+timeout_ms = 15000
+args = [{ name = "key", pattern = '^(theme|emojiSize|sortBy|skinTone|recentMax|hotkey|showTitleBar|launchOnStartup|startMinimizedToTray|allowMultipleInstances|checkUpdatesOnStartup|favoriteEmojiMacros|emoticonStyle|expandTriggerMode|expandKeepTriggerSpace|expandRestoreClipboard|pasteChordOverride)$' }, { name = "value", pattern = '^[^\x00-\x1f\x7f]{1,64}$' }]
+
+[[command]]
+id = "config-reset"
+argv = ["/usr/bin/emobie", "config", "reset", "--json"]
+output = "json"
+timeout_ms = 15000
+args = [{ name = "key", pattern = '^(hotkey|expandExcludedApps)$' }]
+
+[[command]]
+id = "excluded-add"
+argv = ["/usr/bin/emobie", "config", "add", "expandExcludedApps", "--json"]
+output = "json"
+timeout_ms = 15000
+args = [{ name = "app", pattern = '^[^\x00-\x1f\x7f-\x9f]{1,128}$' }]
+
+[[command]]
+id = "excluded-remove"
+argv = ["/usr/bin/emobie", "config", "remove", "expandExcludedApps", "--json"]
+output = "json"
+timeout_ms = 15000
+args = [{ name = "app", pattern = '^[^\x00-\x1f\x7f-\x9f]{1,128}$' }]
+
+# Macros. Deleting moves a macro to the deleted list, where it can be restored; only "Delete for
+# good" is final, and asks first with what it would remove.
+[[command]]
+id = "macro-add"
+argv = ["/usr/bin/emobie", "macro", "add", "--json"]
+output = "json"
+timeout_ms = 15000
+args = [{ name = "trigger", pattern = '^[^\x00-\x1f\x7f-\x9f]{1,256}$' }, { name = "expansion", pattern = '^[^\x00-\x1f\x7f]{1,1000}$' }]
+
+[[command]]
+id = "macro-enable"
+argv = ["/usr/bin/emobie", "macro", "set", "--json", "--enabled", "true"]
+output = "json"
+timeout_ms = 15000
+args = [{ name = "id", pattern = '^[A-Za-z0-9._:][A-Za-z0-9._:-]{0,79}$' }]
+
+[[command]]
+id = "macro-disable"
+argv = ["/usr/bin/emobie", "macro", "set", "--json", "--enabled", "false"]
+output = "json"
+timeout_ms = 15000
+args = [{ name = "id", pattern = '^[A-Za-z0-9._:][A-Za-z0-9._:-]{0,79}$' }]
+
+[[command]]
+id = "macro-remove"
+argv = ["/usr/bin/emobie", "macro", "remove", "--json"]
+output = "json"
+timeout_ms = 15000
+args = [{ name = "id", pattern = '^[A-Za-z0-9._:][A-Za-z0-9._:-]{0,79}$' }]
+confirm = "Delete this macro? It moves to Deleted, where you can restore it."
+preview = "macro-remove-plan"
+
+[[command]]
+id = "macro-restore"
+argv = ["/usr/bin/emobie", "macro", "restore", "--json"]
+output = "json"
+timeout_ms = 15000
+args = [{ name = "id", pattern = '^[A-Za-z0-9._:][A-Za-z0-9._:-]{0,79}$' }]
+
+[[command]]
+id = "macro-purge"
+argv = ["/usr/bin/emobie", "macro", "purge", "--json"]
+output = "json"
+timeout_ms = 15000
+args = [{ name = "id", pattern = '^[A-Za-z0-9._:][A-Za-z0-9._:-]{0,79}$' }]
+confirm = "Delete this macro for good? It can't be restored."
+preview = "macro-purge-plan"
+
+[[command]]
+id = "macro-purge-all"
+argv = ["/usr/bin/emobie", "macro", "purge", "--all", "--json"]
+output = "json"
+timeout_ms = 15000
+confirm = "Delete every deleted macro for good? They can't be restored."
+preview = "macro-purge-all-plan"

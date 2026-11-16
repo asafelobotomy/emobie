@@ -4,9 +4,11 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export CONF="$ROOT/src-tauri/tauri.conf.json"
+export ROOT
 
 node --input-type=module <<'EOF'
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 
 const conf = JSON.parse(readFileSync(process.env.CONF, "utf8"));
 const need = [
@@ -24,6 +26,10 @@ const need = [
   "/usr/share/uq/launcher/emobie.provider",
   "/usr/share/dbus-1/services/org.emobie.Provider.service",
 ];
+// The uQ Settings page: every file of uq/pages/emobie, each mapped under inputd-bundle/.
+for (const f of readdirSync(join(process.env.ROOT, "uq/pages/emobie"))) {
+  need.push(`/usr/share/uq/settings/pages/emobie/${f}`);
+}
 
 for (const bundle of ["deb", "rpm"]) {
   const files = conf?.bundle?.linux?.[bundle]?.files;
