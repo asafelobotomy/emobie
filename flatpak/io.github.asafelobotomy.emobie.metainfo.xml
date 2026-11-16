@@ -59,6 +59,12 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.9.0" date="2026-11-16">
+      <description>
+        <p>An Emoji and macros page in uQ Settings, an emobie command line
+        behind it, and deleted macros that can be restored.</p>
+      </description>
+    </release>
     <release version="0.8.2" date="2026-10-10">
       <description>
         <p>Setting up keyboard access asks for your password once instead of

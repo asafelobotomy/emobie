@@ -1,6 +1,6 @@
 [package]
 name = "emobie-provider"
-version = "0.8.2"
+version = "0.9.0"
 edition = "2021"
 description = "emobie's emoji search for uQ's launcher (org.uq.Launcher1.Provider on the session bus)"
 license = "MIT"
