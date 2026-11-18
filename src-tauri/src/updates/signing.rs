@@ -56,11 +56,12 @@ pub(super) fn verify_signed_sums(
 fn fetch_text(url: &str, max_bytes: u64, what: &str) -> Result<String, String> {
     let response = http_agent()
         .get(url)
-        .set("User-Agent", USER_AGENT)
+        .header("User-Agent", USER_AGENT)
         .call()
         .map_err(|_| format!("Could not download the release {what}."))?;
     let mut text = String::new();
     response
+        .into_body()
         .into_reader()
         .take(max_bytes)
         .read_to_string(&mut text)

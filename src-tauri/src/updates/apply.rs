@@ -164,11 +164,11 @@ fn download_asset(url: &str, dest: &Path, expected_sha256: &str) -> Result<(), S
     validate_download_url(url)?;
     let result = (|| {
         let response = super::http_agent().get(url)
-            .set("User-Agent", USER_AGENT)
-            .set("Accept", "application/octet-stream")
+            .header("User-Agent", USER_AGENT)
+            .header("Accept", "application/octet-stream")
             .call()
             .map_err(|e| format!("Download failed: {e}"))?;
-        let mut reader = response.into_reader().take(MAX_DOWNLOAD_BYTES + 1);
+        let mut reader = response.into_body().into_reader().take(MAX_DOWNLOAD_BYTES + 1);
         let mut opts = OpenOptions::new();
         opts.write(true).create_new(true);
         #[cfg(unix)]
