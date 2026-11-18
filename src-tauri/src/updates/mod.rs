@@ -36,15 +36,17 @@ fn flathub_build() -> bool {
     option_env!("EMOBIE_DISTRIBUTION") == Some("flathub")
 }
 
-/// ureq's default agent has no read timeout, so a stalled connection would
-/// hang forever. The read timeout is per socket read, so large downloads
-/// still work as long as bytes keep arriving.
+/// ureq's default agent has no timeouts, so a stalled connection would hang forever. Connecting
+/// and the response headers must arrive within seconds; the body gets a generous overall limit so
+/// that large downloads still finish while a stalled one cannot hang forever.
 pub(crate) fn http_agent() -> ureq::Agent {
-    ureq::AgentBuilder::new()
-        .timeout_connect(std::time::Duration::from_secs(10))
-        .timeout_read(std::time::Duration::from_secs(30))
-        .timeout_write(std::time::Duration::from_secs(30))
+    ureq::Agent::config_builder()
+        .timeout_connect(Some(std::time::Duration::from_secs(10)))
+        .timeout_send_request(Some(std::time::Duration::from_secs(30)))
+        .timeout_recv_response(Some(std::time::Duration::from_secs(30)))
+        .timeout_recv_body(Some(std::time::Duration::from_secs(900)))
         .build()
+        .into()
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -149,12 +151,13 @@ pub(crate) fn verify_update_asset(
     }
     let url = format!("https://api.github.com/repos/{REPO}/releases/tags/{tag}");
     let response = http_agent().get(&url)
-        .set("User-Agent", USER_AGENT)
-        .set("Accept", "application/vnd.github+json")
+        .header("User-Agent", USER_AGENT)
+        .header("Accept", "application/vnd.github+json")
         .call()
         .map_err(|_| "Could not verify release on GitHub.".to_string())?;
     let release = response
-        .into_json::<GithubRelease>()
+        .into_body()
+        .read_json::<GithubRelease>()
         .map_err(|_| "Unexpected GitHub Releases response.".to_string())?;
     if release.draft || release.prerelease {
         return Err("Refusing to install draft or prerelease.".into());
@@ -205,15 +208,15 @@ fn check_for_updates_blocking() -> UpdateCheckResult {
     let url = format!("https://api.github.com/repos/{REPO}/releases/latest");
 
     let response = http_agent().get(&url)
-        .set("User-Agent", USER_AGENT)
-        .set("Accept", "application/vnd.github+json")
+        .header("User-Agent", USER_AGENT)
+        .header("Accept", "application/vnd.github+json")
         .call();
 
     let Ok(response) = response else {
         return offline_result(current, "Could not reach GitHub Releases.", kind);
     };
 
-    let Ok(release) = response.into_json::<GithubRelease>() else {
+    let Ok(release) = response.into_body().read_json::<GithubRelease>() else {
         return offline_result(current, "Unexpected GitHub Releases response.", kind);
     };
 
