@@ -52,14 +52,7 @@ impl Default for Clipboard {
 impl Clipboard {
     pub fn copy(&self, text: &str) -> Result<(), String> {
         let name = self.program.display();
-        let mut child = Command::new(&self.program)
-            .arg("--")
-            .arg(text)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .map_err(|e| format!("{name}: {e}"))?;
+        let mut child = spawn_retrying(&self.program, text).map_err(|e| format!("{name}: {e}"))?;
         // wl-copy forks a process that serves the selection and exits; wait for that, briefly.
         let deadline = Instant::now() + self.timeout;
         loop {
@@ -74,6 +67,29 @@ impl Clipboard {
                 Ok(None) => std::thread::sleep(Duration::from_millis(10)),
                 Err(e) => return Err(format!("{name}: {e}")),
             }
+        }
+    }
+}
+
+/// Starts `program -- text`. A program that was only just written to disk can briefly be "text
+/// file busy" (ETXTBSY) while another thread's fork still holds its write handle, so that one
+/// error is retried a few times.
+fn spawn_retrying(program: &std::path::Path, text: &str) -> std::io::Result<std::process::Child> {
+    let mut attempt = 0;
+    loop {
+        let spawned = Command::new(program)
+            .arg("--")
+            .arg(text)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn();
+        match spawned {
+            Err(e) if e.raw_os_error() == Some(26) && attempt < 20 => {
+                attempt += 1;
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            other => return other,
         }
     }
 }
