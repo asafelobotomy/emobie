@@ -77,6 +77,7 @@ pub fn run() {
         .setup(move |app| {
             #[cfg(desktop)]
             {
+                autostart::repair_stale_autostart();
                 uq_tokens::watch_tokens(app.handle());
                 prefs_watch::watch(app.handle());
                 let status = tray::setup(app, allow_multiple);

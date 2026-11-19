@@ -59,6 +59,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.9.2" date="2026-11-19">
+      <description>
+        <p>Launch on startup keeps working after the AppImage is renamed by an updater.</p>
+      </description>
+    </release>
     <release version="0.9.1" date="2026-11-16">
       <description>
         <p>Fixes the release build: the clipboard and store plugins now match

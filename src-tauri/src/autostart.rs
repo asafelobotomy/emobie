@@ -147,6 +147,72 @@ fn write_desktop_file(enabled: bool) -> Result<(), String> {
     Ok(())
 }
 
+/// The program an `Exec=` line starts: the first word, or the first non-`NAME=value` word after
+/// `env`. Handles the double-quoted form `quote_exec_arg` writes.
+fn exec_program(exec: &str) -> Option<String> {
+    let mut words = Vec::new();
+    let mut cur = String::new();
+    let (mut quoted, mut started, mut chars) = (false, false, exec.trim().chars());
+    while let Some(c) = chars.next() {
+        match c {
+            '"' => {
+                quoted = !quoted;
+                started = true;
+            }
+            '\\' if quoted => {
+                if let Some(n) = chars.next() {
+                    cur.push(n);
+                }
+            }
+            c if c.is_whitespace() && !quoted => {
+                if started {
+                    words.push(std::mem::take(&mut cur));
+                    started = false;
+                }
+            }
+            c => {
+                cur.push(c);
+                started = true;
+            }
+        }
+    }
+    if started {
+        words.push(cur);
+    }
+    let mut it = words.into_iter().map(|w| w.replace("%%", "%"));
+    let first = it.next()?;
+    if first == "env" || first.ends_with("/env") {
+        return it.find(|w| !w.contains('='));
+    }
+    Some(first)
+}
+
+/// An autostart entry written for an install path that has since moved (an AppImage renamed
+/// by an updater, say) starts nothing at login. Rewrite it for where emobie runs from now.
+pub fn repair_stale_autostart() {
+    if is_flatpak() {
+        return;
+    }
+    let Ok(path) = desktop_path() else { return };
+    let Ok(contents) = fs::read_to_string(&path) else { return };
+    let Some(program) = contents
+        .lines()
+        .find_map(|l| l.strip_prefix("Exec="))
+        .and_then(exec_program)
+    else {
+        return;
+    };
+    let found = if program.contains('/') {
+        Path::new(&program).exists()
+    } else {
+        std::env::var_os("PATH")
+            .is_some_and(|p| std::env::split_paths(&p).any(|d| d.join(&program).exists()))
+    };
+    if !found {
+        let _ = write_desktop_file(true);
+    }
+}
+
 fn desktop_file_enabled() -> Result<bool, String> {
     let path = desktop_path()?;
     if !path.is_file() {
@@ -263,7 +329,19 @@ fn set_launch_on_startup_blocking(enabled: bool) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::quote_exec_arg;
+    use super::{exec_program, quote_exec_arg};
+
+    #[test]
+    fn finds_the_program_an_exec_line_starts() {
+        assert_eq!(exec_program("\"/home/a b/emobie\"").as_deref(), Some("/home/a b/emobie"));
+        assert_eq!(exec_program("/usr/bin/emobie --x").as_deref(), Some("/usr/bin/emobie"));
+        assert_eq!(
+            exec_program("env APPIMAGE_EXTRACT_AND_RUN=1 \"/h/e.AppImage\"").as_deref(),
+            Some("/h/e.AppImage")
+        );
+        assert_eq!(exec_program("flatpak run x").as_deref(), Some("flatpak"));
+        assert_eq!(exec_program("  "), None);
+    }
 
     #[test]
     fn quotes_paths_for_desktop_exec() {
