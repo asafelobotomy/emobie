@@ -1,0 +1,51 @@
+name: Tag release
+
+# When a push to main changes the version (package.json) and no tag for that version exists yet
+# (the merge of a release PR), this creates the vX.Y.Z tag on that commit and starts release.yml
+# on it. The tag is made with GITHUB_TOKEN, and GitHub does not start workflows for pushes made
+# with that token, so release.yml is started explicitly (workflow_dispatch) on the tag. release.yml
+# still checks the tag against the version before it publishes anything. Pushing a tag by hand
+# still works the same way. Anything that needs your own keys (the AUR) stays manual.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - package.json
+
+permissions: {}
+
+concurrency:
+  group: tag-release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the tag
+      actions: write # start release.yml
+    steps:
+      - name: Tag the new version and start the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          raw=$(gh api -H 'Accept: application/vnd.github.raw' "repos/$GITHUB_REPOSITORY/contents/package.json?ref=$SHA")
+          version=$(printf '%s' "$raw" | node -p 'JSON.parse(require("fs").readFileSync(0,"utf8")).version')
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::Cannot read a release version from package.json (got '$version')."
+            exit 1
+          fi
+          tag="v$version"
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+            echo "$tag already exists; nothing to tag."
+            exit 0
+          fi
+          gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f ref="refs/tags/$tag" -f sha="$SHA" >/dev/null
+          echo "Tagged $SHA as $tag."
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$tag" \
+            -f tag="$tag"
+          echo "Started release.yml on $tag." | tee -a "$GITHUB_STEP_SUMMARY"
