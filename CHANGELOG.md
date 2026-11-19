@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-11-19
+
+### Fixed
+
+- **Launch on startup survives an updater renaming the AppImage.** The login entry pointed at the
+  AppImage's old file name, so after appOFholding renamed it to a versioned name nothing started at
+  login (uQ reported "Failed (exit 1)"). emobie now checks the entry when it starts and rewrites it
+  for where it runs from if the program it names is gone.
+
 ## [0.9.1] - 2026-11-16
 
 ### Fixed
