@@ -397,3 +397,28 @@ jobs:
           generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The AUR package's files for this release (scripts/aur-files.sh): the PKGBUILD with the
+  # version and the checksum of GitHub's archive of the tag filled in, and its .SRCINFO. They
+  # are the `aur` artifact; the maintainer pushes them to the AUR from their own machine.
+  aur:
+    needs: [prepare, release]
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+          persist-credentials: false
+      - name: Write the AUR files
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: scripts/aur-files.sh "$TAG"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: aur
+          path: aur/
+          include-hidden-files: true
+          if-no-files-found: ignore
