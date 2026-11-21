@@ -17,6 +17,10 @@
   --danger: #a33b2b;
   --shadow: 0 1px 0 rgba(21, 36, 31, 0.04);
   --radius: 10px;
+  /* Derived from --radius (uQ's ui.radius under uQ), as uQ's own controls do: panels and cards use
+   * --radius, buttons, fields and cells inside them --radius-control, small cells --radius-small. */
+  --radius-control: max(0px, calc(var(--radius) - 2px));
+  --radius-small: max(0px, calc(var(--radius) - 6px));
   --cell: 36px;
   --gap: 4px;
 }

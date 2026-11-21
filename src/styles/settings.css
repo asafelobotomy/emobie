@@ -59,7 +59,7 @@
   overflow: auto;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
   padding: 14px;
   box-shadow: 0 12px 40px rgba(16, 24, 22, 0.18);
 }
@@ -117,7 +117,7 @@
   margin-bottom: 12px;
   padding: 8px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -132,7 +132,7 @@
 .settings-row input[type="text"] {
   border: 1px solid var(--border);
   background: var(--bg);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   padding: 8px 10px;
 }
 
@@ -147,7 +147,7 @@
 .btn {
   border: 1px solid var(--border);
   background: var(--bg-muted);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   padding: 8px 12px;
 }
 
@@ -163,7 +163,7 @@
 
 .hotkey-capture {
   border: 1px dashed var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   padding: 10px;
   text-align: center;
   background: var(--bg);
