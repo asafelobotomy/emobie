@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-11-21
+
 ### Changed
 
 - **Corners follow the uQ theme.** Panels, dialogs and cards round to uQ's radius, and buttons, fields and emoji cells to the radius minus 2 (as uQ's own controls), instead of fixed 4 to 14 px. Without uQ they follow emobie's own `--radius`.
