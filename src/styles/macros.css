@@ -65,7 +65,7 @@
   background: transparent;
   color: var(--ink);
   padding: 2px 4px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   font: inherit;
   cursor: pointer;
   text-align: left;
@@ -142,7 +142,7 @@
   min-height: 3.1rem;
   text-align: left;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: color-mix(in srgb, var(--bg) 70%, var(--accent-soft));
   padding: 6px 7px;
   color: var(--ink);
@@ -240,7 +240,7 @@
   max-height: min(90%, 28rem);
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
   background: var(--bg);
   color: var(--ink);
   padding: 14px;
@@ -256,7 +256,7 @@
 .macro-format-btn {
   border: 1px solid var(--border);
   background: var(--bg-muted);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   width: 1.9rem;
   height: 1.9rem;
   font-size: 0.85rem;
@@ -280,7 +280,7 @@
   margin: 0 0 10px;
   padding: 8px 10px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -390,7 +390,7 @@
 .macro-font-preview {
   margin: 6px 0 0;
   padding: 6px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--surface-2, rgba(127, 127, 127, 0.12));
   white-space: pre-wrap;
   word-break: break-word;
