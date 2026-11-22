@@ -12,16 +12,7 @@ pub const TOKENS_CHANGED_EVENT: &str = "uq-tokens-changed";
 
 /// `$XDG_STATE_HOME/uq` (only an absolute `XDG_STATE_HOME` counts), else `~/.local/state/uq`.
 fn uq_dir() -> Option<PathBuf> {
-    std::env::var_os("XDG_STATE_HOME")
-        .map(PathBuf::from)
-        .filter(|p| p.is_absolute())
-        .or_else(|| {
-            std::env::var_os("HOME")
-                .map(PathBuf::from)
-                .filter(|p| p.is_absolute())
-                .map(|h| h.join(".local").join("state"))
-        })
-        .map(|s| s.join("uq"))
+    crate::uq_consts::paths::uq_dir()
 }
 
 fn read_tokens(uq: &Path) -> Option<String> {

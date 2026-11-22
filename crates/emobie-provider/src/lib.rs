@@ -8,5 +8,7 @@ pub mod inputd;
 pub mod prefs;
 pub mod provider;
 pub mod search;
+#[rustfmt::skip]
+mod uq_consts; // uQ's native/uq-consts, vendored unchanged
 
 pub use provider::{Provider, BUS_NAME, INTERFACE, PATH};

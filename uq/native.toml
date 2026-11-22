@@ -1,0 +1,15 @@
+# uQ kits this repo vendors unchanged (uQ's native/README.md). CI: scripts/check-uq-native.sh
+
+[uq-diag]
+version = "1.0.1"
+files = ["src-tauri/src/uq_diag.rs", "crates/emobie-inputd/src/uq_diag.rs"]
+codes = "uq/diag/emobie.toml"
+sources = ["crates", "src-tauri/src"]
+
+[uq-consts]
+version = "1.0.0"
+files = ["src-tauri/src/uq_consts.rs", "crates/emobie-provider/src/uq_consts.rs"]
+
+[uq-tokens]
+version = "1.0.0"
+files = ["src/vendor/uq-tokens/uq-tokens.js"]

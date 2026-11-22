@@ -2,7 +2,7 @@
 //! binds Super+. to its own emoji search (emobie-provider, see uq/README.md), so the app leaves
 //! its summon hotkey off there (src/lib/uqDesktop.ts).
 
-const UQ_DESKTOP_NAME: &str = "org.uq.Desktop1";
+const UQ_DESKTOP_NAME: &str = crate::uq_consts::dbus::DESKTOP_NAME;
 
 /// zbus 6 has no blocking API: `zbus::block_on` drives the connection on this thread (callers are
 /// on `spawn_blocking`, never inside an async task).

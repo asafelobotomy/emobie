@@ -13,8 +13,10 @@ use std::time::Duration;
 use tokio::sync::Notify;
 
 pub const BUS_NAME: &str = "org.emobie.Provider";
-pub const PATH: &str = "/org/uq/Launcher1";
-pub const INTERFACE: &str = "org.uq.Launcher1.Provider";
+pub const PATH: &str = crate::uq_consts::dbus::LAUNCHER_PROVIDER_PATH;
+/// uQ's `LAUNCHER_PROVIDER_INTERFACE`; `#[zbus::interface]` below needs it as a literal, and a test
+/// keeps the two the same.
+pub const INTERFACE: &str = crate::uq_consts::dbus::LAUNCHER_PROVIDER_INTERFACE;
 /// emobie's icon, installed by its package.
 pub const ICON: &str = "io.github.asafelobotomy.emobie";
 /// Let uQ close look=see>do_ and focus return to the previous window before pasting.
@@ -95,5 +97,17 @@ impl Provider {
             });
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod uq_name {
+    #[test]
+    fn the_interface_is_uqs() {
+        let src = include_str!("provider.rs");
+        assert!(src.contains(&format!(
+            "#[zbus::interface(name = \"{}\")]",
+            super::INTERFACE
+        )));
     }
 }

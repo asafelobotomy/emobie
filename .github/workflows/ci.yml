@@ -74,11 +74,9 @@ jobs:
       - name: Cargo check
         run: cargo check --manifest-path src-tauri/Cargo.toml
 
-      # The vendored uq-diag is uQ's release, and the logged codes match uq/diag/emobie.toml.
-      - name: uQ problem codes
-        run: |
-          bash scripts/check-uq-diag.sh 1.0.1 src-tauri/src/uq_diag.rs crates/emobie-inputd/src/uq_diag.rs
-          bash scripts/check-diag-codes.sh uq/diag/emobie.toml crates src-tauri/src
+      # uQ's kits (uq/native.toml) are the pinned releases, and the logged codes match uq/diag/emobie.toml.
+      - name: uQ kits and problem codes
+        run: bash scripts/check-uq-native.sh
 
       - name: Clippy (app)
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings

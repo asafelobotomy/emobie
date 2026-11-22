@@ -9,6 +9,8 @@ mod prefs_watch;
 mod tray;
 mod updates;
 mod uq_desktop;
+#[rustfmt::skip]
+mod uq_consts; // uQ's native/uq-consts, vendored unchanged
 mod uq_tokens;
 /// uQ's log format and crash records (uQ's `native/uq-diag`, vendored unchanged).
 #[rustfmt::skip]
