@@ -31,6 +31,8 @@ install -m 755 "${CARGO_TARGET_DIR:-$ROOT/crates/emobie-provider/target}/release
 install -m 644 "$ROOT/src/data/emoji.json" "$STAGE/emoji.json"
 install -m 644 "$ROOT/uq/launcher/emobie.provider" "$STAGE/uq/emobie.provider"
 install -m 644 "$ROOT/uq/dbus/org.emobie.Provider.service" "$STAGE/uq/org.emobie.Provider.service"
+# What each problem code means, for `uqctl explain` and uQ's Settings › Problems.
+install -m 644 "$ROOT/uq/diag/emobie.toml" "$STAGE/uq/emobie.toml"
 # The uQ Settings page (Emoji and macros): the whole folder, as /usr/share/uq/settings/pages/emobie/.
 mkdir -p "$STAGE/uq/pages/emobie"
 install -m 644 "$ROOT"/uq/pages/emobie/* "$STAGE/uq/pages/emobie/"

@@ -58,6 +58,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.9.4" date="2026-11-22">
+      <description>
+        <p>Warnings and errors carry problem codes that uQ explains, and a crash leaves a report uQ lists.</p>
+      </description>
+    </release>
     <release version="0.9.3" date="2026-11-21">
       <description>
         <p>Corners follow the uQ theme's radius, and emobie lists under Utility only.</p>

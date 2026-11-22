@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-11-22
+
+### Added
+
+- **Problems are reported to uQ.** The input helper's warnings and errors start with a code, `[EMOBIE-002] expand failed …`, and under systemd carry their level, so the journal files them as warnings and errors, and `uqctl log`, `uqctl explain` and uQ's Settings › Problems say what went wrong and what to do. The codes are listed in `/usr/share/uq/diag/emobie.toml`. A crash in the emobie window leaves a crash record that uQ lists. This uses uQ's `uq-diag` 1.0.1, vendored in `src-tauri/src/uq_diag.rs` and `crates/emobie-inputd/src/uq_diag.rs` and pinned in CI.
+
 ## [0.9.3] - 2026-11-21
 
 ### Changed

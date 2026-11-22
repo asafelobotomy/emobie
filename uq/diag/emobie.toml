@@ -1,0 +1,54 @@
+# emobie's problem codes for uQ (`uqctl log`, `uqctl explain`, Settings › Problems). Installed as
+# /usr/share/uq/diag/emobie.toml. A code never changes meaning: set `retired = true` on one nothing
+# logs any more, and give a new problem the next number.
+app = "emobie"
+units = ["emobie-inputd.service"]
+
+[[code]]
+id = "EMOBIE-001"
+severity = "error"
+title = "emobie's input helper couldn't start"
+means = "emobie-inputd, which types expansions and pastes emoji, couldn't make its socket or its runtime folder, or another copy is already running. Until it runs, macros don't expand and emobie can't paste for you."
+fix = "Run `systemctl --user restart emobie-inputd`. If it says another copy is running, stop the extra one; check that $XDG_RUNTIME_DIR/emobie belongs to you."
+
+[[code]]
+id = "EMOBIE-002"
+severity = "warn"
+title = "A text expansion failed"
+means = "emobie saw a macro's trigger but couldn't type its expansion into the focused window (the message names the input method it tried), so the trigger text was left as typed."
+fix = "Check emobie's input access on its setup page (/dev/uinput and the input group), then try again. Some apps refuse simulated input."
+
+[[code]]
+id = "EMOBIE-003"
+severity = "warn"
+title = "emobie couldn't save or read its macros"
+means = "emobie-inputd couldn't create, write or read its state file, so a change to your macros or the on/off switch may not survive a restart."
+fix = "Check that ~/.local/share/emobie can be written and that your disk isn't full."
+
+[[code]]
+id = "EMOBIE-004"
+severity = "warn"
+title = "emobie's input helper refused a connection"
+means = "emobie-inputd turned a program away: it belonged to another user, too many were connected at once, or the connection failed."
+fix = "Usually harmless. If emobie keeps saying the helper isn't reachable, restart it with `systemctl --user restart emobie-inputd`."
+
+[[code]]
+id = "EMOBIE-005"
+severity = "warn"
+title = "emobie can't follow a desktop change"
+means = "emobie-inputd couldn't watch the keyboard layout, the screen lock or suspend and resume, so after that change expansions may use the wrong layout or stop until the helper restarts."
+fix = "Restart the helper with `systemctl --user restart emobie-inputd`; the message names the watch that's missing."
+
+[[code]]
+id = "EMOBIE-006"
+severity = "warn"
+title = "emobie ignored a setting"
+means = "emobie-inputd ignored a setting it couldn't trust or read: an EMOBIE_INPUTD_SOCKET outside emobie's folders, or a preferences file it couldn't import. It used its defaults instead."
+fix = "Remove or correct the setting the message names."
+
+[[code]]
+id = "EMOBIE-007"
+severity = "warn"
+title = "emobie's tray icon isn't available"
+means = "emobie couldn't add its icon to the system tray, so it can only be opened from the launcher or its shortcut."
+fix = "Check that a StatusNotifier tray is running (uQ's bar has one)."

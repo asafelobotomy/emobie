@@ -1,6 +1,6 @@
 [package]
 name = "emobie-inputd"
-version = "0.9.3"
+version = "0.9.4"
 edition = "2021"
 description = "Privileged input helper for emobie text expansion"
 license = "MIT"
@@ -28,6 +28,9 @@ evdev = "0.12"
 xkbcommon = "0.8"
 nix = { version = "0.29", features = ["fs", "uio", "socket", "user", "poll"] }
 ctrlc = "3"
+# uQ's log format (the vendored uq_diag.rs, uQ's native/uq-diag).
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt", "std"] }
 reis = { version = "0.7", optional = true }
 ashpd = { version = "0.11", optional = true, features = ["tokio"] }
 tokio = { version = "1", optional = true, features = ["rt", "macros"] }

@@ -10,6 +10,9 @@ mod tray;
 mod updates;
 mod uq_desktop;
 mod uq_tokens;
+/// uQ's log format and crash records (uQ's `native/uq-diag`, vendored unchanged).
+#[rustfmt::skip]
+pub mod uq_diag;
 
 const FLATPAK_APP_ID: &str = "io.github.asafelobotomy.emobie";
 

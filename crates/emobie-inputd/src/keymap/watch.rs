@@ -34,7 +34,7 @@ pub fn start() {
     if super::sources::is_plasma() {
         std::thread::spawn(|| {
             if let Err(err) = watch_plasma() {
-                eprintln!("emobie-inputd: Plasma layout watch unavailable ({err})");
+                crate::diag::problem(crate::diag::Level::WARN, &format!("[EMOBIE-005] Plasma layout watch unavailable ({err})"));
             }
         });
     }

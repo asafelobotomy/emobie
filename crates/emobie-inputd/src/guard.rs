@@ -96,7 +96,7 @@ pub fn spawn_lock_watch() {
         let session = match session_proxy() {
             Ok(session) => session,
             Err(err) => {
-                eprintln!("emobie-inputd: session watch unavailable ({err})");
+                crate::diag::problem(crate::diag::Level::WARN, &format!("[EMOBIE-005] session watch unavailable ({err})"));
                 SESSION_WATCH_FAILED.store(true, Ordering::Release);
                 return;
             }
@@ -122,7 +122,9 @@ pub fn spawn_lock_watch() {
 }
 
 fn watch_ended(what: &str) {
-    eprintln!("emobie-inputd: {what} watch ended (logind signal stream closed)");
+    crate::diag::problem(crate::diag::Level::WARN, &format!(
+        "[EMOBIE-005] {what} watch ended (logind signal stream closed)"
+    ));
     SESSION_WATCH_FAILED.store(true, Ordering::Release);
 }
 

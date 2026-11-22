@@ -28,7 +28,9 @@ trait Login1Manager {
 pub fn spawn() {
     std::thread::spawn(|| {
         if let Err(err) = watch() {
-            eprintln!("emobie-inputd: suspend/resume watch unavailable ({err}); skipping");
+            crate::diag::problem(crate::diag::Level::WARN, &format!(
+                "[EMOBIE-005] suspend/resume watch unavailable ({err}); skipping"
+            ));
         }
     });
 }

@@ -113,11 +113,11 @@ pub fn load() -> (PersistedState, bool) {
     };
     // Cap raw size roughly to one request budget.
     if raw.len() > 512 * 1024 {
-        eprintln!(
-            "warning: ignoring oversized state file {} ({} bytes)",
+        crate::diag::problem(crate::diag::Level::WARN, &format!(
+            "[EMOBIE-003] ignoring oversized state file {} ({} bytes)",
             path.display(),
             raw.len()
-        );
+        ));
         return (PersistedState::default(), false);
     }
     let mut state: PersistedState = serde_json::from_str(&raw).unwrap_or_default();
@@ -147,7 +147,7 @@ fn save_locked(enabled: bool, matches: &[MatchRule]) {
     };
     if let Some(parent) = path.parent() {
         if let Err(err) = fs::create_dir_all(parent) {
-            eprintln!("warning: could not create state dir: {err}");
+            crate::diag::problem(crate::diag::Level::WARN, &format!("[EMOBIE-003] could not create state dir: {err}"));
             return;
         }
         if let Ok(meta) = fs::metadata(parent) {
@@ -186,7 +186,7 @@ fn save_locked(enabled: bool, matches: &[MatchRule]) {
         Ok(())
     })();
     if let Err(err) = write_result {
-        eprintln!("warning: failed to save inputd state: {err}");
+        crate::diag::problem(crate::diag::Level::WARN, &format!("[EMOBIE-003] failed to save inputd state: {err}"));
         let _ = fs::remove_file(&tmp);
     }
 }

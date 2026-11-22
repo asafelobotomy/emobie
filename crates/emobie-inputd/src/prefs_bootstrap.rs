@@ -77,7 +77,9 @@ fn matches_from_preferences(prefs: &Value) -> Option<Vec<MatchRule>> {
         return Some(Vec::new());
     }
     crate::state::validate_matches(&matches)
-        .map_err(|err| eprintln!("warning: ignoring preferences bootstrap: {err}"))
+        .map_err(|err| {
+            crate::diag::problem(crate::diag::Level::WARN, &format!("[EMOBIE-006] ignoring preferences bootstrap: {err}"))
+        })
         .ok()?;
     Some(matches)
 }
