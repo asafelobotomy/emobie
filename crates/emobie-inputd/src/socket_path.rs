@@ -80,11 +80,11 @@ pub fn resolve_socket_path() -> PathBuf {
         if is_trusted(&path) {
             return path;
         }
-        eprintln!(
-            "ignoring untrusted EMOBIE_INPUTD_SOCKET (must be under \
+        crate::diag::problem(crate::diag::Level::WARN, &format!(
+            "[EMOBIE-006] ignoring untrusted EMOBIE_INPUTD_SOCKET (must be under \
              $XDG_RUNTIME_DIR/emobie/, /run/emobie/, or /tmp/emobie-$UID/): {}",
             custom
-        );
+        ));
     }
     default_socket_path()
 }

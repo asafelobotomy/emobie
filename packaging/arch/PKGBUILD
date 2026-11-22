@@ -7,7 +7,7 @@
 # Prefer Flatpak/AppImage + packaging/install-inputd-user.sh for most users.
 
 pkgname=emobie
-pkgver=0.9.3
+pkgver=0.9.4
 pkgrel=1
 pkgdesc="Compact emoji palette with macros and optional text expansion"
 arch=('x86_64')
@@ -56,6 +56,7 @@ package() {
   install -Dm644 uq/dbus/org.emobie.Provider.service \
     "$pkgdir/usr/share/dbus-1/services/org.emobie.Provider.service"
   install -Dm644 -t "$pkgdir/usr/share/uq/settings/pages/emobie" uq/pages/emobie/*
+  install -Dm644 uq/diag/emobie.toml "$pkgdir/usr/share/uq/diag/emobie.toml"
   install -Dm644 packaging/systemd/emobie-inputd.service \
     "$pkgdir/usr/lib/systemd/user/emobie-inputd.service"
   install -Dm755 packaging/setup-input-access.sh \

@@ -24,6 +24,7 @@ const need = [
   "/usr/bin/emobie-provider",
   "/usr/share/emobie/emoji.json",
   "/usr/share/uq/launcher/emobie.provider",
+  "/usr/share/uq/diag/emobie.toml",
   "/usr/share/dbus-1/services/org.emobie.Provider.service",
 ];
 // The uQ Settings page: every file of uq/pages/emobie, each mapped under inputd-bundle/.

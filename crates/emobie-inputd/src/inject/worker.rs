@@ -70,7 +70,7 @@ fn recover_after_expand_failure(
         }
     }
     listen::restore_to_buffer(trigger);
-    eprintln!("expand failed: {err}");
+    crate::diag::problem(crate::diag::Level::WARN, &format!("[EMOBIE-002] expand failed: {err}"));
     finish_listen_suppress();
 }
 
@@ -155,7 +155,7 @@ pub(super) fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
                             InjectJob::Expand { trigger, .. } => {
                                 listen::restore_to_buffer(&trigger);
                                 finish_listen_suppress();
-                                eprintln!("expand failed: {err}");
+                                crate::diag::problem(crate::diag::Level::WARN, &format!("[EMOBIE-002] expand failed: {err}"));
                             }
                             InjectJob::Paste { reply, .. } | InjectJob::PinToggle { reply, .. } => {
                                 let _ = reply.send(Err(err.clone()));
@@ -210,10 +210,10 @@ pub(super) fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
                         finish_listen_suppress();
                     }
                     Ok(Err(err)) => {
-                        eprintln!(
-                            "emobie-inputd: expand fail backend={}",
+                        crate::diag::problem(crate::diag::Level::WARN, &format!(
+                            "[EMOBIE-002] expand fail backend={}",
                             last_backend().unwrap_or("unknown")
-                        );
+                        ));
                         recover_after_expand_failure(
                             &mut uinput,
                             &mut enigo,
@@ -223,7 +223,7 @@ pub(super) fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
                         );
                     }
                     Err(_) => {
-                        eprintln!("emobie-inputd: expand fail backend=panic");
+                        crate::diag::problem(crate::diag::Level::WARN, "[EMOBIE-002] expand fail backend=panic");
                         recover_after_expand_failure(
                             &mut uinput,
                             &mut enigo,

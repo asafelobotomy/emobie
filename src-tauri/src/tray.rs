@@ -278,7 +278,7 @@ pub fn setup(app: &tauri::App, unique_id: bool) -> TrayStatus {
                 detail: "StatusNotifier tray ready".into(),
             },
             Err(error) => {
-                eprintln!("emobie: system tray unavailable: {error}");
+                eprintln!("emobie: [EMOBIE-007] system tray unavailable: {error}");
                 TrayStatus {
                     available: false,
                     detail: error,
@@ -297,7 +297,7 @@ pub fn setup(app: &tauri::App, unique_id: bool) -> TrayStatus {
             },
             Err(error) => {
                 let detail = error.to_string();
-                eprintln!("emobie: system tray unavailable: {detail}");
+                eprintln!("emobie: [EMOBIE-007] system tray unavailable: {detail}");
                 TrayStatus {
                     available: false,
                     detail,

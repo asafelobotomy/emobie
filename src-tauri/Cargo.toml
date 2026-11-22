@@ -1,6 +1,6 @@
 [package]
 name = "emobie"
-version = "0.9.3"
+version = "0.9.4"
 description = "emobie — compact emoji palette for content creators"
 authors = ["aSafeLobotomy"]
 edition = "2021"
@@ -16,6 +16,9 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# uQ's crash records (the vendored src/uq_diag.rs, uQ's native/uq-diag).
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt", "std"] }
 tauri-plugin-store = "2"
 tauri-plugin-clipboard-manager = "2.3.2"
 tauri-plugin-single-instance = "2"

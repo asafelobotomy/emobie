@@ -1,3 +1,4 @@
+mod diag;
 mod focused_window;
 mod guard;
 mod inject;
@@ -13,6 +14,9 @@ mod prefs_bootstrap;
 mod sleep_watch;
 mod state;
 mod uinput_kbd;
+#[allow(dead_code)] // vendored whole; the helper uses part of it
+#[rustfmt::skip]
+mod uq_diag;
 
 use matcher::TriggerTrie;
 use nix::sys::socket::{getsockopt, sockopt::PeerCredentials};
@@ -76,13 +80,13 @@ fn main() {
     let lock_dir = instance_lock_dir();
     // Always create the per-uid lock dir (and socket parent if different).
     if let Err(err) = ensure_runtime_dir(&lock_dir) {
-        eprintln!("failed to create {}: {err}", lock_dir.display());
+        crate::diag::problem(crate::diag::Level::ERROR, &format!("[EMOBIE-001] failed to create {}: {err}", lock_dir.display()));
         std::process::exit(1);
     }
     if let Some(parent) = path.parent() {
         if parent != lock_dir.as_path() {
             if let Err(err) = ensure_runtime_dir(parent) {
-                eprintln!("failed to create {}: {err}", parent.display());
+                crate::diag::problem(crate::diag::Level::ERROR, &format!("[EMOBIE-001] failed to create {}: {err}", parent.display()));
                 std::process::exit(1);
             }
         }
@@ -92,7 +96,7 @@ fn main() {
     let _instance_lock = match acquire_instance_lock() {
         Ok(lock) => lock,
         Err(err) => {
-            eprintln!("{err}");
+            crate::diag::problem(crate::diag::Level::ERROR, &format!("[EMOBIE-001] {err}"));
             std::process::exit(1);
         }
     };
@@ -131,7 +135,7 @@ fn main() {
     let prev_umask = umask(Mode::from_bits_truncate(0o177));
     let listener = UnixListener::bind(&path).unwrap_or_else(|err| {
         let _ = umask(prev_umask);
-        eprintln!("failed to bind {}: {err}", path.display());
+        crate::diag::problem(crate::diag::Level::ERROR, &format!("[EMOBIE-001] failed to bind {}: {err}", path.display()));
         std::process::exit(1);
     });
     let _ = umask(prev_umask);
@@ -166,14 +170,14 @@ fn main() {
         match listener.accept() {
             Ok((stream, _)) => {
                 if !peer_uid_allowed(&stream) {
-                    eprintln!("rejected non-owner peer on socket (uid mismatch)");
+                    crate::diag::problem(crate::diag::Level::WARN, "[EMOBIE-004] rejected non-owner peer on socket (uid mismatch)");
                     continue;
                 }
                 configure_client_stream(&stream);
                 let active = clients.fetch_add(1, Ordering::AcqRel);
                 if active >= MAX_CLIENT_THREADS {
                     clients.fetch_sub(1, Ordering::AcqRel);
-                    eprintln!("rejecting client — too many connections");
+                    crate::diag::problem(crate::diag::Level::WARN, "[EMOBIE-004] rejecting client — too many connections");
                     continue;
                 }
                 let enabled = enabled.clone();
@@ -192,7 +196,7 @@ fn main() {
                 if stop.load(Ordering::Relaxed) {
                     break;
                 }
-                eprintln!("accept error: {err}");
+                crate::diag::problem(crate::diag::Level::WARN, &format!("[EMOBIE-004] accept error: {err}"));
                 thread::sleep(Duration::from_millis(50));
             }
         }

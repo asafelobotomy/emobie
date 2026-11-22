@@ -139,7 +139,7 @@ fn fire_expand(
         &pending.trigger,
         trigger_committed,
     ) {
-        eprintln!("expand failed: {err}");
+        crate::diag::problem(crate::diag::Level::WARN, &format!("[EMOBIE-002] expand failed: {err}"));
         // Queue full / worker down — put the trigger back so buffer stays aligned
         // with what the focused app still shows on screen.
         if let Ok(mut guard) = buffer.lock() {
