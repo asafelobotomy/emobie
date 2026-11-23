@@ -128,10 +128,10 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.uq
-          key: uqctl-v0.3.35
+          key: uqctl-v0.3.37
       - name: Build uqctl
         if: steps.uqctl.outputs.cache-hit != 'true'
-        run: cargo install --locked --git https://github.com/asafelobotomy/uq --tag v0.3.35 uqctl --root "$HOME/.uq"
+        run: cargo install --locked --git https://github.com/asafelobotomy/uq --tag v0.3.37 uqctl --root "$HOME/.uq"
 
       # `--no-programs` skips only the "program exists" check: emobie isn't installed here.
       # Paths and everything else are still checked.
