@@ -15,7 +15,7 @@ npm run test:tauri        # cargo test, src-tauri
 npm run test:inputd       # cargo test, crates/emobie-inputd
 npm run test:provider     # cargo test, crates/emobie-provider (starts a private dbus-daemon)
 npm run emoji:check       # src/data/emoji.json matches emojibase
-npm run check:uq-tokens   # vendored uq-tokens is the pinned version
+npm run check:uq-native   # vendored uQ kits match uq/native.toml
 npm run check:acl         # every Tauri command is allowed by the ACL
 bash scripts/check-loc.sh
 bash scripts/check-inputd-packaging.sh
@@ -45,7 +45,7 @@ Run the app with `npm run tauri dev`. Package with `npm run tauri:build`, never 
 ## Generated and vendored files
 
 - `src/data/emoji.json` is generated and committed. After bumping `emojibase-data` or editing `src/data/extraEmoticons.ts`, run `npm run emoji:build`.
-- `src/vendor/uq-tokens/uq-tokens.js` is copied unchanged from uQ's `web/uq-tokens`. To update it, copy the new file over and bump the version in the `check:uq-tokens` script in `package.json`. `uq-tokens.css` is emobie's own.
+- `src/vendor/uq-tokens/uq-tokens.js` is copied unchanged from uQ's `web/uq-tokens`. To update it, copy the new file over and update its version and sha256 in `uq/native.toml` (`scripts/check-uq-native.sh --sync ../uq` does both). `uq-tokens.css` is emobie's own.
 - `tests/uq/fixtures` are the real output of the emobie CLI. When that output changes, run `UPDATE_FIXTURES=1 npm run test:tauri` and commit the result.
 - `src-tauri/inputd-bundle/` is build output staged by `scripts/stage-inputd.sh` (git-ignored). `flatpak/shared-modules` is a git submodule.
 
