@@ -132,8 +132,8 @@ as `/usr/share/emobie/emoji.json` for `emobie-provider`. After bumping
 
 **uq-tokens.** `src/vendor/uq-tokens/` is vendored from uQ's `web/uq-tokens`
 (`uq-tokens.js` unchanged; `uq-tokens.css` holds emobie's palette as fallbacks).
-To update, copy the new `uq-tokens.js` over it and bump the version pinned in
-`package.json`'s `check:uq-tokens` script.
+To update, copy the new `uq-tokens.js` over it and update its pin in
+`uq/native.toml` (`scripts/check-uq-native.sh --sync ../uq`).
 
 ---
 

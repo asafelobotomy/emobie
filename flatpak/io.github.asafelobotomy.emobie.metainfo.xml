@@ -58,6 +58,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.9.5" date="2026-11-22">
+      <description>
+        <p>uQ's folder and D-Bus names come from uQ's shared constants; no visible change.</p>
+      </description>
+    </release>
     <release version="0.9.4" date="2026-11-22">
       <description>
         <p>Warnings and errors carry problem codes that uQ explains, and a crash leaves a report uQ lists.</p>

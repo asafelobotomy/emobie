@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-11-22
+
+### Changed
+
+- **uQ's names and folders come from uQ.** The app's uQ state folder and `org.uq.Desktop1`, and the launcher provider's `/org/uq/Launcher1` path and `org.uq.Launcher1.Provider` interface, now come from uQ's shared uq-consts 1.0.0 (`uq_consts.rs`, vendored unchanged) instead of emobie's own copies; a test keeps the provider's D-Bus interface the same as uQ's. CI checks every vendored uQ kit, now including `uq-tokens.js`, with uQ's single `scripts/check-uq-native.sh` and `uq/native.toml`.
+
 ## [0.9.4] - 2026-11-22
 
 ### Added
