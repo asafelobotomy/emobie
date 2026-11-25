@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The command line treats two macros whose triggers differ only by surrounding spaces as one, as the app does.
 - The input helper waits for connections instead of checking 20 times a second while idle.
 
+### Security
+
+- `cookie` 0.18.3 (RUSTSEC-2026-0594, private cookie nonces could repeat after a fork; it reaches emobie through Tauri). Tauri 2.12.7, tauri-build 2.7.6, zbus 6.5.0 and ashpd 0.14.3 came along. `deny.toml` no longer ignores four advisories that no dependency has any more.
+
 ### Removed
 
 - `packaging/arch/PKGBUILD`, an older copy of the AUR package's PKGBUILD (`packaging/aur/emobie/PKGBUILD`). The docs now point Arch users to the AUR package.
