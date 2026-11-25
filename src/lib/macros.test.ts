@@ -6,6 +6,10 @@ import {
   expansionMatches,
   findHotkeyConflict,
   findTriggerConflict,
+  fitForHelper,
+  helperRefusal,
+  HELPER_MAX_EXPANSION_BYTES,
+  HELPER_MAX_MATCHES,
   searchMacros,
   shortcodeTrigger,
   type MacroEntry,
@@ -271,5 +275,38 @@ describe("font styles", () => {
     assert.equal(customExpansionMatches(entries, "space")[0].expansion, "𝐠𝐨");
     const round = importMacrosYaml(exportMacrosYaml(macros), []);
     assert.equal(round.macros.find((m) => m.trigger === ".b")?.fontStyle, "bold");
+  });
+});
+
+describe("matches the input helper accepts", () => {
+  const m = (trigger: string, expansion: string) => ({ trigger, expansion, mode: "space" as const });
+
+  it("leaves out only the matches the helper would refuse", () => {
+    const tooLong = "x".repeat(HELPER_MAX_EXPANSION_BYTES + 1);
+    const { matches, skipped } = fitForHelper([
+      m(":ok", "fine"),
+      m(":big", tooLong),
+      m("t".repeat(257), "y"),
+      m("a\tb", "y"),
+      m(":also", "fine too"),
+    ]);
+    assert.deepEqual(matches.map((x) => x.trigger), [":ok", ":also"]);
+    assert.equal(skipped, 3);
+  });
+
+  it("counts bytes, so styled letters can push an output over the limit", () => {
+    const styled = "𝐚".repeat(HELPER_MAX_EXPANSION_BYTES / 4 + 1);
+    assert.ok(styled.length < HELPER_MAX_EXPANSION_BYTES);
+    assert.match(helperRefusal(":s", styled) ?? "", /at most 64 KB/);
+    assert.equal(helperRefusal(":s", "𝐚𝐛"), null);
+  });
+
+  it("keeps a sync within the helper's count and request size", () => {
+    const many = Array.from({ length: HELPER_MAX_MATCHES + 5 }, (_, i) => m(`:m${i}`, "y"));
+    assert.equal(fitForHelper(many).matches.length, HELPER_MAX_MATCHES);
+    const big = Array.from({ length: 20 }, (_, i) => m(`:b${i}`, "z".repeat(60 * 1024)));
+    const fitted = fitForHelper(big);
+    assert.ok(fitted.matches.length < 20 && fitted.matches.length >= 7);
+    assert.ok(JSON.stringify(fitted.matches).length < 512 * 1024);
   });
 });

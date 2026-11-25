@@ -116,6 +116,7 @@ fn unusable_entries_are_ignored_like_the_app_does() {
     p.insert("macros".into(), json!([
         {"id": "1", "trigger": ".ok", "expansion": "x"},
         {"id": "2", "trigger": ".ok", "expansion": "dup trigger"},
+        {"id": "4", "trigger": " .ok ", "expansion": "dup once trimmed, as the app trims"},
         {"id": "", "trigger": ".noid", "expansion": "x"},
         {"id": "3", "trigger": ".bad\u{1}", "expansion": "x"},
         "junk"

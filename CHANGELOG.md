@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.6] - 2026-11-25
+
+### Fixed
+
+- **One over-long macro no longer turns Expand off for every macro.** The input helper refuses a whole sync when any macro breaks its limits (a trigger over 256 characters, an output over 64 KB, more than 2,000 macros or more than 512 KB in all), so a single long macro, or a styled one whose look-alike letters take up to 4 bytes each, left Expand off with "Could not send your macros to the helper". emobie now sends the macros the helper accepts, says how many it left out, and the macro editor refuses a macro the helper can't take.
+- **An AUR install is updated by pacman, not by emobie.** On a pacman install emobie used to offer "Update now", which put a second copy in `~/.local/bin` beside the package's. It now says an update is available and leaves installing it to your package manager; any other copy under `/usr` from a package manager emobie can't drive is treated the same way.
+- **"Start with the desktop" in uQ's Settings works without the window.** `emobie config set launchOnStartup` (what uQ's Settings page runs) now adds or removes the startup entry itself; before, the change only took effect the next time the emobie window opened.
+- The command line treats two macros whose triggers differ only by surrounding spaces as one, as the app does.
+- The input helper waits for connections instead of checking 20 times a second while idle.
+
+### Removed
+
+- `packaging/arch/PKGBUILD`, an older copy of the AUR package's PKGBUILD (`packaging/aur/emobie/PKGBUILD`). The docs now point Arch users to the AUR package.
+
 ## [0.9.5] - 2026-11-22
 
 ### Changed

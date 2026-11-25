@@ -10,11 +10,12 @@ environments. Companion to [`MACROS.md`](MACROS.md) (input helper) and
 |---------------|--------|----------------|
 | Ubuntu / Debian / Pop!_OS / Mint | `.deb` from [Releases](https://github.com/asafelobotomy/emobie/releases) | Bundled `emobie-inputd`; Expand → Polkit |
 | Fedora / RHEL / openSUSE | `.rpm` | Same as `.deb` (helper + udev + polkit in package) |
-| Arch / Manjaro / **CachyOS** | Flatpak or AppImage, or build from source | Auto host helper on Expand; fallback `install-inputd-user.sh` |
+| Arch / Manjaro / **CachyOS** | [`emobie` on the AUR](https://aur.archlinux.org/packages/emobie) | Helper, udev rules and polkit in the package; Expand → Polkit |
 | Immutable (Silverblue, etc.) | Flatpak + host/user helper | Helper must run outside the app sandbox |
 
-There is no official AUR package yet. A starting point lives in
-[`packaging/arch/PKGBUILD`](../packaging/arch/PKGBUILD).
+The AUR package's PKGBUILD is [`packaging/aur/emobie/PKGBUILD`](../packaging/aur/emobie/PKGBUILD);
+each release fills in its version and checksum. A pacman install is updated by pacman, so
+emobie's own updater only tells you a new version exists.
 
 ## Desktop environments
 

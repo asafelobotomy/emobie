@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { errorMessage } from "../lib/errorMessage";
-import { customExpansionMatches, type MacroEntry } from "../lib/macroHelpers";
+import {
+  expansionMatches,
+  fitForHelper,
+  type MacroEntry,
+} from "../lib/macroHelpers";
 import type { InputHelperStatus } from "../lib/inputHelper";
 import type { Preferences } from "../types/preferences";
 
@@ -65,12 +69,17 @@ export function useInputHelperSync({
     pasteChordOverride,
   } = prefs;
 
-  const matches = useMemo(
+  // Same as customExpansionMatches, keeping the count of macros the helper can't take.
+  const { matches, skipped } = useMemo(
     () =>
-      customExpansionMatches(
-        expansionMacros,
-        expandTriggerMode,
-        expandKeepTriggerSpace,
+      fitForHelper(
+        expansionMatches(
+          expansionMacros.filter(
+            (macro) => macro.source === "custom" || macro.source === "favorite",
+          ),
+          expandTriggerMode,
+          expandKeepTriggerSpace,
+        ),
       ),
     [expansionMacros, expandTriggerMode, expandKeepTriggerSpace],
   );
@@ -145,6 +154,13 @@ export function useInputHelperSync({
         await call("input_helper_set_enabled", { enabled: true });
       } catch (error) {
         fail(error, "Could not turn on text expansion.");
+        return;
+      }
+      if (skipped > 0) {
+        fail(
+          null,
+          `${skipped} macro${skipped === 1 ? " is" : "s are"} too long for Expand and won't expand; the others do. Shorten ${skipped === 1 ? "it" : "them"} in Macros.`,
+        );
       }
     });
 
@@ -158,6 +174,7 @@ export function useInputHelperSync({
     pasteChordOverride,
     excludedKey,
     matchesKey,
+    skipped,
     reconcileNonce,
   ]);
 }
