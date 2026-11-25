@@ -5,6 +5,8 @@ import { FONT_STYLES, applyFontStyle, type FontStyleId } from "../lib/fontStyles
 import {
   findHotkeyConflict,
   findTriggerConflict,
+  helperRefusal,
+  macroOutput,
 } from "../lib/macroHelpers";
 import {
   INLINE_MARKERS,
@@ -130,6 +132,15 @@ export function MacroEditorDialog({
     }
     if (!draft.expansion) {
       setFormError("Expansion is required.");
+      return;
+    }
+    // What the input helper refuses would otherwise only fail later, when Expand syncs.
+    const helperError = helperRefusal(
+      draft.trigger.trim(),
+      macroOutput({ expansion: draft.expansion, fontStyle: draft.fontStyle ?? undefined }),
+    );
+    if (helperError) {
+      setFormError(helperError);
       return;
     }
     const hotkeyError = findHotkeyConflict(

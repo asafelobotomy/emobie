@@ -2,6 +2,7 @@
 
 mod apply;
 mod native;
+mod install_kind;
 mod signing;
 mod verified_install;
 
@@ -110,6 +111,7 @@ fn pick_asset(assets: &[GithubAsset], kind: InstallKind) -> Option<&GithubAsset>
         // often blanks out under WebKit on Wayland).
         InstallKind::Native | InstallKind::Deb => [".deb"].as_slice(),
         InstallKind::Rpm => [".rpm"].as_slice(),
+        InstallKind::System => return None,
     };
     assets.iter().find(|asset| {
         prefer
@@ -243,6 +245,8 @@ fn check_for_updates_blocking() -> UpdateCheckResult {
                 format!("Update available: v{latest} — you can install it here")
             } else if flathub_build() {
                 format!("Update available: v{latest} — it will arrive through Flathub")
+            } else if kind == InstallKind::System {
+                format!("Update available: v{latest} — update it with your package manager")
             } else {
                 format!("Update available: v{latest}")
             }

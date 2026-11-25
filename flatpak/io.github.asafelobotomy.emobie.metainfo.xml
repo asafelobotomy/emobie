@@ -58,6 +58,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.9.6" date="2026-11-25">
+      <description>
+        <p>One over-long macro no longer turns text expansion off for every macro; the editor says when a macro is too long. A copy installed from the AUR is left to pacman instead of being updated by emobie. Turning Start with the desktop on or off in uQ's Settings takes effect without opening emobie.</p>
+      </description>
+    </release>
     <release version="0.9.5" date="2026-11-22">
       <description>
         <p>uQ's folder and D-Bus names come from uQ's shared constants; no visible change.</p>

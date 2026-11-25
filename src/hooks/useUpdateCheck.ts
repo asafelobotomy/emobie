@@ -6,7 +6,9 @@ export type InstallKind =
   | "appImage"
   | "deb"
   | "rpm"
-  | "native";
+  | "native"
+  /** Installed by pacman (the AUR) or another manager emobie doesn't drive. */
+  | "system";
 
 export type UpdateCheckResult = {
   current: string;
