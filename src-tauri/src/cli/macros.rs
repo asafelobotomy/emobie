@@ -51,7 +51,7 @@ fn list_of(prefs: &Prefs, key: &str, unique_triggers: bool) -> Vec<Value> {
         .into_iter()
         .flatten()
         .filter(|m| m.is_object() && valid(m))
-        .filter(|m| seen_ids.insert(text(m, "id")) && (!unique_triggers || seen_triggers.insert(text(m, "trigger"))))
+        .filter(|m| seen_ids.insert(text(m, "id")) && (!unique_triggers || seen_triggers.insert(text(m, "trigger").trim().to_string())))
         .cloned()
         .collect()
 }

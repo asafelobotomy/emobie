@@ -303,6 +303,11 @@ pub async fn set_launch_on_startup(enabled: bool) -> Result<(), String> {
         .map_err(|err| format!("autostart task failed: {err}"))?
 }
 
+/// For the command line, which has no async runtime.
+pub(crate) fn set_launch_on_startup_now(enabled: bool) -> Result<(), String> {
+    set_launch_on_startup_blocking(enabled)
+}
+
 fn set_launch_on_startup_blocking(enabled: bool) -> Result<(), String> {
     if is_flatpak() {
         match set_via_background_portal(enabled) {

@@ -7,6 +7,7 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+pub use super::install_kind::detect_install_kind;
 use super::native::install_native_from_deb;
 use super::verified_install::{install_deb, install_rpm};
 
@@ -28,6 +29,8 @@ fn refresh_inputd_after_update(kind: InstallKind) {
             InstallKind::Native => {
                 let _ = crate::input_helper::unix::try_restart_inputd_unit();
             }
+            // Never installed by emobie: apply_update refuses it.
+            InstallKind::System => {}
             InstallKind::Deb | InstallKind::Rpm => {
                 if let Ok(home) = std::env::var("HOME") {
                     let user_unit = PathBuf::from(&home)
@@ -54,6 +57,9 @@ pub enum InstallKind {
     Deb,
     Rpm,
     Native,
+    /// Installed by a package manager emobie doesn't drive (pacman, from the AUR or a repo):
+    /// updates come from there, never from emobie, so a copy in ~/.local can't shadow it.
+    System,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -65,49 +71,9 @@ pub struct ApplyUpdateResult {
     pub restart_required: bool,
 }
 
-pub fn detect_install_kind() -> InstallKind {
-    if std::env::var_os("FLATPAK_ID").is_some() {
-        return InstallKind::Flatpak;
-    }
-    if std::env::var_os("APPIMAGE").is_some() {
-        return InstallKind::AppImage;
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        if exe
-            .file_name()
-            .and_then(|n| n.to_str())
-            .is_some_and(|n| n.contains("AppImage"))
-        {
-            return InstallKind::AppImage;
-        }
-        let path = exe.to_string_lossy();
-        if path.starts_with("/usr/") {
-            if Path::new("/var/lib/dpkg/info/emobie.list").exists()
-                || Path::new("/var/lib/dpkg/info/emobie.md5sums").exists()
-            {
-                return InstallKind::Deb;
-            }
-            if Command::new("rpm")
-                .args(["-q", "emobie"])
-                .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null())
-                .status()
-                .map(|s| s.success())
-                .unwrap_or(false)
-            {
-                return InstallKind::Rpm;
-            }
-            // Packaged under /usr but unknown manager — prefer deb if apt exists.
-            if which("apt-get") || which("dpkg") {
-                return InstallKind::Deb;
-            }
-            if which("dnf") || which("zypper") || which("rpm") {
-                return InstallKind::Rpm;
-            }
-        }
-    }
-    InstallKind::Native
-}
+pub(super) const PACKAGE_MANAGER: &str =
+    "This copy of emobie is updated by your package manager (pacman or your AUR helper), not by emobie.";
+
 
 pub(super) fn which(bin: &str) -> bool {
     Command::new("sh")
@@ -332,6 +298,9 @@ pub fn apply_update(
     }
 
     let kind = detect_install_kind();
+    if kind == InstallKind::System {
+        return Err(PACKAGE_MANAGER.into());
+    }
     let expected_sha256 =
         super::verify_update_asset(&release_tag, &download_url, &asset_name, kind)?;
     let expected = match kind {
@@ -339,6 +308,7 @@ pub fn apply_update(
         InstallKind::AppImage => ".AppImage",
         InstallKind::Native | InstallKind::Deb => ".deb",
         InstallKind::Rpm => ".rpm",
+        InstallKind::System => return Err(PACKAGE_MANAGER.into()),
     };
     if !asset_name.ends_with(expected) {
         return Err(format!(
@@ -378,6 +348,7 @@ pub fn apply_update(
             detail: "Package installed. Quit and relaunch emobie to finish.".into(),
             restart_required: true,
         }),
+        InstallKind::System => Err(PACKAGE_MANAGER.into()),
     };
 
     if result.is_ok() {

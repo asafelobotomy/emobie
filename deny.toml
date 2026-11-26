@@ -1,4 +1,4 @@
-# cargo-deny: dependency advisories (CI runs `cargo deny check advisories` for both crates).
+# cargo-deny: dependency advisories (CI runs `cargo deny check advisories` for every crate).
 [advisories]
 # Unmaintained, no vulnerability, no drop-in replacement yet:
 # - the zbus 5 family (zvariant, zvariant_derive, zbus_names): goes away with the move to zbus 6,

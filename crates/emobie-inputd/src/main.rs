@@ -142,9 +142,6 @@ fn main() {
     if let Err(err) = chmod_path(&path, 0o600) {
         eprintln!("warning: could not chmod socket: {err}");
     }
-    if let Err(err) = listener.set_nonblocking(true) {
-        eprintln!("warning: could not set nonblocking accept: {err}");
-    }
     println!(
         "emobie-inputd listening on {} (enabled={}, matches={})",
         path.display(),
@@ -159,11 +156,14 @@ fn main() {
         session_env::wait_for_compositor(Duration::from_secs(45));
     });
 
+    // accept() blocks (no polling while idle), so Ctrl+C ends the process from the handler.
+    // Saves are write-then-rename, so leaving mid-save never leaves a torn state file.
     let stop_flag = stop.clone();
     let sock_cleanup = path.clone();
     let _ = ctrlc::set_handler(move || {
         stop_flag.store(true, Ordering::Relaxed);
         let _ = fs::remove_file(&sock_cleanup);
+        std::process::exit(0);
     });
 
     while !stop.load(Ordering::Relaxed) {
@@ -189,9 +189,7 @@ fn main() {
                     handle_client(stream, &enabled, &trie, &stored, slot);
                 });
             }
-            Err(err) if err.kind() == ErrorKind::WouldBlock => {
-                thread::sleep(Duration::from_millis(50));
-            }
+            Err(err) if err.kind() == ErrorKind::Interrupted => {}
             Err(err) => {
                 if stop.load(Ordering::Relaxed) {
                     break;
