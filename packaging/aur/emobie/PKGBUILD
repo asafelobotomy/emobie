@@ -30,6 +30,8 @@ optdepends=(
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('ef49c54bfbf80a4ea4d5ea8d47444e6f87f9f540676b1e97bb8b7527dcf6dc78')
 
+conflicts+=('uq<0.3.41')  # uq-compat: from uQ's compat/family.toml
+
 prepare() {
   cd "$pkgname-$pkgver"
   npm ci --legacy-peer-deps
