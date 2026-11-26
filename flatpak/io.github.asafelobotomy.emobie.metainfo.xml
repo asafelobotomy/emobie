@@ -58,6 +58,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.9.8" date="2026-11-26">
+      <description>
+        <p>Typing emoji and snippets on Hyprland no longer knocks Num Lock or Caps Lock out of step with your keyboard.</p>
+      </description>
+    </release>
     <release version="0.9.7" date="2026-11-26">
       <description>
         <p>Granting input access from the AppImage or a build no longer stops the AUR package from installing later.</p>

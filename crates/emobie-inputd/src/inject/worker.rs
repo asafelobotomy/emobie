@@ -5,7 +5,7 @@ use super::enigo::{
     expand_with_enigo, new_enigo, paste_chord_enigo, retype_trigger_enigo,
     toggle_above_gnome_enigo, warm_up_enigo, ENIGO_MAX_IDLE, POST_PASTE_DELAY,
 };
-use super::uinput::{expand_with_uinput, retype_trigger_uinput, UINPUT_MAX_IDLE};
+use super::uinput::{expand_with_uinput, retype_trigger_uinput, UINPUT_IDLE_CLOSE, UINPUT_MAX_IDLE};
 use super::{finish_listen_suppress, now_ms, EXPAND_ENABLED, REOPEN_UINPUT, SUPPRESS_STARTED_MS};
 
 use ::enigo::Enigo;
@@ -123,8 +123,36 @@ pub(super) fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
     };
     let mut enigo: Option<Enigo> = None;
     let mut last_inject = Instant::now();
+    // On Hyprland an idle injector keyboard is closed: its Num/Caps Lock state would otherwise
+    // keep joining what apps see on every focus change (see crate::lock_sync).
+    let close_when_idle = uinput.is_some() && crate::lock_sync::on_hyprland();
+    let mut uinput_closed = false;
 
-    while let Ok(job) = rx.recv() {
+    loop {
+        let job = if close_when_idle && uinput.is_some() {
+            match rx.recv_timeout(UINPUT_IDLE_CLOSE) {
+                Ok(job) => job,
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    uinput = None;
+                    uinput_closed = true;
+                    continue;
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+        } else {
+            match rx.recv() {
+                Ok(job) => job,
+                Err(_) => break,
+            }
+        };
+        if uinput_closed {
+            uinput_closed = false;
+            uinput = UInputKeyboard::open().ok();
+            if uinput.is_none() {
+                eprintln!("emobie-inputd: uinput reopen failed; Enigo fallback");
+            }
+            last_inject = Instant::now();
+        }
         // The requester timed out — a late Ctrl+V / pin chord would land in
         // whatever window is focused by now.
         if job.is_cancelled() {
@@ -166,6 +194,10 @@ pub(super) fn inject_worker_loop(rx: mpsc::Receiver<InjectJob>) {
                     }
                 }
             }
+        }
+
+        if let Some(kbd) = uinput.as_mut() {
+            crate::lock_sync::sync(kbd);
         }
 
         match job {

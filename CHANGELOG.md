@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.8] - 2026-11-26
+
+### Fixed
+
+- **Num Lock and Caps Lock stay in step on Hyprland.** Hyprland keeps a lock state per keyboard, and emobie's typing device (`emobie-inject`) had its own: after a paste apps saw *its* Num Lock, and on every focus change Hyprland OR-ed it in, so Num Lock could come back on after you turned it off and a press could seem to do nothing. Before typing, emobie now reads every keyboard's locks from Hyprland and taps Num Lock / Caps Lock on its device until they match the keyboard you last typed on, and it closes the device after 15 seconds without a job so a stale state can't linger.
+
 ## [0.9.7] - 2026-11-26
 
 ### Fixed

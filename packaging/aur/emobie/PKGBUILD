@@ -6,7 +6,7 @@
 # scripts/aur-files.sh vX.Y.Z in an Arch container, or makepkg from a copy.
 
 pkgname=emobie
-pkgver=0.9.7
+pkgver=0.9.8
 pkgrel=1
 pkgdesc="Compact emoji palette with macros and optional text expansion"
 arch=('x86_64')
