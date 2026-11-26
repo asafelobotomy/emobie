@@ -18,7 +18,20 @@ LOCAL_DIR="/usr/local/share/emobie"
 RULES_NAME="99-emobie-input.rules"
 POLICY_NAME="io.github.asafelobotomy.emobie.inputd.policy"
 RULES_DST="/etc/udev/rules.d/${RULES_NAME}"
-POLICY_DST="/usr/share/polkit-1/actions/${POLICY_NAME}"
+# The package ships the action in /usr/share; Grant from an AppImage or build puts
+# its copy where packages never write, so installing the package later can't
+# conflict with it, when polkitd reads /usr/local/share (recent versions); older ones get
+# /usr/share.
+POLICY_PKG="/usr/share/polkit-1/actions/${POLICY_NAME}"
+POLICY_LOCAL="/usr/local/share/polkit-1/actions/${POLICY_NAME}"
+polkit_reads_local() {
+  local d
+  for d in /usr/lib/polkit-1/polkitd /usr/libexec/polkitd /usr/libexec/polkit-1/polkitd /usr/lib/polkit/polkitd; do
+    [[ -f "$d" ]] && grep -qa /usr/local/share/polkit-1/actions "$d" && return 0
+  done
+  return 1
+}
+if polkit_reads_local; then POLICY_DST="$POLICY_LOCAL"; else POLICY_DST="$POLICY_PKG"; fi
 # Opt-in keyboard/pointer read access for "Expand as you type".
 READ_RULES_NAME="98-emobie-keyboard-read.rules"
 READ_RULES_DST="/etc/udev/rules.d/${READ_RULES_NAME}"
@@ -123,7 +136,7 @@ resolve_read_rules_src() {
 
 resolve_policy_src() {
   # Empty POLICY_SRC means policy already installed system-wide.
-  if [[ -f "$POLICY_DST" ]]; then
+  if [[ -f "$POLICY_PKG" || -f "$POLICY_DST" ]]; then
     return 0
   fi
   local candidate
@@ -267,7 +280,9 @@ fi
 
 install -m 644 "$RULES_SRC" "$RULES_DST"
 if [[ -n "${POLICY_SRC:-}" ]]; then
-  if [[ ! -d "$(dirname "$POLICY_DST")" ]]; then
+  if [[ "$POLICY_DST" == "$POLICY_LOCAL" ]]; then
+    mkdir -p "$(dirname "$POLICY_DST")"
+  elif [[ ! -d "$(dirname "$POLICY_DST")" ]]; then
     echo "Polkit actions directory missing; cannot install policy." >&2
     exit 1
   fi
