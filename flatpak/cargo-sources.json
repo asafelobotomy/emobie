@@ -3330,27 +3330,27 @@
     {
         "type": "archive",
         "archive-type": "tar-gzip",
-        "url": "https://static.crates.io/crates/notify/notify-8.2.2.crate",
-        "sha256": "c41a04a5f59df9322cc657286dd2d79f90816119b22c5f847607c850110205ab",
-        "dest": "cargo/vendor/notify-8.2.2"
+        "url": "https://static.crates.io/crates/notify/notify-9.0.0.crate",
+        "sha256": "5482d5bd11b91a337521980e5d52fe115bdccfb4c217099daaf0abd69159dc4e",
+        "dest": "cargo/vendor/notify-9.0.0"
     },
     {
         "type": "inline",
-        "contents": "{\"package\": \"c41a04a5f59df9322cc657286dd2d79f90816119b22c5f847607c850110205ab\", \"files\": {}}",
-        "dest": "cargo/vendor/notify-8.2.2",
+        "contents": "{\"package\": \"5482d5bd11b91a337521980e5d52fe115bdccfb4c217099daaf0abd69159dc4e\", \"files\": {}}",
+        "dest": "cargo/vendor/notify-9.0.0",
         "dest-filename": ".cargo-checksum.json"
     },
     {
         "type": "archive",
         "archive-type": "tar-gzip",
-        "url": "https://static.crates.io/crates/notify-types/notify-types-2.3.0.crate",
-        "sha256": "8c491a384baf9fec20df565cdb8138a12809d4c7439763b566eb8114c5d59979",
-        "dest": "cargo/vendor/notify-types-2.3.0"
+        "url": "https://static.crates.io/crates/notify-types/notify-types-2.3.1.crate",
+        "sha256": "cbd044e85df3d939d8e32a1c35a3b737c7d0a4eeb7acd737bd207644e00f4e5f",
+        "dest": "cargo/vendor/notify-types-2.3.1"
     },
     {
         "type": "inline",
-        "contents": "{\"package\": \"8c491a384baf9fec20df565cdb8138a12809d4c7439763b566eb8114c5d59979\", \"files\": {}}",
-        "dest": "cargo/vendor/notify-types-2.3.0",
+        "contents": "{\"package\": \"cbd044e85df3d939d8e32a1c35a3b737c7d0a4eeb7acd737bd207644e00f4e5f\", \"files\": {}}",
+        "dest": "cargo/vendor/notify-types-2.3.1",
         "dest-filename": ".cargo-checksum.json"
     },
     {
@@ -7394,6 +7394,19 @@
         "type": "inline",
         "contents": "{\"package\": \"b9cc00251562a284751c9973bace760d86c0276c471b4be569fe6b068ee97a56\", \"files\": {}}",
         "dest": "cargo/vendor/xkeysym-0.2.1",
+        "dest-filename": ".cargo-checksum.json"
+    },
+    {
+        "type": "archive",
+        "archive-type": "tar-gzip",
+        "url": "https://static.crates.io/crates/xxhash-rust/xxhash-rust-0.8.21.crate",
+        "sha256": "40de123dbb523ebcc00d61ec01840ad192578afc378d859f3429caa38308fad5",
+        "dest": "cargo/vendor/xxhash-rust-0.8.21"
+    },
+    {
+        "type": "inline",
+        "contents": "{\"package\": \"40de123dbb523ebcc00d61ec01840ad192578afc378d859f3429caa38308fad5\", \"files\": {}}",
+        "dest": "cargo/vendor/xxhash-rust-0.8.21",
         "dest-filename": ".cargo-checksum.json"
     },
     {
