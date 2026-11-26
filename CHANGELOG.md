@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Grant from the AppImage or a build no longer blocks installing the AUR package later.** It copied its polkit action into `/usr/share/polkit-1/actions`, where no package owns it; the `emobie` package ships the same file, so pacman refused the install as a file conflict. Grant now puts it in `/usr/local/share/polkit-1/actions` (polkit 124 and newer read it there); older polkit still gets `/usr/share`. If an earlier Grant left the file behind, remove it before installing the package: `run0 rm /usr/share/polkit-1/actions/io.github.asafelobotomy.emobie.inputd.policy` (only when `pacman -Qo` says no package owns it).
+
 ## [0.9.6] - 2026-11-25
 
 ### Fixed
