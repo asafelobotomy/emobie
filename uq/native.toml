@@ -13,3 +13,7 @@ files = ["src-tauri/src/uq_consts.rs", "crates/emobie-provider/src/uq_consts.rs"
 [uq-tokens]
 version = "1.0.0"
 files = ["src/vendor/uq-tokens/uq-tokens.js"]
+
+[uq-loc]
+version = "1.0.0"
+files = ["scripts/check-loc.sh"]
