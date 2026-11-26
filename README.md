@@ -43,7 +43,7 @@ Grab the latest build from
 | **`.rpm`** | Fedora / RHEL / openSUSE | `sudo dnf install ./emobie-*-1.x86_64.rpm` (openSUSE: `zypper install …`) |
 | **AppImage** | Portable / Arch / CachyOS | `chmod +x emobie_*.AppImage && ./emobie_*.AppImage` — Auto-paste auto-installs the host helper |
 
-Arch / CachyOS / Manjaro: see [`docs/LINUX.md`](docs/LINUX.md) and optional [`packaging/arch/PKGBUILD`](packaging/arch/PKGBUILD).
+Arch / CachyOS / Manjaro: install [`emobie` from the AUR](https://aur.archlinux.org/packages/emobie) (for example `paru -S emobie`); pacman then updates it. See [`docs/LINUX.md`](docs/LINUX.md).
 
 ```bash
 # Flatpak (after downloading the release bundle)

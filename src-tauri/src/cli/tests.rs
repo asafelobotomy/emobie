@@ -227,3 +227,20 @@ fn the_page_fixtures_are_what_the_commands_print() {
         check_fixture("error-restore.json", &run_args(&["macro", "restore", "--json", "zzz"]).1);
     });
 }
+
+#[test]
+fn launch_on_startup_registers_the_startup_entry_without_the_window() {
+    with_home("autostart", |home| {
+        let entry = home.join(".config/autostart/emobie.desktop");
+        let (ok, v) = run_json("config set launchOnStartup true --dry-run --json");
+        assert!(ok, "{v}");
+        assert!(!entry.exists(), "a dry run changes nothing");
+        let (ok, v) = run_json("config set launchOnStartup true --json");
+        assert!(ok, "{v}");
+        assert!(v.get("warning").is_none(), "{v}");
+        assert!(std::fs::read_to_string(&entry).unwrap().contains("Exec="));
+        let (ok, _) = run_json("config set launchOnStartup false --json");
+        assert!(ok);
+        assert!(!entry.exists());
+    });
+}

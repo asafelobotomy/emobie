@@ -252,7 +252,7 @@ fn config(args: &Args) -> Output {
                 ),
                 Err(e) => plan::Plan::refuse(e),
             };
-            mutate(args, plan, |prefs| {
+            let out = mutate(args, plan, |prefs| {
                 let value = next(prefs)?;
                 let previous = settings::current(&setting, prefs);
                 prefs.insert(key.into(), value.clone());
@@ -263,10 +263,25 @@ fn config(args: &Args) -> Output {
                     }
                 }
                 Ok(json!({"summary": format!("{key} is now {value}"), "key": key, "value": value, "previous": previous}))
-            })
+            });
+            if key == "launchOnStartup" && out.ok && !args.dry_run {
+                return apply_autostart(out);
+            }
+            out
         }
         other => Output::fail(format!("unknown config command \"{other}\"")),
     }
+}
+
+/// The window registers launch-on-startup when it runs; the window may not run before the next
+/// login, so a change from here (uQ's Settings page) registers it at once too.
+fn apply_autostart(mut out: Output) -> Output {
+    let Some(on) = out.json["value"].as_bool() else { return out };
+    if let Err(e) = crate::autostart::set_launch_on_startup_now(on) {
+        out.json["warning"] = json!(format!("Saved, but the startup entry couldn't be changed: {e}"));
+        out.text = format!("{}\nwarning: the startup entry couldn't be changed: {e}", out.text);
+    }
+    out
 }
 
 fn macro_cmd(args: &Args) -> Output {
