@@ -20,7 +20,7 @@ POLICY_NAME="io.github.asafelobotomy.emobie.inputd.policy"
 RULES_DST="/etc/udev/rules.d/${RULES_NAME}"
 # The package ships the action in /usr/share; Grant from an AppImage or build puts
 # its copy where packages never write, so installing the package later can't
-# conflict with it. Polkit only reads /usr/local/share since 124: older ones get
+# conflict with it, when polkitd reads /usr/local/share (recent versions); older ones get
 # /usr/share.
 POLICY_PKG="/usr/share/polkit-1/actions/${POLICY_NAME}"
 POLICY_LOCAL="/usr/local/share/polkit-1/actions/${POLICY_NAME}"
