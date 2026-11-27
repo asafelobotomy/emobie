@@ -4,6 +4,7 @@ mod guard;
 mod inject;
 mod keymap;
 mod listen;
+mod lock_sync;
 mod matcher;
 mod paste_chord;
 mod protocol;

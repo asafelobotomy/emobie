@@ -18,6 +18,9 @@ const PRE_ERASE_DELAY: Duration = Duration::from_millis(12);
 /// the existing failure-recovery path. Bound the staleness window instead of
 /// relying on an error that may never come.
 pub(super) const UINPUT_MAX_IDLE: Duration = Duration::from_secs(300);
+/// On Hyprland the device is closed after this long without a job (see crate::lock_sync), and
+/// opened again for the next one. Long enough that a burst of pastes reuses one device.
+pub(super) const UINPUT_IDLE_CLOSE: Duration = Duration::from_secs(15);
 
 fn paste_chords(kbd: &mut UInputKeyboard) -> Result<(), String> {
     // Best-effort focused-window detection picks the chord (Ctrl+V by
