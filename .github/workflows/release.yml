@@ -23,6 +23,7 @@ jobs:
   prepare:
     name: Resolve version
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     outputs:
       version: ${{ steps.meta.outputs.version }}
       tag: ${{ steps.meta.outputs.tag }}
@@ -70,6 +71,7 @@ jobs:
     name: Build Linux packages
     needs: prepare
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -233,6 +235,7 @@ jobs:
     name: Build Flatpak bundle
     needs: [prepare, build-linux]
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
       options: --privileged
@@ -274,6 +277,7 @@ jobs:
     name: Publish GitHub Release
     needs: [prepare, build-linux, build-flatpak]
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     permissions:
       contents: write
     steps:
@@ -404,6 +408,7 @@ jobs:
   aur:
     needs: [prepare, release]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     container: archlinux:base-devel
     permissions:
       contents: read
